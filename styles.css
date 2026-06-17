@@ -116,8 +116,8 @@ button { cursor: pointer; }
 }
 
 .auth-card {
-  width: min(440px, 100%);
-  padding: 34px;
+  width: min(420px, 100%);
+  padding: 34px 30px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   background: #18191f;
@@ -126,18 +126,31 @@ button { cursor: pointer; }
 }
 
 .auth-card h1 {
-  margin-top: 24px;
+  margin: 22px 0 6px;
   font-size: 24px;
+  text-align: center;
 }
 
-.auth-card p { color: #a7adbb; }
+.auth-card p {
+  color: #a7adbb;
+  text-align: center;
+}
 
 .auth-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 12px;
   color: #ffffff;
   font-weight: 800;
+  text-align: center;
+}
+
+.auth-brand .brand-mark {
+  width: 52px;
+  height: 52px;
+  font-size: 18px;
 }
 
 .brand-row {
@@ -163,7 +176,7 @@ button { cursor: pointer; }
 .auth-form {
   display: grid;
   gap: 16px;
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .auth-form label {
@@ -186,36 +199,57 @@ button { cursor: pointer; }
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
 }
 
-.auth-mode {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 22px;
-  padding: 4px;
-  border-radius: 8px;
-  background: #22242c;
-}
-
-.auth-mode .segment {
-  color: #a7adbb;
-}
-
-.auth-mode .segment.active {
-  background: #31333d;
-  color: #ffffff;
-  box-shadow: none;
-}
-
 .auth-message {
   min-height: 20px;
   color: #fca5a5;
   font-size: 14px;
   font-weight: 700;
+  text-align: left;
+}
+
+.auth-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: -2px;
+}
+
+.remember-option {
+  display: inline-flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 8px !important;
+  color: #a7adbb !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.remember-option input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #60a5fa;
+}
+
+.link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #e5e7eb;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link-button:hover {
+  color: #ffffff;
 }
 
 .auth-actions {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .auth-actions .primary-button {
@@ -225,6 +259,44 @@ button { cursor: pointer; }
 }
 
 .auth-actions .primary-button:hover { background: #ffffff; }
+
+.google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #24252d;
+  color: #f8fafc;
+  font-weight: 800;
+}
+
+.google-button:hover {
+  background: #2c2e38;
+}
+
+.google-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #2563eb;
+  font-weight: 900;
+}
+
+.auth-switch {
+  margin: 22px 0 0;
+  font-size: 12px;
+}
+
+.auth-switch .link-button {
+  margin-left: 4px;
+}
 
 .app-shell {
   display: grid;

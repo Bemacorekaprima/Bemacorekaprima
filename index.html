@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260617224500">
+  <link rel="stylesheet" href="styles.css?v=20260617230000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -58,11 +58,6 @@
       <h1 id="authTitle">Masuk</h1>
       <p id="authHint">Masuk untuk membuka dashboard tugas dan laporan.</p>
 
-      <div class="auth-mode">
-        <button class="segment active" type="button" id="loginModeButton">Masuk</button>
-        <button class="segment" type="button" id="registerModeButton">Daftar</button>
-      </div>
-
       <form id="authForm" class="auth-form">
         <p id="authMessage" class="auth-message"></p>
         <label>Email
@@ -71,10 +66,26 @@
         <label>Password
           <input id="authPassword" type="password" required placeholder="Minimal 6 karakter">
         </label>
+        <div id="loginOptions" class="auth-options">
+          <label class="remember-option">
+            <input id="rememberMe" type="checkbox">
+            <span>Ingat saya</span>
+          </label>
+          <button class="link-button" type="button" id="forgotPasswordButton">Lupa password?</button>
+        </div>
         <div class="auth-actions">
           <button class="primary-button" type="submit" id="authSubmitButton">Masuk</button>
+          <button class="google-button" type="button" id="googleLoginButton">
+            <span class="google-mark">G</span>
+            <span>Lanjutkan dengan Google</span>
+          </button>
         </div>
       </form>
+      <p class="auth-switch">
+        <span id="authSwitchText">Belum punya akun?</span>
+        <button class="link-button" type="button" id="registerModeButton">Daftar</button>
+        <button class="link-button hidden" type="button" id="loginModeButton">Masuk</button>
+      </p>
     </section>
   </div>
 
@@ -299,7 +310,7 @@
     </div>
   </dialog>
 
-  <script src="firebase-config.js?v=20260617224500"></script>
-  <script type="module" src="app.js?v=20260617224500"></script>
+  <script src="firebase-config.js?v=20260617230000"></script>
+  <script type="module" src="app.js?v=20260617230000"></script>
 </body>
 </html>

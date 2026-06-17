@@ -3,6 +3,9 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
@@ -25,6 +28,7 @@ if (!firebaseConfig || firebaseConfig.apiKey === "ISI_API_KEY_ANDA") {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
 let currentUser = null;
@@ -51,6 +55,8 @@ function bindControls() {
   document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
   document.getElementById("loginModeButton").addEventListener("click", () => setAuthMode("login"));
   document.getElementById("registerModeButton").addEventListener("click", () => setAuthMode("register"));
+  document.getElementById("forgotPasswordButton").addEventListener("click", handleForgotPassword);
+  document.getElementById("googleLoginButton").addEventListener("click", handleGoogleLogin);
   document.getElementById("logoutButton").addEventListener("click", () => signOut(auth));
   document.getElementById("newTaskButton").addEventListener("click", openTaskModal);
   document.getElementById("newTaskButtonTable").addEventListener("click", openTaskModal);
@@ -118,8 +124,10 @@ function setAuthMode(mode) {
     ? "Buat akun baru dengan email dan password."
     : "Masuk untuk membuka dashboard tugas dan laporan.";
   document.getElementById("authSubmitButton").textContent = isRegister ? "Daftar" : "Masuk";
-  document.getElementById("loginModeButton").classList.toggle("active", !isRegister);
-  document.getElementById("registerModeButton").classList.toggle("active", isRegister);
+  document.getElementById("loginOptions").classList.toggle("hidden", isRegister);
+  document.getElementById("authSwitchText").textContent = isRegister ? "Sudah punya akun?" : "Belum punya akun?";
+  document.getElementById("loginModeButton").classList.toggle("hidden", !isRegister);
+  document.getElementById("registerModeButton").classList.toggle("hidden", isRegister);
 }
 
 function handleAuthSubmit(event) {
@@ -159,6 +167,33 @@ async function handleRegister() {
   }
 }
 
+async function handleForgotPassword() {
+  const email = document.getElementById("authEmail").value.trim();
+  if (!email) {
+    setAuthMessage("Isi email dulu, lalu klik Lupa password.");
+    document.getElementById("authEmail").focus();
+    return;
+  }
+
+  setAuthMessage("Mengirim link reset password...");
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setAuthMessage("Link reset password sudah dikirim ke email.");
+  } catch (error) {
+    setAuthMessage(getAuthErrorMessage(error));
+  }
+}
+
+async function handleGoogleLogin() {
+  setAuthMessage("Membuka login Google...");
+  try {
+    await signInWithPopup(auth, googleProvider);
+    setAuthMessage("");
+  } catch (error) {
+    setAuthMessage(getAuthErrorMessage(error));
+  }
+}
+
 function setAuthMessage(message) {
   document.getElementById("authMessage").textContent = message;
 }
@@ -172,6 +207,8 @@ function getAuthErrorMessage(error) {
   if (code.includes("email-already-in-use")) return "Email ini sudah terdaftar. Pilih Masuk.";
   if (code.includes("weak-password")) return "Password minimal 6 karakter.";
   if (code.includes("invalid-email")) return "Format email belum benar.";
+  if (code.includes("popup-closed-by-user")) return "Login Google dibatalkan.";
+  if (code.includes("operation-not-allowed")) return "Provider login ini belum diaktifkan di Firebase Authentication.";
   return error.message || "Terjadi masalah login.";
 }
 
