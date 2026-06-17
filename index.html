@@ -55,15 +55,19 @@
         <div>
           <h1 id="pageTitle">Dashboard</h1>
           <p id="todayText"></p>
+          <p id="syncStatus" class="sync-status">Menunggu login...</p>
         </div>
         <div class="top-actions">
           <input id="searchInput" type="search" placeholder="Cari tugas atau catatan">
+          <button class="secondary-button" id="exportCsvButton">Export CSV</button>
           <button class="secondary-button" id="sendAllButton">Kirim Reminder</button>
           <button class="primary-button" id="newTaskButton">+ Tugas Baru</button>
         </div>
       </header>
 
       <section id="dashboardView" class="view active">
+        <section id="attentionBanner" class="attention-banner hidden"></section>
+
         <section class="stats-grid">
           <article class="stat-card"><span>Total</span><strong id="statTotal">0</strong></article>
           <article class="stat-card green"><span>Selesai</span><strong id="statDone">0</strong></article>
@@ -103,6 +107,10 @@
             </div>
           </div>
           <aside class="right-panel">
+            <section class="panel">
+              <h2>Fokus Hari Ini</h2>
+              <div id="focusList" class="focus-list"></div>
+            </section>
             <section class="panel">
               <h2>Ringkasan Laporan</h2>
               <div id="reportPreview" class="report-preview">Belum ada laporan dibuat pada sesi ini.</div>
@@ -249,4 +257,3 @@
   <script type="module" src="app.js"></script>
 </body>
 </html>
-

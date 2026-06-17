@@ -36,7 +36,8 @@ let state = {
   reports: [],
   today: getToday(),
   filter: "all",
-  activeView: "dashboard"
+  activeView: "dashboard",
+  syncMessage: "Menunggu login..."
 };
 
 const statusToList = {
@@ -58,6 +59,7 @@ function bindControls() {
   document.getElementById("closeTaskModalButton").addEventListener("click", closeTaskModal);
   document.getElementById("createReportButton").addEventListener("click", createReport);
   document.getElementById("createReportButtonReports").addEventListener("click", createReport);
+  document.getElementById("exportCsvButton").addEventListener("click", exportTasksCsv);
   document.getElementById("sendAllButton").addEventListener("click", sendAllReminders);
   document.getElementById("sendSelectedButton").addEventListener("click", sendSelectedReminders);
   document.getElementById("closePreviewModalButton").addEventListener("click", closePreviewModal);
@@ -88,7 +90,16 @@ onAuthStateChanged(auth, user => {
 
   if (user) {
     document.getElementById("userEmail").textContent = user.email;
+    state.tasks = loadCachedTasks(user.uid);
+    state.syncMessage = state.tasks.length
+      ? "Menampilkan cadangan lokal. Sinkronisasi Firebase berjalan..."
+      : "Memuat data dari Firebase...";
+    render();
     watchTasks(user.uid);
+  } else {
+    state.tasks = [];
+    state.syncMessage = "Menunggu login...";
+    render();
   }
 });
 
@@ -125,9 +136,22 @@ function watchTasks(uid) {
   );
 
   unsubscribeTasks = onSnapshot(tasksQuery, snapshot => {
-    state.tasks = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    const remoteTasks = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    const cachedTasks = loadCachedTasks(uid);
+
+    if (!remoteTasks.length && cachedTasks.length) {
+      state.tasks = cachedTasks;
+      state.syncMessage = "Firebase belum mengirim data. Menampilkan cadangan lokal terakhir.";
+    } else {
+      state.tasks = remoteTasks;
+      saveTasksToCache(uid, state.tasks);
+      state.syncMessage = "Tersinkron dengan Firebase.";
+    }
     render();
   }, error => {
+    state.tasks = loadCachedTasks(uid);
+    state.syncMessage = "Firebase gagal dibaca. Menampilkan cadangan lokal.";
+    render();
     alert(error.message);
   });
 }
@@ -140,7 +164,10 @@ function render() {
   renderReports();
   renderRecipients();
   renderAgenda();
+  renderFocusList();
+  renderAttentionBanner();
   document.getElementById("todayText").textContent = `Hari ini: ${formatHumanDate(state.today)}`;
+  document.getElementById("syncStatus").textContent = state.syncMessage;
   document.getElementById("emailBridgeStatus").textContent = window.EMAIL_BRIDGE_URL
     ? "Email bridge aktif. Pengiriman email memakai Apps Script."
     : "Belum aktif. Tombol email akan membuka aplikasi email melalui mailto.";
@@ -198,6 +225,8 @@ function renderTasksTable() {
           <td>${escapeHtml(task.deadline || "-")}</td>
           <td>${escapeHtml(task.penanggungJawab || "-")}<small>${escapeHtml(task.emailPenanggungJawab || "")}</small></td>
           <td class="table-actions">
+            ${task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
+            ${task.status !== "Selesai" ? `<button class="link-button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
             <button class="link-button" data-action="preview" data-id="${task.id}">Preview</button>
             <button class="link-button" data-action="email" data-id="${task.id}">Email</button>
             <button class="link-button" data-action="edit" data-id="${task.id}">Edit</button>
@@ -241,6 +270,48 @@ function renderAgenda() {
     : "Tidak ada agenda aktif.";
 }
 
+function renderFocusList() {
+  const focusTasks = getFocusTasks().slice(0, 5);
+  const list = document.getElementById("focusList");
+  list.innerHTML = focusTasks.length
+    ? focusTasks.map(task => {
+        const urgency = getUrgency(task);
+        return `
+          <article class="focus-item">
+            <div>
+              <strong>${escapeHtml(task.namaTugas)}</strong>
+              <small>${escapeHtml(task.deadline || task.tanggal || "-")}</small>
+            </div>
+            <span class="urgency ${urgency.className}">${urgency.label}</span>
+          </article>
+        `;
+      }).join("")
+    : "<p>Tidak ada tugas yang perlu difokuskan.</p>";
+}
+
+function renderAttentionBanner() {
+  const activeTasks = state.tasks.filter(task => task.status !== "Selesai").map(task => ({ ...task, terlambat: isOverdue(task) }));
+  const late = activeTasks.filter(task => task.terlambat).length;
+  const today = activeTasks.filter(task => task.tanggal === state.today).length;
+  const high = activeTasks.filter(task => task.prioritas === "Tinggi").length;
+  const banner = document.getElementById("attentionBanner");
+
+  if (!late && !today && !high) {
+    banner.classList.add("hidden");
+    banner.innerHTML = "";
+    return;
+  }
+
+  banner.classList.remove("hidden");
+  banner.innerHTML = `
+    <div>
+      <strong>Perhatian hari ini</strong>
+      <p>${late} terlambat, ${today} dijadwalkan hari ini, ${high} prioritas tinggi.</p>
+    </div>
+    <button class="secondary-button" data-filter-shortcut="late">Lihat Terlambat</button>
+  `;
+}
+
 function getFilteredTasks(useUi) {
   const keyword = useUi ? document.getElementById("searchInput").value.toLowerCase() : "";
   const status = useUi ? document.getElementById("statusFilter").value : "all";
@@ -262,6 +333,7 @@ function taskCard(task) {
   const priorityClass = `priority-${String(task.prioritas || "").toLowerCase()}`;
   const lateChip = task.terlambat ? '<span class="chip late">Terlambat</span>' : "";
   const preview = buildTaskPreview(task);
+  const urgency = getUrgency(task);
 
   return `
     <article class="task-card">
@@ -270,6 +342,7 @@ function taskCard(task) {
         <div class="task-meta">
           <span class="chip ${priorityClass}">${escapeHtml(task.prioritas)}</span>
           <span class="chip">${escapeHtml(task.status)}</span>
+          <span class="urgency ${urgency.className}">${urgency.label}</span>
           ${lateChip}
         </div>
       </div>
@@ -281,6 +354,8 @@ function taskCard(task) {
       <div class="task-preview">${escapeHtml(preview)}</div>
       <p>${escapeHtml(task.catatan || "")}</p>
       <div class="card-actions">
+        ${task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
+        ${task.status !== "Selesai" ? `<button class="link-button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
         <button class="link-button" data-action="preview" data-id="${task.id}">Preview</button>
         <button class="link-button" data-action="email" data-id="${task.id}">Email</button>
         <button class="link-button" data-action="edit" data-id="${task.id}">Edit</button>
@@ -291,6 +366,16 @@ function taskCard(task) {
 }
 
 document.addEventListener("click", event => {
+  const filterShortcut = event.target.closest("[data-filter-shortcut]");
+  if (filterShortcut) {
+    state.filter = filterShortcut.dataset.filterShortcut;
+    document.querySelectorAll(".segment").forEach(item => {
+      item.classList.toggle("active", item.dataset.filter === state.filter);
+    });
+    render();
+    return;
+  }
+
   const button = event.target.closest("[data-action]");
   if (button) bindTaskAction(button, true);
 });
@@ -301,6 +386,8 @@ function bindTaskAction(button, runNow = false) {
   if (!runNow) return;
   if (action === "preview") previewTask(id);
   if (action === "email") sendTaskEmail(id);
+  if (action === "start") setTaskStatus(id, "Proses");
+  if (action === "done") setTaskStatus(id, "Selesai");
   if (action === "edit") editTask(id);
   if (action === "delete") removeTask(id);
 }
@@ -344,9 +431,14 @@ async function saveTask(event) {
   try {
     if (id) {
       await updateDoc(doc(db, "tasks", id), payload);
+      updateTaskCache(currentUser.uid, { id, ...payload });
     } else {
-      await addDoc(collection(db, "tasks"), { ...payload, createdAt: serverTimestamp() });
+      const newTask = await addDoc(collection(db, "tasks"), { ...payload, createdAt: serverTimestamp() });
+      updateTaskCache(currentUser.uid, { id: newTask.id, ...payload });
     }
+    state.syncMessage = "Tugas berhasil disimpan.";
+    state.tasks = loadCachedTasks(currentUser.uid);
+    render();
     closeTaskModal();
   } catch (error) {
     alert(error.message);
@@ -373,6 +465,26 @@ async function removeTask(id) {
   if (!confirm("Hapus tugas ini?")) return;
   try {
     await deleteDoc(doc(db, "tasks", id));
+    removeTaskFromCache(currentUser.uid, id);
+    state.tasks = loadCachedTasks(currentUser.uid);
+    state.syncMessage = "Tugas berhasil dihapus.";
+    render();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function setTaskStatus(id, status) {
+  try {
+    await updateDoc(doc(db, "tasks", id), {
+      status,
+      updatedAt: serverTimestamp()
+    });
+    const task = state.tasks.find(item => item.id === id);
+    if (task) updateTaskCache(currentUser.uid, { ...task, status });
+    state.tasks = loadCachedTasks(currentUser.uid);
+    state.syncMessage = `Status tugas diubah ke ${status}.`;
+    render();
   } catch (error) {
     alert(error.message);
   }
@@ -468,6 +580,31 @@ function createReport() {
   renderReports();
 }
 
+function exportTasksCsv() {
+  const tasks = getFilteredTasks(false);
+  if (!tasks.length) return alert("Belum ada tugas untuk diekspor.");
+
+  const headers = ["Tanggal", "Nama Tugas", "Prioritas", "Status", "Deadline", "Penanggung Jawab", "Email", "Catatan"];
+  const rows = tasks.map(task => [
+    task.tanggal,
+    task.namaTugas,
+    task.prioritas,
+    task.status,
+    task.deadline,
+    task.penanggungJawab,
+    task.emailPenanggungJawab,
+    task.catatan
+  ]);
+  const csv = [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `asisten-harian-${state.today}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function buildStats(tasks) {
   const normalized = tasks.map(task => ({ ...task, terlambat: isOverdue(task) }));
   return {
@@ -478,6 +615,27 @@ function buildStats(tasks) {
     tertunda: normalized.filter(task => task.status === "Tertunda").length,
     terlambat: normalized.filter(task => task.terlambat).length
   };
+}
+
+function getFocusTasks() {
+  return state.tasks
+    .filter(task => task.status !== "Selesai")
+    .map(task => ({ ...task, terlambat: isOverdue(task) }))
+    .sort((a, b) => {
+      const scoreA = getUrgency(a).score;
+      const scoreB = getUrgency(b).score;
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return String(a.deadline || a.tanggal || "").localeCompare(String(b.deadline || b.tanggal || ""));
+    });
+}
+
+function getUrgency(task) {
+  if (task.terlambat || isOverdue(task)) return { label: "Mendesak", className: "urgency-late", score: 4 };
+  if (String(task.deadline || "").startsWith(state.today) || task.tanggal === state.today) {
+    return { label: "Hari Ini", className: "urgency-today", score: 3 };
+  }
+  if (task.prioritas === "Tinggi") return { label: "Prioritas", className: "urgency-high", score: 2 };
+  return { label: "Normal", className: "urgency-normal", score: 1 };
 }
 
 function buildEmailBody(tasks) {
@@ -491,6 +649,55 @@ function buildTaskPreview(task) {
   return [task.deadline ? `Deadline ${task.deadline}` : "", task.penanggungJawab ? `PJ ${task.penanggungJawab}` : "", task.catatan || ""]
     .filter(Boolean)
     .join(" - ") || "Tidak ada detail tambahan.";
+}
+
+function csvCell(value) {
+  return `"${String(value || "").replaceAll('"', '""')}"`;
+}
+
+function getCacheKey(uid) {
+  return `asisten-harian.tasks.${uid}`;
+}
+
+function loadCachedTasks(uid) {
+  if (!uid) return [];
+  try {
+    return JSON.parse(localStorage.getItem(getCacheKey(uid)) || "[]");
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveTasksToCache(uid, tasks) {
+  if (!uid) return;
+  const cleanTasks = tasks.map(task => ({
+    id: task.id,
+    ownerUid: task.ownerUid,
+    tanggal: task.tanggal || "",
+    namaTugas: task.namaTugas || "",
+    prioritas: task.prioritas || "Sedang",
+    status: task.status || "Belum Selesai",
+    deadline: task.deadline || "",
+    penanggungJawab: task.penanggungJawab || "",
+    emailPenanggungJawab: task.emailPenanggungJawab || "",
+    catatan: task.catatan || ""
+  }));
+  localStorage.setItem(getCacheKey(uid), JSON.stringify(cleanTasks));
+}
+
+function updateTaskCache(uid, task) {
+  const tasks = loadCachedTasks(uid);
+  const index = tasks.findIndex(item => item.id === task.id);
+  if (index >= 0) {
+    tasks[index] = { ...tasks[index], ...task };
+  } else {
+    tasks.unshift(task);
+  }
+  saveTasksToCache(uid, tasks);
+}
+
+function removeTaskFromCache(uid, id) {
+  saveTasksToCache(uid, loadCachedTasks(uid).filter(task => task.id !== id));
 }
 
 function isOverdue(task) {
@@ -514,4 +721,3 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
-
