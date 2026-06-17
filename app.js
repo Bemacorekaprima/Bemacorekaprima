@@ -15,7 +15,6 @@ import {
   doc,
   onSnapshot,
   query,
-  where,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -95,12 +94,12 @@ onAuthStateChanged(auth, user => {
 
   if (user) {
     document.getElementById("userEmail").textContent = user.email;
-    state.tasks = loadCachedTasks(user);
+    state.tasks = loadCachedTasks();
     state.syncMessage = state.tasks.length
       ? "Menampilkan cadangan lokal. Sinkronisasi Firebase berjalan..."
       : "Memuat data dari Firebase...";
     render();
-    watchTasks(user.uid);
+    watchTasks();
   } else {
     state.tasks = [];
     state.syncMessage = "Menunggu login...";
@@ -174,29 +173,26 @@ function getAuthErrorMessage(error) {
   return error.message || "Terjadi masalah login.";
 }
 
-function watchTasks(uid) {
-  const tasksQuery = query(
-    collection(db, "tasks"),
-    where("ownerUid", "==", uid)
-  );
+function watchTasks() {
+  const tasksQuery = query(collection(db, "tasks"));
 
   unsubscribeTasks = onSnapshot(tasksQuery, snapshot => {
     const remoteTasks = snapshot.docs
       .map(item => ({ id: item.id, ...item.data() }))
       .sort((a, b) => String(b.tanggal || "").localeCompare(String(a.tanggal || "")));
-    const cachedTasks = loadCachedTasks(currentUser || uid);
+    const cachedTasks = loadCachedTasks();
 
     if (!remoteTasks.length && cachedTasks.length) {
       state.tasks = cachedTasks;
       state.syncMessage = "Firebase belum mengirim data. Menampilkan cadangan lokal terakhir.";
     } else {
       state.tasks = remoteTasks;
-      saveTasksToCache(currentUser || uid, state.tasks);
-      state.syncMessage = "Tersinkron dengan Firebase.";
+      saveTasksToCache(state.tasks);
+      state.syncMessage = "Tersinkron dengan Firebase. Semua akun melihat tugas bersama.";
     }
     render();
   }, error => {
-    state.tasks = loadCachedTasks(currentUser || uid);
+    state.tasks = loadCachedTasks();
     state.syncMessage = "Firebase gagal dibaca. Menampilkan cadangan lokal.";
     render();
     alert(error.message);
@@ -474,6 +470,7 @@ async function saveTask(event) {
   const id = document.getElementById("taskId").value;
   const payload = {
     ownerUid: currentUser.uid,
+    dibuatOleh: currentUser.email || "",
     tanggal: document.getElementById("taskDate").value,
     namaTugas: document.getElementById("taskName").value.trim(),
     prioritas: document.getElementById("taskPriority").value,
@@ -487,23 +484,23 @@ async function saveTask(event) {
 
   try {
     if (id) {
-      updateTaskCache(currentUser, { id, ...payload });
-      state.tasks = loadCachedTasks(currentUser);
+      updateTaskCache({ id, ...payload });
+      state.tasks = loadCachedTasks();
       state.syncMessage = "Tugas disimpan di perangkat. Mengirim ke Firebase...";
       render();
       closeTaskModal();
       await updateDoc(doc(db, "tasks", id), payload);
     } else {
       const taskRef = doc(collection(db, "tasks"));
-      updateTaskCache(currentUser, { id: taskRef.id, ...payload });
-      state.tasks = loadCachedTasks(currentUser);
+      updateTaskCache({ id: taskRef.id, ...payload });
+      state.tasks = loadCachedTasks();
       state.syncMessage = "Tugas disimpan di perangkat. Mengirim ke Firebase...";
       render();
       closeTaskModal();
       await setDoc(taskRef, { ...payload, createdAt: serverTimestamp() });
     }
     state.syncMessage = "Tugas berhasil disimpan dan tersinkron.";
-    state.tasks = loadCachedTasks(currentUser);
+    state.tasks = loadCachedTasks();
     render();
   } catch (error) {
     state.syncMessage = "Firebase gagal menyimpan. Tugas tetap ada di cadangan lokal perangkat ini.";
@@ -531,8 +528,8 @@ function editTask(id) {
 async function removeTask(id) {
   if (!confirm("Hapus tugas ini?")) return;
   try {
-    removeTaskFromCache(currentUser, id);
-    state.tasks = loadCachedTasks(currentUser);
+    removeTaskFromCache(id);
+    state.tasks = loadCachedTasks();
     state.syncMessage = "Tugas dihapus dari perangkat. Mengirim ke Firebase...";
     render();
     await deleteDoc(doc(db, "tasks", id));
@@ -547,8 +544,8 @@ async function setTaskStatus(id, status) {
   try {
     const task = state.tasks.find(item => item.id === id);
     if (task) {
-      updateTaskCache(currentUser, { ...task, status });
-      state.tasks = loadCachedTasks(currentUser);
+      updateTaskCache({ ...task, status });
+      state.tasks = loadCachedTasks();
       state.syncMessage = `Status tugas diubah ke ${status}. Mengirim ke Firebase...`;
       render();
     }
@@ -730,40 +727,19 @@ function csvCell(value) {
   return `"${String(value || "").replaceAll('"', '""')}"`;
 }
 
-function getCacheKeys(userOrUid) {
-  const fallbackKey = "asisten-harian.tasks.last";
-  if (!userOrUid) return [fallbackKey];
-  if (typeof userOrUid === "string") return [`asisten-harian.tasks.${userOrUid}`, fallbackKey];
-
-  const keys = [fallbackKey];
-  if (userOrUid.uid) keys.push(`asisten-harian.tasks.${userOrUid.uid}`);
-  if (userOrUid.email) keys.push(`asisten-harian.tasks.email.${userOrUid.email.toLowerCase()}`);
-  return [...new Set(keys)];
+function loadCachedTasks() {
+  try {
+    return JSON.parse(localStorage.getItem("asisten-harian.tasks.shared") || "[]");
+  } catch (error) {
+    return [];
+  }
 }
 
-function loadCachedTasks(userOrUid) {
-  const keys = getCacheKeys(userOrUid);
-  if (!keys.length) return [];
-
-  let bestTasks = [];
-  keys.forEach(key => {
-    try {
-      const tasks = JSON.parse(localStorage.getItem(key) || "[]");
-      if (tasks.length > bestTasks.length) bestTasks = tasks;
-    } catch (error) {
-      // Abaikan cache rusak dan lanjutkan kunci berikutnya.
-    }
-  });
-  return bestTasks;
-}
-
-function saveTasksToCache(userOrUid, tasks) {
-  const keys = getCacheKeys(userOrUid);
-  if (!keys.length) return;
-
+function saveTasksToCache(tasks) {
   const cleanTasks = tasks.map(task => ({
     id: task.id,
     ownerUid: task.ownerUid,
+    dibuatOleh: task.dibuatOleh || "",
     tanggal: task.tanggal || "",
     namaTugas: task.namaTugas || "",
     prioritas: task.prioritas || "Sedang",
@@ -774,24 +750,22 @@ function saveTasksToCache(userOrUid, tasks) {
     catatan: task.catatan || ""
   }));
 
-  keys.forEach(key => {
-    localStorage.setItem(key, JSON.stringify(cleanTasks));
-  });
+  localStorage.setItem("asisten-harian.tasks.shared", JSON.stringify(cleanTasks));
 }
 
-function updateTaskCache(userOrUid, task) {
-  const tasks = loadCachedTasks(userOrUid);
+function updateTaskCache(task) {
+  const tasks = loadCachedTasks();
   const index = tasks.findIndex(item => item.id === task.id);
   if (index >= 0) {
     tasks[index] = { ...tasks[index], ...task };
   } else {
     tasks.unshift(task);
   }
-  saveTasksToCache(userOrUid, tasks);
+  saveTasksToCache(tasks);
 }
 
-function removeTaskFromCache(userOrUid, id) {
-  saveTasksToCache(userOrUid, loadCachedTasks(userOrUid).filter(task => task.id !== id));
+function removeTaskFromCache(id) {
+  saveTasksToCache(loadCachedTasks().filter(task => task.id !== id));
 }
 
 function loadLegacyCache(uid) {
