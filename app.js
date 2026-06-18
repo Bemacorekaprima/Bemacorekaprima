@@ -6,12 +6,14 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
+  updateProfile,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
   getFirestore,
   collection,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -32,7 +34,9 @@ const googleProvider = new GoogleAuthProvider();
 const db = getFirestore(app);
 
 let currentUser = null;
+let currentProfile = null;
 let unsubscribeTasks = null;
+let welcomeTimer = null;
 let state = {
   tasks: [],
   reports: [],
@@ -57,7 +61,16 @@ function bindControls() {
   document.getElementById("registerModeButton").addEventListener("click", () => setAuthMode("register"));
   document.getElementById("forgotPasswordButton").addEventListener("click", handleForgotPassword);
   document.getElementById("googleLoginButton").addEventListener("click", handleGoogleLogin);
-  document.getElementById("logoutButton").addEventListener("click", () => signOut(auth));
+  document.getElementById("logoutButton").addEventListener("click", handleLogout);
+  document.getElementById("profileMenuButton").addEventListener("click", toggleProfileMenu);
+  document.getElementById("openProfileButton").addEventListener("click", openProfileModal);
+  document.getElementById("profileResetPasswordButton").addEventListener("click", handleProfilePasswordReset);
+  document.getElementById("profileForm").addEventListener("submit", saveProfile);
+  document.getElementById("closeProfileModalButton").addEventListener("click", closeProfileModal);
+  document.getElementById("cancelProfileButton").addEventListener("click", closeProfileModal);
+  document.getElementById("closeWelcomeToast").addEventListener("click", hideWelcomeToast);
+  document.getElementById("profileDisplayName").addEventListener("input", updateProfilePreview);
+  document.getElementById("profileNickname").addEventListener("input", updateProfilePreview);
   document.getElementById("newTaskButton").addEventListener("click", openTaskModal);
   document.getElementById("newTaskButtonTable").addEventListener("click", openTaskModal);
   document.getElementById("taskForm").addEventListener("submit", saveTask);
@@ -91,7 +104,7 @@ function bindControls() {
   });
 }
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   currentUser = user;
   document.body.classList.remove("auth-pending");
   document.getElementById("loadingView").classList.add("hidden");
@@ -102,17 +115,26 @@ onAuthStateChanged(auth, user => {
 
   if (user) {
     document.getElementById("userEmail").textContent = user.email;
+    currentProfile = await loadUserProfile(user);
+    renderUserProfile();
     state.tasks = loadCachedTasks();
     state.syncMessage = state.tasks.length
       ? "Menampilkan cadangan lokal. Sinkronisasi Firebase berjalan..."
       : "Memuat data dari Firebase...";
     render();
     watchTasks();
+    showWelcomeToast();
   } else {
+    currentProfile = null;
     state.tasks = [];
     state.syncMessage = "Menunggu login...";
     render();
   }
+});
+
+document.addEventListener("click", event => {
+  const profileWrap = event.target.closest(".sidebar-profile-wrap");
+  if (!profileWrap) closeProfileMenu();
 });
 
 function setAuthMode(mode) {
@@ -192,6 +214,174 @@ async function handleGoogleLogin() {
   } catch (error) {
     setAuthMessage(getAuthErrorMessage(error));
   }
+}
+
+async function handleLogout() {
+  if (currentUser) sessionStorage.removeItem(`asisten-harian.welcome.${currentUser.uid}`);
+  closeProfileMenu();
+  await signOut(auth);
+}
+
+function getDefaultProfile(user) {
+  const emailName = String(user.email || "Pengguna").split("@")[0];
+  const displayName = user.displayName || emailName;
+  return {
+    displayName,
+    nickname: displayName.split(/\s+/)[0] || emailName,
+    gender: "",
+    role: "",
+    bio: "",
+    avatarUrl: user.photoURL || "",
+    email: user.email || ""
+  };
+}
+
+async function loadUserProfile(user) {
+  const fallback = getDefaultProfile(user);
+  const cached = loadProfileCache(user.uid);
+
+  try {
+    const snapshot = await getDoc(doc(db, "profiles", user.uid));
+    if (!snapshot.exists()) return { ...fallback, ...cached };
+    const profile = { ...fallback, ...cached, ...snapshot.data() };
+    saveProfileCache(user.uid, profile);
+    return profile;
+  } catch (error) {
+    return { ...fallback, ...cached };
+  }
+}
+
+function renderUserProfile() {
+  if (!currentUser || !currentProfile) return;
+  const profile = currentProfile;
+  document.getElementById("sidebarNickname").textContent = profile.nickname || profile.displayName;
+  document.getElementById("profileMenuName").textContent = profile.displayName;
+  document.getElementById("profileMenuNickname").textContent = profile.nickname || "";
+  document.getElementById("profileMenuEmail").textContent = currentUser.email || "";
+  setAvatar("sidebarAvatar", profile);
+  setAvatar("profileMenuAvatar", profile);
+  setAvatar("welcomeAvatar", profile);
+}
+
+function toggleProfileMenu() {
+  const popover = document.getElementById("profilePopover");
+  const willOpen = popover.classList.contains("hidden");
+  popover.classList.toggle("hidden", !willOpen);
+  document.getElementById("profileMenuButton").setAttribute("aria-expanded", String(willOpen));
+}
+
+function closeProfileMenu() {
+  document.getElementById("profilePopover").classList.add("hidden");
+  document.getElementById("profileMenuButton").setAttribute("aria-expanded", "false");
+}
+
+function openProfileModal() {
+  if (!currentUser || !currentProfile) return;
+  closeProfileMenu();
+  document.getElementById("profileDisplayName").value = currentProfile.displayName || "";
+  document.getElementById("profileNickname").value = currentProfile.nickname || "";
+  document.getElementById("profileEmail").value = currentUser.email || "";
+  document.getElementById("profileGender").value = currentProfile.gender || "";
+  document.getElementById("profileRole").value = currentProfile.role || "";
+  document.getElementById("profileBio").value = currentProfile.bio || "";
+  updateProfilePreview();
+  document.getElementById("profileModal").showModal();
+}
+
+function closeProfileModal() {
+  document.getElementById("profileModal").close();
+}
+
+function updateProfilePreview() {
+  const displayName = document.getElementById("profileDisplayName").value.trim();
+  const nickname = document.getElementById("profileNickname").value.trim();
+  document.getElementById("profilePreviewNickname").textContent = nickname || displayName || "Pengguna";
+  setAvatar("profilePreviewAvatar", {
+    displayName: displayName || currentProfile?.displayName,
+    nickname: nickname || currentProfile?.nickname,
+    avatarUrl: currentProfile?.avatarUrl
+  });
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  if (!currentUser) return;
+
+  const profile = {
+    displayName: document.getElementById("profileDisplayName").value.trim(),
+    nickname: document.getElementById("profileNickname").value.trim(),
+    gender: document.getElementById("profileGender").value,
+    role: document.getElementById("profileRole").value.trim(),
+    bio: document.getElementById("profileBio").value.trim(),
+    avatarUrl: currentProfile?.avatarUrl || currentUser.photoURL || "",
+    email: currentUser.email || "",
+    updatedAt: serverTimestamp()
+  };
+
+  currentProfile = { ...currentProfile, ...profile };
+  saveProfileCache(currentUser.uid, currentProfile);
+  renderUserProfile();
+  closeProfileModal();
+
+  try {
+    await updateProfile(currentUser, { displayName: profile.displayName });
+    await setDoc(doc(db, "profiles", currentUser.uid), {
+      ...profile,
+      uid: currentUser.uid,
+      createdAt: currentProfile.createdAt || serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    alert("Profil tersimpan pada perangkat ini, tetapi belum tersinkron ke Firebase. Periksa Rules koleksi profiles.");
+  }
+}
+
+async function handleProfilePasswordReset() {
+  if (!currentUser?.email) return;
+  closeProfileMenu();
+  try {
+    await sendPasswordResetEmail(auth, currentUser.email);
+    alert("Link reset password sudah dikirim ke email Anda.");
+  } catch (error) {
+    alert(getAuthErrorMessage(error));
+  }
+}
+
+function showWelcomeToast() {
+  if (!currentUser || !currentProfile) return;
+  const storageKey = `asisten-harian.welcome.${currentUser.uid}`;
+  if (sessionStorage.getItem(storageKey)) return;
+  sessionStorage.setItem(storageKey, "shown");
+
+  const activeCount = state.tasks.filter(task => task.status !== "Selesai").length;
+  document.getElementById("welcomeTitle").textContent =
+    `Selamat datang kembali, ${currentProfile.nickname || currentProfile.displayName}!`;
+  document.getElementById("welcomeMessage").textContent = activeCount
+    ? `Ada ${activeCount} tugas aktif yang perlu diperhatikan hari ini.`
+    : "Semoga pekerjaan hari ini berjalan lancar.";
+
+  const toast = document.getElementById("welcomeToast");
+  toast.classList.remove("hidden", "closing");
+  window.clearTimeout(welcomeTimer);
+  welcomeTimer = window.setTimeout(hideWelcomeToast, 3000);
+}
+
+function hideWelcomeToast() {
+  const toast = document.getElementById("welcomeToast");
+  window.clearTimeout(welcomeTimer);
+  if (toast.classList.contains("hidden")) return;
+  toast.classList.add("closing");
+  window.setTimeout(() => {
+    toast.classList.add("hidden");
+    toast.classList.remove("closing");
+  }, 180);
+}
+
+function setAvatar(elementId, profile) {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  const avatarUrl = String(profile?.avatarUrl || "");
+  element.style.backgroundImage = avatarUrl ? `url(${JSON.stringify(avatarUrl)})` : "";
+  element.textContent = avatarUrl ? "" : getInitials(profile?.nickname || profile?.displayName || "AH");
 }
 
 function setAuthMessage(message) {
@@ -416,6 +606,8 @@ function taskCard(task) {
   const lateChip = task.terlambat ? '<span class="chip late">Terlambat</span>' : "";
   const preview = buildTaskPreview(task);
   const urgency = getUrgency(task);
+  const ownerName = task.penanggungJawab || "Belum ditentukan";
+  const ownerEmail = task.emailPenanggungJawab || "";
 
   return `
     <article class="task-card">
@@ -430,11 +622,16 @@ function taskCard(task) {
       </div>
       <div class="task-meta">
         <span>Deadline: ${escapeHtml(task.deadline || "-")}</span>
-        <span>PJ: ${escapeHtml(task.penanggungJawab || "-")}</span>
-        <span>${escapeHtml(task.emailPenanggungJawab || "")}</span>
       </div>
       <div class="task-preview">${escapeHtml(preview)}</div>
       <p>${escapeHtml(task.catatan || "")}</p>
+      <div class="task-assignee">
+        <span class="user-avatar task-avatar">${escapeHtml(getInitials(ownerName))}</span>
+        <span class="task-assignee-copy">
+          <strong>${escapeHtml(ownerName)}</strong>
+          ${ownerEmail ? `<small>${escapeHtml(ownerEmail)}</small>` : ""}
+        </span>
+      </div>
       <div class="card-actions">
         ${task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
         ${task.status !== "Selesai" ? `<button class="link-button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
@@ -807,6 +1004,27 @@ function removeTaskFromCache(id) {
   saveTasksToCache(loadCachedTasks().filter(task => task.id !== id));
 }
 
+function loadProfileCache(uid) {
+  try {
+    return JSON.parse(localStorage.getItem(`asisten-harian.profile.${uid}`) || "{}");
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveProfileCache(uid, profile) {
+  const cleanProfile = {
+    displayName: profile.displayName || "",
+    nickname: profile.nickname || "",
+    gender: profile.gender || "",
+    role: profile.role || "",
+    bio: profile.bio || "",
+    avatarUrl: profile.avatarUrl || "",
+    email: profile.email || ""
+  };
+  localStorage.setItem(`asisten-harian.profile.${uid}`, JSON.stringify(cleanProfile));
+}
+
 function loadLegacyCache(uid) {
   try {
     return JSON.parse(localStorage.getItem(`asisten-harian.tasks.${uid}`) || "[]");
@@ -826,6 +1044,13 @@ function getToday() {
 function formatHumanDate(value) {
   return new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })
     .format(new Date(value + "T00:00:00"));
+}
+
+function getInitials(value) {
+  const parts = String(value || "AH").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "AH";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function escapeHtml(value) {

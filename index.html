@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260617230000">
+  <link rel="stylesheet" href="styles.css?v=20260618093000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -104,7 +104,28 @@
         <button class="nav-item" data-view="reports">Laporan</button>
         <button class="nav-item" data-view="settings">Pengaturan</button>
       </nav>
-      <button class="ghost-button" id="logoutButton">Keluar</button>
+      <div class="sidebar-profile-wrap">
+        <button class="sidebar-profile" id="profileMenuButton" type="button" aria-expanded="false">
+          <span class="user-avatar user-avatar-small" id="sidebarAvatar">AH</span>
+          <span class="sidebar-profile-copy">
+            <strong id="sidebarNickname">Pengguna</strong>
+            <small>Profil pengguna</small>
+          </span>
+        </button>
+        <section class="profile-popover hidden" id="profilePopover">
+          <header class="profile-popover-header">
+            <span class="user-avatar user-avatar-large" id="profileMenuAvatar">AH</span>
+            <div>
+              <strong id="profileMenuName">Pengguna</strong>
+              <small id="profileMenuNickname"></small>
+              <small id="profileMenuEmail"></small>
+            </div>
+          </header>
+          <button type="button" id="openProfileButton">Edit profil</button>
+          <button type="button" id="profileResetPasswordButton">Ubah password</button>
+          <button type="button" class="danger-menu-button" id="logoutButton">Keluar</button>
+        </section>
+      </div>
     </aside>
 
     <main class="main">
@@ -123,6 +144,15 @@
       </header>
 
       <section id="dashboardView" class="view active">
+        <aside id="welcomeToast" class="welcome-toast hidden" role="status" aria-live="polite">
+          <span class="user-avatar" id="welcomeAvatar">AH</span>
+          <div>
+            <strong id="welcomeTitle">Selamat datang kembali!</strong>
+            <p id="welcomeMessage">Semoga pekerjaan hari ini berjalan lancar.</p>
+          </div>
+          <button type="button" id="closeWelcomeToast" aria-label="Tutup sapaan">x</button>
+        </aside>
+
         <section id="attentionBanner" class="attention-banner hidden"></section>
 
         <section class="stats-grid">
@@ -235,7 +265,7 @@
           </article>
           <article class="panel">
             <h2>Database</h2>
-            <p>Data tersimpan di Firebase Firestore per akun login.</p>
+            <p>Data tugas tersimpan bersama di Firebase Firestore dan dapat dilihat semua akun yang diizinkan.</p>
           </article>
         </section>
       </section>
@@ -310,7 +340,60 @@
     </div>
   </dialog>
 
-  <script src="firebase-config.js?v=20260617230000"></script>
-  <script type="module" src="app.js?v=20260617230000"></script>
+  <dialog id="profileModal">
+    <form method="dialog" class="modal-card profile-modal-card" id="profileForm">
+      <header>
+        <div>
+          <h2>Profil Pengguna</h2>
+          <p>Digunakan untuk avatar, sapaan, dan identitas pengguna.</p>
+        </div>
+        <button type="button" class="icon-button" id="closeProfileModalButton">x</button>
+      </header>
+      <div class="profile-form-layout">
+        <section class="profile-avatar-editor">
+          <span class="user-avatar profile-preview-avatar" id="profilePreviewAvatar">AH</span>
+          <strong id="profilePreviewNickname">Pengguna</strong>
+          <small>Foto Google digunakan otomatis jika tersedia.</small>
+        </section>
+        <section class="profile-fields">
+          <div class="form-grid">
+            <label>Nama Lengkap
+              <input id="profileDisplayName" required placeholder="Nama lengkap">
+            </label>
+            <label>Nama Panggilan
+              <input id="profileNickname" required placeholder="Nama panggilan">
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>Email
+              <input id="profileEmail" type="email" disabled>
+            </label>
+            <label>Gender
+              <select id="profileGender">
+                <option value="">Tidak disebutkan</option>
+                <option>Pria</option>
+                <option>Wanita</option>
+                <option>Lainnya</option>
+              </select>
+            </label>
+          </div>
+          <label>Jabatan / Tim
+            <input id="profileRole" placeholder="Contoh: Administrator">
+          </label>
+          <label>Tentang Saya
+            <textarea id="profileBio" rows="3" placeholder="Peran atau tanggung jawab singkat"></textarea>
+          </label>
+          <p class="profile-privacy-note">Gender bersifat opsional dan tidak ditampilkan pada kartu tugas.</p>
+        </section>
+      </div>
+      <footer>
+        <button type="button" class="secondary-button" id="cancelProfileButton">Batal</button>
+        <button class="primary-button" type="submit">Simpan Profil</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script src="firebase-config.js?v=20260618093000"></script>
+  <script type="module" src="app.js?v=20260618093000"></script>
 </body>
 </html>
