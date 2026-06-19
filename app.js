@@ -204,6 +204,9 @@ function bindControls() {
   document.getElementById("resetPersonnelFilters").addEventListener("click", resetPersonnelFilters);
   document.getElementById("refreshPersonnelButton").addEventListener("click", loadExternalSheetData);
   document.getElementById("exportPersonnelButton").addEventListener("click", exportPersonnelCsv);
+  document.getElementById("exportPersonnelExcelButton").addEventListener("click", exportPersonnelExcel);
+  document.getElementById("exportPersonnelPdfButton").addEventListener("click", exportPersonnelPdf);
+  document.getElementById("personnelToolsButton").addEventListener("click", togglePersonnelToolsMenu);
   document.getElementById("personnelPrevPage").addEventListener("click", () => changePersonnelPage(-1));
   document.getElementById("personnelNextPage").addEventListener("click", () => changePersonnelPage(1));
   document.getElementById("personnelTableBody").addEventListener("click", handlePersonnelTableClick);
@@ -289,6 +292,8 @@ document.addEventListener("click", event => {
   if (!profileWrap) closeProfileMenu();
   const actionDropdown = event.target.closest(".action-dropdown");
   if (!actionDropdown) closeActionMenu();
+  const personnelDropdown = event.target.closest(".personnel-action-dropdown, .personnel-row-dropdown");
+  if (!personnelDropdown) closePersonnelMenus();
   const recipientCombobox = event.target.closest(".recipient-combobox");
   if (!recipientCombobox) closeRecipientCombobox();
 });
@@ -598,6 +603,33 @@ function toggleActionMenu() {
 function closeActionMenu() {
   document.getElementById("actionDropdownMenu").classList.add("hidden");
   document.getElementById("actionMenuButton").setAttribute("aria-expanded", "false");
+}
+
+function togglePersonnelToolsMenu() {
+  const menu = document.getElementById("personnelToolsMenu");
+  const button = document.getElementById("personnelToolsButton");
+  const willOpen = menu.classList.contains("hidden");
+  closePersonnelMenus();
+  menu.classList.toggle("hidden", !willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+
+function closePersonnelMenus() {
+  document.querySelectorAll(".personnel-tools-menu, .personnel-row-menu").forEach(menu => {
+    menu.classList.add("hidden");
+  });
+  document.querySelectorAll(".personnel-action-dropdown .action-dropdown-button, .personnel-row-dropdown .action-dropdown-button").forEach(button => {
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function togglePersonnelRowMenu(button) {
+  const menu = button.closest(".personnel-row-dropdown")?.querySelector(".personnel-row-menu");
+  if (!menu) return;
+  const willOpen = menu.classList.contains("hidden");
+  closePersonnelMenus();
+  menu.classList.toggle("hidden", !willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
 }
 
 function openAiChat() {
@@ -1265,11 +1297,18 @@ function renderPersonnel() {
       <tr>
         ${columns.map(column => `<td data-label="${escapeHtml(humanizeFieldName(column))}">${escapeHtml(record[column] || "-")}</td>`).join("")}
         <td data-label="Aksi" class="personnel-row-actions">
-          <button class="text-button" type="button" data-personnel-action="detail" data-personnel-index="${index}">Detail</button>
-          ${canManagePersonnel() ? `
-            <button class="text-button" type="button" data-personnel-action="edit" data-personnel-index="${index}">Edit</button>
-            <button class="text-button danger-text" type="button" data-personnel-action="delete" data-personnel-index="${index}">Hapus</button>
-          ` : ""}
+          <div class="personnel-row-dropdown">
+            <button class="secondary-button action-dropdown-button" type="button" data-personnel-menu="${index}" aria-expanded="false">
+              Options <span class="dropdown-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="personnel-row-menu hidden">
+              <button type="button" data-personnel-action="detail" data-personnel-index="${index}">View</button>
+              ${canManagePersonnel() ? `
+                <button type="button" data-personnel-action="edit" data-personnel-index="${index}">Edit</button>
+                <button class="danger-text" type="button" data-personnel-action="delete" data-personnel-index="${index}">Delete</button>
+              ` : ""}
+            </div>
+          </div>
         </td>
       </tr>
     `).join("")
@@ -1323,11 +1362,18 @@ function setPersonnelPaginationButtons(pageCount) {
 }
 
 function handlePersonnelTableClick(event) {
+  const menuButton = event.target.closest("[data-personnel-menu]");
+  if (menuButton) {
+    togglePersonnelRowMenu(menuButton);
+    return;
+  }
+
   const button = event.target.closest("[data-personnel-index]");
   if (!button) return;
   const record = state.personnelVisibleRecords?.[Number(button.dataset.personnelIndex)];
   if (!record) return;
   const action = button.dataset.personnelAction || "detail";
+  closePersonnelMenus();
   if (action === "edit") openPersonnelForm(record);
   else if (action === "delete") deletePersonnelRecord(record);
   else openPersonnelDetail(record);
@@ -1367,6 +1413,42 @@ function getEditablePersonnelColumns(records) {
   return getPersonnelColumns(records).filter(column => !isComputedPersonnelColumn(column));
 }
 
+function getPersonnelStatusColumn(columns) {
+  return columns.find(column => includesAny(normalizeSearchText(column), ["status"])) || "";
+}
+
+function normalizePersonnelSourceFromStatus(value, fallbackSource = state.personnelSource) {
+  const text = normalizeSearchText(value);
+  if (includesAny(text, ["outsourcing", "out sour", "outsourching", "outsorcing"])) return "outsourcing";
+  if (includesAny(text, ["bemaco", "bmc", "rekaprima"])) return "personil-bmc";
+  return fallbackSource;
+}
+
+function normalizePersonnelStatusLabel(sourceId) {
+  return sourceId === "outsourcing" ? "Outsourcing" : "Bemaco";
+}
+
+function renderPersonnelInput(column, value, required) {
+  const statusColumn = includesAny(normalizeSearchText(column), ["status"]);
+  if (statusColumn) {
+    const selectedSource = normalizePersonnelSourceFromStatus(value, state.personnelSource);
+    return `
+      <select name="${escapeHtml(column)}" ${required ? "required" : ""}>
+        <option value="Bemaco" ${selectedSource === "personil-bmc" ? "selected" : ""}>Bemaco</option>
+        <option value="Outsourcing" ${selectedSource === "outsourcing" ? "selected" : ""}>Outsourcing</option>
+      </select>
+    `;
+  }
+  return `
+    <input
+      name="${escapeHtml(column)}"
+      value="${escapeHtml(value || "")}"
+      autocomplete="off"
+      ${required ? "required" : ""}
+    >
+  `;
+}
+
 function openPersonnelForm(record = null) {
   if (!requirePermission(
     canManagePersonnel(),
@@ -1392,12 +1474,7 @@ function openPersonnelForm(record = null) {
   document.getElementById("personnelFormFields").innerHTML = columns.map((column, index) => `
     <label class="${columns.length % 2 && index === columns.length - 1 ? "full" : ""}">
       <span>${escapeHtml(humanizeFieldName(column))}</span>
-      <input
-        name="${escapeHtml(column)}"
-        value="${escapeHtml(record?.[column] || "")}"
-        autocomplete="off"
-        ${index === 0 ? "required" : ""}
-      >
+      ${renderPersonnelInput(column, record?.[column] || "", index === 0)}
     </label>
   `).join("");
   document.getElementById("personnelFormModal").showModal();
@@ -1419,9 +1496,14 @@ async function savePersonnelRecord(event) {
   const data = Object.fromEntries(
     Array.from(new FormData(form).entries()).map(([key, value]) => [key, String(value).trim()])
   );
+  const columns = Object.keys(data);
+  const statusColumn = getPersonnelStatusColumn(columns);
+  const targetSourceId = normalizePersonnelSourceFromStatus(data[statusColumn], state.personnelSource);
+  if (statusColumn) data[statusColumn] = normalizePersonnelStatusLabel(targetSourceId);
   await sendPersonnelMutation(rowNumber ? "update" : "add", {
     rowNumber,
-    data
+    data,
+    targetSourceId
   });
 }
 
@@ -1457,6 +1539,7 @@ async function sendPersonnelMutation(action, payload) {
         firebaseIdToken,
         action,
         sourceId: state.personnelSource,
+        targetSourceId: payload.targetSourceId || state.personnelSource,
         rowNumber: payload.rowNumber || 0,
         data: payload.data || {}
       })
@@ -1488,6 +1571,101 @@ function exportPersonnelCsv() {
   link.download = `${state.personnelSource}-${state.today}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function getPersonnelExportData() {
+  const records = getFilteredPersonnelRecords();
+  if (!records.length) {
+    alert("Tidak ada data personil untuk diekspor.");
+    return null;
+  }
+  return {
+    records,
+    columns: getPersonnelColumns(records),
+    title: document.getElementById("personnelTableTitle").textContent || "Personil"
+  };
+}
+
+function buildPersonnelExportTable(data) {
+  const header = data.columns.map(column =>
+    `<th>${escapeHtml(humanizeFieldName(column))}</th>`
+  ).join("");
+  const rows = data.records.map(record => `
+    <tr>
+      ${data.columns.map(column => `<td>${escapeHtml(record[column] || "-")}</td>`).join("")}
+    </tr>
+  `).join("");
+  return `
+    <table>
+      <thead><tr>${header}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function exportPersonnelExcel() {
+  const data = getPersonnelExportData();
+  if (!data) return;
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+          th { background: #e8eef7; color: #111827; font-weight: 700; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; }
+          h1 { font-family: Arial, sans-serif; font-size: 18px; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(data.title)}</h1>
+        ${buildPersonnelExportTable(data)}
+      </body>
+    </html>
+  `;
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${state.personnelSource}-${state.today}.xls`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPersonnelPdf() {
+  const data = getPersonnelExportData();
+  if (!data) return;
+  const win = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
+  if (!win) return alert("Popup browser diblokir. Izinkan popup untuk export PDF.");
+  win.document.write(`
+    <html>
+      <head>
+        <title>${escapeHtml(data.title)}</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm; }
+          body { font-family: Arial, sans-serif; color: #111827; }
+          h1 { margin: 0 0 6px; font-size: 20px; }
+          p { margin: 0 0 14px; color: #64748b; }
+          table { border-collapse: collapse; width: 100%; font-size: 10px; }
+          th { background: #e8eef7; color: #111827; font-weight: 700; }
+          th, td { border: 1px solid #cbd5e1; padding: 6px; vertical-align: top; word-break: break-word; }
+          tr { break-inside: avoid; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(data.title)}</h1>
+        <p>Diekspor ${formatHumanDate(state.today)} - ${data.records.length} data</p>
+        ${buildPersonnelExportTable(data)}
+        <script>
+          window.onload = () => {
+            window.focus();
+            window.print();
+          };
+        <\/script>
+      </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 function formatSyncTime(timestamp) {

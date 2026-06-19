@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260619224500">
+  <link rel="stylesheet" href="styles.css?v=20260619233000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -249,9 +249,18 @@
               <p id="personnelSyncText">Menunggu sinkronisasi spreadsheet...</p>
             </div>
             <div class="personnel-heading-actions">
-              <button class="primary-button hidden" id="addPersonnelButton" type="button">+ Tambah Personil</button>
               <button class="secondary-button" id="refreshPersonnelButton" type="button">Refresh</button>
-              <button class="secondary-button" id="exportPersonnelButton" type="button">Export CSV</button>
+              <div class="action-dropdown personnel-action-dropdown">
+                <button class="secondary-button action-dropdown-button" id="personnelToolsButton" type="button" aria-expanded="false">
+                  Pilihan <span class="dropdown-chevron" aria-hidden="true"></span>
+                </button>
+                <div class="action-dropdown-menu personnel-tools-menu hidden" id="personnelToolsMenu">
+                  <button class="hidden" id="addPersonnelButton" type="button">Tambah Personil</button>
+                  <button id="exportPersonnelExcelButton" type="button">Export Excel</button>
+                  <button id="exportPersonnelPdfButton" type="button">Export PDF</button>
+                  <button id="exportPersonnelButton" type="button">Export CSV</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -634,7 +643,7 @@
     </section>
   </dialog>
 
-  <script src="firebase-config.js?v=20260619224500"></script>
-  <script type="module" src="app.js?v=20260619224500"></script>
+  <script src="firebase-config.js?v=20260619233000"></script>
+  <script type="module" src="app.js?v=20260619233000"></script>
 </body>
 </html>

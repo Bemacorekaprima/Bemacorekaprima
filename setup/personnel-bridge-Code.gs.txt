@@ -55,15 +55,25 @@ function doPost(e) {
 
     const spreadsheet = getBoundSpreadsheet_();
     const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
+    const targetSourceId = String(payload.targetSourceId || sourceId);
+    if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, targetSourceId)) {
+      throw new Error('Target sheet tidak valid.');
+    }
+    const targetSheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[targetSourceId]);
     const action = String(payload.action || '');
     const lock = LockService.getDocumentLock();
     lock.waitLock(30000);
 
     try {
       if (action === 'add') {
-        addPersonnelRow_(sheet, payload.data || {});
+        addPersonnelRow_(targetSheet, payload.data || {});
       } else if (action === 'update') {
-        updatePersonnelRow_(sheet, Number(payload.rowNumber), payload.data || {});
+        if (targetSourceId !== sourceId) {
+          addPersonnelRow_(targetSheet, payload.data || {});
+          deletePersonnelRow_(sheet, Number(payload.rowNumber));
+        } else {
+          updatePersonnelRow_(sheet, Number(payload.rowNumber), payload.data || {});
+        }
       } else if (action === 'delete') {
         deletePersonnelRow_(sheet, Number(payload.rowNumber));
       } else {
@@ -77,6 +87,7 @@ function doPost(e) {
       ok: true,
       action: action,
       sourceId: sourceId,
+      targetSourceId: targetSourceId,
       email: firebaseUser.email,
       role: role
     });

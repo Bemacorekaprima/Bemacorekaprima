@@ -1213,6 +1213,7 @@ td small { display: block; margin-top: 4px; color: var(--muted); }
 .personnel-panel { min-width: 0; }
 .personnel-heading { align-items: flex-end; }
 .personnel-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.personnel-tools-menu { width: 210px; }
 
 .personnel-tools {
   display: grid;
@@ -1281,10 +1282,56 @@ td small { display: block; margin-top: 4px; color: var(--muted); }
 .personnel-detail-row span { color: var(--muted); }
 .personnel-detail-row strong { overflow-wrap: anywhere; }
 .personnel-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 160px;
+  min-width: 118px;
+  overflow: visible;
+}
+
+.personnel-row-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.personnel-row-dropdown .action-dropdown-button {
+  min-width: 104px;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.personnel-row-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 80;
+  display: grid;
+  min-width: 150px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  background: #202127;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.24);
+}
+
+.personnel-row-menu button {
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  background: transparent;
+  color: #f8fafc;
+  font-weight: 700;
+  text-align: left;
+}
+
+.personnel-row-menu button:hover,
+.personnel-row-menu button:focus-visible {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.personnel-row-menu button:last-child { border-bottom: 0; }
+.personnel-row-menu .danger-text { color: #fca5a5; }
+
+.personnel-table-wrap {
+  overflow: auto;
+  padding-bottom: 80px;
 }
 .danger-text { color: #c62828; }
 .personnel-form-card { width: min(780px, calc(100vw - 28px)); }
