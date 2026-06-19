@@ -1,0 +1,307 @@
+const PERSONNEL_BRIDGE_TOKEN = 'Ospr630-personnel-bridge';
+const FIREBASE_API_KEY = 'AIzaSyCKmFdf3aiNaUKkRGcnWOKMO2YPFl-WRbw';
+const FIREBASE_PROJECT_ID = 'daily-report-ospr';
+const BOOTSTRAP_SUPER_ADMIN_EMAIL = 'o.supriyadi630@gmail.com';
+
+const PERSONNEL_SHEETS = {
+  'data-utama': 2034016714,
+  'personil-bmc': 2048149704,
+  outsourcing: 1030462578
+};
+
+const PERSONNEL_WRITE_ROLES = ['super_admin', 'editor', 'author'];
+
+function doGet(e) {
+  const callback = String((e && e.parameter && e.parameter.callback) || 'personnelBridgeCallback');
+
+  try {
+    validateBridgeToken_((e && e.parameter && e.parameter.token) || '');
+    const spreadsheet = getBoundSpreadsheet_();
+    const sheets = {};
+
+    Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
+      const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
+      sheets[sourceId] = readSheet_(sheet);
+    });
+
+    return javascriptResponse_(callback, {
+      ok: true,
+      sheets: sheets,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    return javascriptResponse_(callback, {
+      ok: false,
+      error: error.message || String(error)
+    });
+  }
+}
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    validateBridgeToken_(payload.token);
+
+    const firebaseUser = verifyFirebaseUser_(payload.firebaseIdToken);
+    const role = getFirebaseRole_(firebaseUser.email, payload.firebaseIdToken);
+    if (PERSONNEL_WRITE_ROLES.indexOf(role) === -1) {
+      throw new Error('Role ' + role + ' tidak diizinkan mengubah data personil.');
+    }
+
+    const sourceId = String(payload.sourceId || '');
+    if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, sourceId)) {
+      throw new Error('Sumber sheet tidak valid.');
+    }
+
+    const spreadsheet = getBoundSpreadsheet_();
+    const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
+    const action = String(payload.action || '');
+    const lock = LockService.getDocumentLock();
+    lock.waitLock(30000);
+
+    try {
+      if (action === 'add') {
+        addPersonnelRow_(sheet, payload.data || {});
+      } else if (action === 'update') {
+        updatePersonnelRow_(sheet, Number(payload.rowNumber), payload.data || {});
+      } else if (action === 'delete') {
+        deletePersonnelRow_(sheet, Number(payload.rowNumber));
+      } else {
+        throw new Error('Aksi personil tidak dikenali.');
+      }
+    } finally {
+      lock.releaseLock();
+    }
+
+    return jsonResponse_({
+      ok: true,
+      action: action,
+      sourceId: sourceId,
+      email: firebaseUser.email,
+      role: role
+    });
+  } catch (error) {
+    console.error(error);
+    return jsonResponse_({
+      ok: false,
+      error: error.message || String(error)
+    });
+  }
+}
+
+function getBoundSpreadsheet_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!spreadsheet) {
+    throw new Error('Apps Script harus dibuat dari menu Ekstensi > Apps Script pada spreadsheet sumber.');
+  }
+  return spreadsheet;
+}
+
+function getSheetById_(spreadsheet, sheetId) {
+  const sheet = spreadsheet.getSheets().find(function(item) {
+    return item.getSheetId() === sheetId;
+  });
+  if (!sheet) throw new Error('Sheet dengan GID ' + sheetId + ' tidak ditemukan.');
+  return sheet;
+}
+
+function readSheet_(sheet) {
+  const values = sheet.getDataRange().getDisplayValues();
+  if (!values.length) return [];
+
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const records = [];
+
+  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (!row.some(function(value) { return String(value).trim() !== ''; })) continue;
+
+    const record = { '_Sumber Baris': rowIndex + 1 };
+    headers.forEach(function(header, columnIndex) {
+      record[header] = row[columnIndex] || '';
+    });
+    records.push(record);
+  }
+
+  return records;
+}
+
+function addPersonnelRow_(sheet, data) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const targetRow = Math.max(sheet.getLastRow() + 1, headerIndex + 2);
+  const sourceFormulaRow = Math.max(headerIndex + 2, targetRow - 1);
+
+  headers.forEach(function(header, columnIndex) {
+    const column = columnIndex + 1;
+    const targetCell = sheet.getRange(targetRow, column);
+    const sourceCell = sheet.getRange(sourceFormulaRow, column);
+    const formula = sourceFormulaRow < targetRow ? sourceCell.getFormulaR1C1() : '';
+
+    if (Object.prototype.hasOwnProperty.call(data, header) && !isComputedHeader_(header)) {
+      targetCell.setValue(normalizeWriteValue_(data[header]));
+    } else if (formula) {
+      targetCell.setFormulaR1C1(formula);
+    }
+  });
+}
+
+function updatePersonnelRow_(sheet, rowNumber, data) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const firstDataRow = headerIndex + 2;
+
+  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
+    throw new Error('Nomor baris personil tidak valid.');
+  }
+
+  headers.forEach(function(header, columnIndex) {
+    if (!Object.prototype.hasOwnProperty.call(data, header) || isComputedHeader_(header)) return;
+    const cell = sheet.getRange(rowNumber, columnIndex + 1);
+    if (cell.getFormula()) return;
+    cell.setValue(normalizeWriteValue_(data[header]));
+  });
+}
+
+function deletePersonnelRow_(sheet, rowNumber) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const firstDataRow = findHeaderRow_(values) + 2;
+  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
+    throw new Error('Nomor baris personil tidak valid.');
+  }
+  sheet.deleteRow(rowNumber);
+}
+
+function findHeaderRow_(rows) {
+  let bestIndex = 0;
+  let bestScore = -1;
+  const limit = Math.min(rows.length, 35);
+
+  for (let index = 0; index < limit; index += 1) {
+    const row = rows[index].map(function(value) {
+      return String(value || '').trim();
+    });
+    const nonEmpty = row.filter(Boolean).length;
+    const text = normalizeText_(row.join(' '));
+    const keywordScore = [
+      'nama',
+      'personil',
+      'jabatan',
+      'posisi',
+      'status',
+      'pekerjaan',
+      'tanggal'
+    ].reduce(function(score, keyword) {
+      return score + (text.indexOf(keyword) !== -1 ? 4 : 0);
+    }, 0);
+    const score = nonEmpty + keywordScore;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function makeUniqueHeaders_(row) {
+  const counts = {};
+  return row.map(function(value, index) {
+    const base = String(value || '').trim() || 'Kolom ' + (index + 1);
+    counts[base] = (counts[base] || 0) + 1;
+    return counts[base] === 1 ? base : base + ' ' + counts[base];
+  });
+}
+
+function isComputedHeader_(header) {
+  const normalized = normalizeText_(header);
+  return [
+    'pekerjaan aktif',
+    'tugas aktif',
+    'project aktif',
+    'keterlibatan pekerjaan',
+    'status selesai',
+    'akumulasi'
+  ].some(function(keyword) {
+    return normalized.indexOf(keyword) !== -1;
+  });
+}
+
+function normalizeWriteValue_(value) {
+  const text = String(value == null ? '' : value).trim();
+  if (text === '') return '';
+  return text;
+}
+
+function normalizeText_(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function validateBridgeToken_(token) {
+  if (!token || String(token) !== PERSONNEL_BRIDGE_TOKEN) {
+    throw new Error('Token Personnel Bridge tidak valid.');
+  }
+}
+
+function verifyFirebaseUser_(idToken) {
+  if (!idToken) throw new Error('Sesi Firebase tidak tersedia.');
+  const response = UrlFetchApp.fetch(
+    'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(FIREBASE_API_KEY),
+    {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ idToken: idToken }),
+      muteHttpExceptions: true
+    }
+  );
+  const result = JSON.parse(response.getContentText() || '{}');
+  const user = result.users && result.users[0];
+  if (response.getResponseCode() !== 200 || !user || !user.email) {
+    throw new Error('Sesi Firebase tidak valid atau sudah berakhir.');
+  }
+  return {
+    uid: user.localId,
+    email: String(user.email).toLowerCase()
+  };
+}
+
+function getFirebaseRole_(email, idToken) {
+  if (email === BOOTSTRAP_SUPER_ADMIN_EMAIL) return 'super_admin';
+
+  const roleUrl =
+    'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID +
+    '/databases/(default)/documents/roles/' + encodeURIComponent(email);
+  const response = UrlFetchApp.fetch(roleUrl, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + idToken },
+    muteHttpExceptions: true
+  });
+
+  if (response.getResponseCode() === 404) return 'member';
+  const result = JSON.parse(response.getContentText() || '{}');
+  return result.fields && result.fields.role && result.fields.role.stringValue
+    ? result.fields.role.stringValue
+    : 'member';
+}
+
+function javascriptResponse_(callback, data) {
+  const safeCallback = /^[A-Za-z_$][A-Za-z0-9_$.]*$/.test(callback)
+    ? callback
+    : 'personnelBridgeCallback';
+  return ContentService
+    .createTextOutput(safeCallback + '(' + JSON.stringify(data) + ');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function jsonResponse_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}

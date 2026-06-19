@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260619193000">
+  <link rel="stylesheet" href="styles.css?v=20260619224500">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -95,7 +95,6 @@
         <span class="brand-mark">AH</span>
         <div>
           <strong>Asisten Harian</strong>
-          <small id="userEmail">Memuat...</small>
         </div>
       </div>
       <nav class="nav">
@@ -250,6 +249,7 @@
               <p id="personnelSyncText">Menunggu sinkronisasi spreadsheet...</p>
             </div>
             <div class="personnel-heading-actions">
+              <button class="primary-button hidden" id="addPersonnelButton" type="button">+ Tambah Personil</button>
               <button class="secondary-button" id="refreshPersonnelButton" type="button">Refresh</button>
               <button class="secondary-button" id="exportPersonnelButton" type="button">Export CSV</button>
             </div>
@@ -531,6 +531,25 @@
     </section>
   </dialog>
 
+  <dialog id="personnelFormModal">
+    <form method="dialog" class="modal-card personnel-form-card" id="personnelForm">
+      <header>
+        <div>
+          <h2 id="personnelFormTitle">Tambah Personil</h2>
+          <p id="personnelFormSource"></p>
+        </div>
+        <button type="button" class="icon-button" id="closePersonnelFormButton">x</button>
+      </header>
+      <input type="hidden" id="personnelFormRow">
+      <div id="personnelFormFields" class="personnel-form-fields"></div>
+      <p class="personnel-form-note">Kolom hasil perhitungan spreadsheet tidak diubah dari web.</p>
+      <footer>
+        <button type="button" class="secondary-button" id="cancelPersonnelFormButton">Batal</button>
+        <button class="primary-button" type="submit">Simpan ke Spreadsheet</button>
+      </footer>
+    </form>
+  </dialog>
+
   <dialog id="profileModal">
     <form method="dialog" class="modal-card profile-modal-card" id="profileForm">
       <header>
@@ -586,7 +605,7 @@
 
   <button class="ai-chat-launcher hidden" id="aiChatLauncher" type="button" aria-label="Buka percakapan AI">
     <span class="chat-icon" aria-hidden="true"></span>
-    <span>Chat</span>
+    <span class="chat-launcher-label">Chat</span>
   </button>
 
   <dialog id="aiChatModal" class="ai-chat-dialog">
@@ -615,7 +634,7 @@
     </section>
   </dialog>
 
-  <script src="firebase-config.js?v=20260619193000"></script>
-  <script type="module" src="app.js?v=20260619193000"></script>
+  <script src="firebase-config.js?v=20260619224500"></script>
+  <script type="module" src="app.js?v=20260619224500"></script>
 </body>
 </html>

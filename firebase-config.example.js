@@ -14,3 +14,6 @@ window.FIREBASE_CONFIG = {
 window.EMAIL_BRIDGE_URL = "";
 window.EMAIL_BRIDGE_TOKEN = "";
 
+// Optional. Gunakan untuk membaca dan mengubah data personil Google Spreadsheet.
+window.PERSONNEL_BRIDGE_URL = "";
+window.PERSONNEL_BRIDGE_TOKEN = "GANTI_DENGAN_TOKEN_PERSONNEL_BRIDGE";

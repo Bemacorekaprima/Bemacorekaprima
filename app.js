@@ -207,8 +207,12 @@ function bindControls() {
   document.getElementById("personnelPrevPage").addEventListener("click", () => changePersonnelPage(-1));
   document.getElementById("personnelNextPage").addEventListener("click", () => changePersonnelPage(1));
   document.getElementById("personnelTableBody").addEventListener("click", handlePersonnelTableClick);
+  document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
+  document.getElementById("personnelForm").addEventListener("submit", savePersonnelRecord);
+  document.getElementById("closePersonnelFormButton").addEventListener("click", closePersonnelForm);
+  document.getElementById("cancelPersonnelFormButton").addEventListener("click", closePersonnelForm);
   document.getElementById("taskDate").addEventListener("input", event => closeDatePicker(event.target));
   document.getElementById("taskDate").addEventListener("change", event => closeDatePicker(event.target));
   document.getElementById("taskDeadline").addEventListener("input", event => closeDatePicker(event.target));
@@ -252,7 +256,6 @@ onAuthStateChanged(auth, async user => {
   }
 
   if (user) {
-    document.getElementById("userEmail").textContent = user.email;
     currentProfile = await loadUserProfile(user);
     state.accessRole = await loadAccessRole(user);
     watchCurrentAccessRole(user);
@@ -505,6 +508,10 @@ function canCreateReports() {
   return hasAccessRole("super_admin", "admin", "editor", "author", "contributor");
 }
 
+function canManagePersonnel() {
+  return hasAccessRole("super_admin", "editor", "author");
+}
+
 function requirePermission(condition, message = "Anda tidak memiliki izin untuk tindakan ini.") {
   if (condition) return true;
   alert(message);
@@ -549,6 +556,7 @@ function renderAccessControl() {
   document.getElementById("sendSelectedButton").classList.toggle("hidden", !canSendReminders());
   document.getElementById("createReportButton").classList.toggle("hidden", !canCreateReports());
   document.getElementById("createReportButtonReports").classList.toggle("hidden", !canCreateReports());
+  document.getElementById("addPersonnelButton").classList.toggle("hidden", !canManagePersonnel());
   renderRoleSelectOptions();
   renderRoleAssignments();
 }
@@ -958,7 +966,24 @@ async function loadExternalSheetData() {
   state.externalSheets = loadingSheets;
   renderExternalSheetStatus();
 
+  let bridgeRecords = {};
+  if (window.PERSONNEL_BRIDGE_URL && window.PERSONNEL_BRIDGE_TOKEN) {
+    try {
+      bridgeRecords = await loadPersonnelBridgeData();
+    } catch (error) {
+      bridgeRecords = {};
+    }
+  }
+
   const results = await Promise.all(loadingSheets.map(async sheet => {
+    if (Array.isArray(bridgeRecords[sheet.id])) {
+      return {
+        ...sheet,
+        records: bridgeRecords[sheet.id],
+        status: "ready",
+        error: ""
+      };
+    }
     try {
       const separator = sheet.url.includes("?") ? "&" : "?";
       const response = await fetch(`${sheet.url}${separator}_=${Date.now()}`, {
@@ -986,6 +1011,44 @@ async function loadExternalSheetData() {
   externalSheetLastLoadedAt = Date.now();
   renderExternalSheetStatus();
   renderPersonnel();
+}
+
+function loadPersonnelBridgeData() {
+  return new Promise((resolve, reject) => {
+    const callbackName = `personnelBridgeCallback_${Date.now()}`;
+    const script = document.createElement("script");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Personnel Bridge tidak merespons."));
+    }, 15000);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      script.remove();
+      delete window[callbackName];
+    }
+
+    window[callbackName] = response => {
+      cleanup();
+      if (!response?.ok) {
+        reject(new Error(response?.error || "Personnel Bridge gagal membaca data."));
+        return;
+      }
+      resolve(response.sheets || {});
+    };
+
+    const url = new URL(window.PERSONNEL_BRIDGE_URL);
+    url.searchParams.set("action", "read");
+    url.searchParams.set("token", window.PERSONNEL_BRIDGE_TOKEN);
+    url.searchParams.set("callback", callbackName);
+    url.searchParams.set("_", String(Date.now()));
+    script.src = url.toString();
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("Personnel Bridge gagal dimuat."));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 function csvToRecords(csvText) {
@@ -1201,8 +1264,12 @@ function renderPersonnel() {
     ? pageRecords.map((record, index) => `
       <tr>
         ${columns.map(column => `<td data-label="${escapeHtml(humanizeFieldName(column))}">${escapeHtml(record[column] || "-")}</td>`).join("")}
-        <td data-label="Aksi">
-          <button class="text-button personnel-detail-button" type="button" data-personnel-index="${index}">Detail</button>
+        <td data-label="Aksi" class="personnel-row-actions">
+          <button class="text-button" type="button" data-personnel-action="detail" data-personnel-index="${index}">Detail</button>
+          ${canManagePersonnel() ? `
+            <button class="text-button" type="button" data-personnel-action="edit" data-personnel-index="${index}">Edit</button>
+            <button class="text-button danger-text" type="button" data-personnel-action="delete" data-personnel-index="${index}">Hapus</button>
+          ` : ""}
         </td>
       </tr>
     `).join("")
@@ -1259,7 +1326,11 @@ function handlePersonnelTableClick(event) {
   const button = event.target.closest("[data-personnel-index]");
   if (!button) return;
   const record = state.personnelVisibleRecords?.[Number(button.dataset.personnelIndex)];
-  if (record) openPersonnelDetail(record);
+  if (!record) return;
+  const action = button.dataset.personnelAction || "detail";
+  if (action === "edit") openPersonnelForm(record);
+  else if (action === "delete") deletePersonnelRecord(record);
+  else openPersonnelDetail(record);
 }
 
 function openPersonnelDetail(record) {
@@ -1279,6 +1350,129 @@ function openPersonnelDetail(record) {
 
 function closePersonnelDetail() {
   document.getElementById("personnelDetailModal").close();
+}
+
+function isComputedPersonnelColumn(column) {
+  return includesAny(normalizeSearchText(column), [
+    "pekerjaan aktif",
+    "tugas aktif",
+    "project aktif",
+    "keterlibatan pekerjaan",
+    "status selesai",
+    "akumulasi"
+  ]);
+}
+
+function getEditablePersonnelColumns(records) {
+  return getPersonnelColumns(records).filter(column => !isComputedPersonnelColumn(column));
+}
+
+function openPersonnelForm(record = null) {
+  if (!requirePermission(
+    canManagePersonnel(),
+    "Hanya Super Admin, Editor, atau Author yang dapat mengubah data personil."
+  )) return;
+
+  const sheet = getPersonnelSheet();
+  if (!sheet || sheet.status !== "ready") {
+    alert("Data personil belum selesai dimuat.");
+    return;
+  }
+
+  const columns = getEditablePersonnelColumns(sheet.records);
+  if (!columns.length) {
+    alert("Kolom personil belum dapat dikenali.");
+    return;
+  }
+
+  document.getElementById("personnelFormTitle").textContent =
+    record ? "Edit Personil" : "Tambah Personil";
+  document.getElementById("personnelFormSource").textContent = sheet.label;
+  document.getElementById("personnelFormRow").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("personnelFormFields").innerHTML = columns.map((column, index) => `
+    <label class="${columns.length % 2 && index === columns.length - 1 ? "full" : ""}">
+      <span>${escapeHtml(humanizeFieldName(column))}</span>
+      <input
+        name="${escapeHtml(column)}"
+        value="${escapeHtml(record?.[column] || "")}"
+        autocomplete="off"
+        ${index === 0 ? "required" : ""}
+      >
+    </label>
+  `).join("");
+  document.getElementById("personnelFormModal").showModal();
+}
+
+function closePersonnelForm() {
+  document.getElementById("personnelFormModal").close();
+}
+
+async function savePersonnelRecord(event) {
+  event.preventDefault();
+  if (!requirePermission(
+    canManagePersonnel(),
+    "Hanya Super Admin, Editor, atau Author yang dapat menyimpan data personil."
+  )) return;
+
+  const form = event.currentTarget;
+  const rowNumber = Number(document.getElementById("personnelFormRow").value) || 0;
+  const data = Object.fromEntries(
+    Array.from(new FormData(form).entries()).map(([key, value]) => [key, String(value).trim()])
+  );
+  await sendPersonnelMutation(rowNumber ? "update" : "add", {
+    rowNumber,
+    data
+  });
+}
+
+async function deletePersonnelRecord(record) {
+  if (!requirePermission(
+    canManagePersonnel(),
+    "Hanya Super Admin, Editor, atau Author yang dapat menghapus data personil."
+  )) return;
+  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
+  if (!rowNumber) return alert("Nomor baris personil tidak ditemukan.");
+  if (!confirm(`Hapus data personil "${getPersonnelName(record)}" dari Google Spreadsheet?`)) return;
+  await sendPersonnelMutation("delete", { rowNumber, data: {} });
+}
+
+async function sendPersonnelMutation(action, payload) {
+  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) {
+    alert("Personnel Bridge belum dikonfigurasi. Ikuti panduan PERSONNEL-BRIDGE.md.");
+    return;
+  }
+  if (!currentUser) return alert("Silakan login kembali.");
+
+  const submitButton = document.querySelector("#personnelForm button[type='submit']");
+  if (submitButton) submitButton.disabled = true;
+
+  try {
+    const firebaseIdToken = await currentUser.getIdToken(true);
+    await fetch(window.PERSONNEL_BRIDGE_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        token: window.PERSONNEL_BRIDGE_TOKEN,
+        firebaseIdToken,
+        action,
+        sourceId: state.personnelSource,
+        rowNumber: payload.rowNumber || 0,
+        data: payload.data || {}
+      })
+    });
+
+    closePersonnelForm();
+    alert(action === "delete"
+      ? "Permintaan hapus dikirim ke Google Spreadsheet."
+      : "Data personil dikirim ke Google Spreadsheet.");
+    await new Promise(resolve => window.setTimeout(resolve, 1400));
+    await loadExternalSheetData();
+  } catch (error) {
+    alert(`Data personil gagal dikirim: ${error.message}`);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 }
 
 function exportPersonnelCsv() {

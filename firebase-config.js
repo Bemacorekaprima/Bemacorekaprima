@@ -10,3 +10,7 @@ window.FIREBASE_CONFIG = {
 
 window.EMAIL_BRIDGE_URL = "https://script.google.com/macros/s/AKfycbzkF2LcBiTjFI-eQGYMl6woKrBPlD9yl60SoT1DPFB4cq8_-Hqcy6UGv4vHPtg8aWv49g/exec";
 window.EMAIL_BRIDGE_TOKEN = "Ospr630-daily-report";
+
+// Isi setelah apps-script-personnel-bridge selesai di-deploy sebagai Web App.
+window.PERSONNEL_BRIDGE_URL = "";
+window.PERSONNEL_BRIDGE_TOKEN = "Ospr630-personnel-bridge";
