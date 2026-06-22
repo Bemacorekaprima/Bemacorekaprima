@@ -164,7 +164,9 @@ let state = {
   jobsSort: "name-asc",
   jobsPage: 1,
   jobsPageSize: 25,
-  jobsVisibleRecords: []
+  jobsVisibleRecords: [],
+  dashboardActivePersonnelRecords: [],
+  dashboardInactivePersonnelRecords: []
 };
 
 const statusToList = {
@@ -257,6 +259,8 @@ function bindControls() {
   document.getElementById("personnelPrevPage").addEventListener("click", () => changePersonnelPage(-1));
   document.getElementById("personnelNextPage").addEventListener("click", () => changePersonnelPage(1));
   document.getElementById("personnelTableBody").addEventListener("click", handlePersonnelTableClick);
+  document.getElementById("dashboardActivePersonnelBody").addEventListener("click", handleDashboardPersonnelClick);
+  document.getElementById("dashboardInactivePersonnelBody").addEventListener("click", handleDashboardPersonnelClick);
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
@@ -1341,6 +1345,7 @@ async function loadExternalSheetData() {
   renderExternalSheetStatus();
   renderPersonnel();
   renderJobs();
+  renderDashboardWorkSummary();
 }
 
 function loadPersonnelBridgeData() {
@@ -2274,8 +2279,10 @@ function recordMatchesPersonnelYear(record, selectedYear, finished) {
       getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"])
     );
     if (finishYear) return finishYear === year;
+    return getRecordYears(record).includes(year);
   }
-  return getRecordYears(record).includes(year);
+  const recordYears = getRecordYears(record);
+  return !recordYears.length || recordYears.includes(year);
 }
 
 function getPersonnelWorkMetrics(personnelName, selectedYear = state.personnelYear) {
@@ -2307,11 +2314,11 @@ function setComputedPersonnelValue(record, canonicalColumn, aliases, value) {
   record[existingColumn || canonicalColumn] = value;
 }
 
-function getIntegratedPersonnelRecords(records) {
+function getIntegratedPersonnelRecords(records, selectedYear = state.personnelYear) {
   return (records || []).map(record => {
     const integrated = { ...record };
-    const metrics = getPersonnelWorkMetrics(getPersonnelName(record));
-    setComputedPersonnelValue(integrated, "TAHUN", ["tahun"], state.personnelYear === "all" ? "Semua Tahun" : state.personnelYear);
+    const metrics = getPersonnelWorkMetrics(getPersonnelName(record), selectedYear);
+    setComputedPersonnelValue(integrated, "TAHUN", ["tahun"], selectedYear === "all" ? "Semua Tahun" : selectedYear);
     setComputedPersonnelValue(integrated, "PEKERJAAN AKTIF", ["pekerjaan aktif", "tugas aktif", "project aktif"], metrics.active);
     setComputedPersonnelValue(
       integrated,
@@ -2322,6 +2329,141 @@ function getIntegratedPersonnelRecords(records) {
     setComputedPersonnelValue(integrated, "AKUMULASI", ["akumulasi"], metrics.total);
     return integrated;
   });
+}
+
+function getCurrentSummaryYear() {
+  return String(getYearFromDateValue(state.today) || new Date().getFullYear());
+}
+
+function getAllIntegratedPersonnelRecords(selectedYear = getCurrentSummaryYear()) {
+  return ["personil-bmc", "outsourcing"].flatMap(sourceId => {
+    const sheet = getPersonnelSheet(sourceId);
+    if (!sheet || sheet.status !== "ready") return [];
+    return getIntegratedPersonnelRecords(sheet.records, selectedYear).map(record => ({
+      ...record,
+      _PersonSource: sourceId
+    }));
+  });
+}
+
+function getPersonnelPosition(record) {
+  return getRecordValue(record, [
+    "posisi jabatan real",
+    "posisi jabatan kontrak",
+    "jabatan atau posisi",
+    "jabatan",
+    "posisi"
+  ]) || "-";
+}
+
+function getPersonnelStatus(record) {
+  const statusKey = Object.keys(record || {}).find(column =>
+    ["status", "status personil", "kategori personil"].includes(normalizeSearchText(column))
+  );
+  return String(record?.[statusKey] || "").trim() ||
+    (record?._PersonSource === "outsourcing" ? "Outsourcing" : "Bemaco");
+}
+
+function getPersonnelAccumulation(record) {
+  const key = Object.keys(record || {}).find(column =>
+    normalizeSearchText(column) === "akumulasi"
+  );
+  return key ? getRecordDisplayValue(record, key) : "0";
+}
+
+function getPersonnelFinishedWork(record) {
+  const key = Object.keys(record || {}).find(column =>
+    normalizeSearchText(column) === "keterlibatan pekerjaan status selesai"
+  );
+  return key ? getRecordDisplayValue(record, key) : "0";
+}
+
+function getActivePersonnelForJob(job, selectedYear) {
+  const names = new Set();
+  (job?.records || []).forEach(record => {
+    const involvement = normalizeSearchText(getRecordValue(record, ["keterlibatan"]));
+    if (involvement !== "ya" || !isActiveWorkRecord(record)) return;
+    if (!recordMatchesPersonnelYear(record, selectedYear, false)) return;
+    const name = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
+    if (name) names.add(canonicalPersonnelName(name) || normalizeSearchText(name));
+  });
+  return names.size;
+}
+
+function renderDashboardWorkSummary() {
+  const activeJobsBody = document.getElementById("dashboardActiveJobsBody");
+  const activePersonnelBody = document.getElementById("dashboardActivePersonnelBody");
+  const inactivePersonnelBody = document.getElementById("dashboardInactivePersonnelBody");
+  if (!activeJobsBody || !activePersonnelBody || !inactivePersonnelBody) return;
+
+  const selectedYear = getCurrentSummaryYear();
+  const activeJobs = buildJobsFromDataUtama()
+    .filter(job => getActivePersonnelForJob(job, selectedYear) > 0)
+    .sort((left, right) => left.pekerjaan.localeCompare(right.pekerjaan, "id"));
+  const personnel = getAllIntegratedPersonnelRecords(selectedYear)
+    .sort((left, right) => getPersonnelName(left).localeCompare(getPersonnelName(right), "id"));
+  const activePersonnel = personnel.filter(record => getPersonnelActiveWork(record) > 0);
+  const inactivePersonnel = personnel.filter(record => getPersonnelActiveWork(record) <= 0);
+
+  state.dashboardActivePersonnelRecords = activePersonnel;
+  state.dashboardInactivePersonnelRecords = inactivePersonnel;
+
+  document.getElementById("dashboardWorkSummaryPeriod").textContent = `Ringkasan tahun ${selectedYear}`;
+  document.getElementById("dashboardActiveJobsCount").textContent = activeJobs.length;
+  document.getElementById("dashboardActivePersonnelCount").textContent = activePersonnel.length;
+  document.getElementById("dashboardInactivePersonnelCount").textContent = inactivePersonnel.length;
+
+  activeJobsBody.innerHTML = activeJobs.length
+    ? activeJobs.map(job => `
+      <tr>
+        <td><strong>${escapeHtml(job.pekerjaan)}</strong></td>
+        <td>${escapeHtml(getJobYearLabel(job))}</td>
+        <td>${escapeHtml(job.tanggalSelesai || "-")}</td>
+        <td>${getActivePersonnelForJob(job, selectedYear)}</td>
+        <td><span class="work-status-badge active">Aktif</span></td>
+      </tr>
+    `).join("")
+    : '<tr><td class="dashboard-summary-empty" colspan="5">Belum ada pekerjaan aktif pada tahun ini.</td></tr>';
+
+  activePersonnelBody.innerHTML = activePersonnel.length
+    ? activePersonnel.map((record, index) => `
+      <tr>
+        <td>
+          <button class="personnel-history-link" type="button" data-dashboard-personnel-group="active" data-dashboard-personnel-index="${index}">
+            ${escapeHtml(getPersonnelName(record))}
+          </button>
+        </td>
+        <td>${escapeHtml(getPersonnelStatus(record))}</td>
+        <td>${escapeHtml(String(getPersonnelActiveWork(record)))}</td>
+        <td>${escapeHtml(getPersonnelAccumulation(record))}</td>
+      </tr>
+    `).join("")
+    : '<tr><td class="dashboard-summary-empty" colspan="4">Belum ada personil dengan pekerjaan aktif.</td></tr>';
+
+  inactivePersonnelBody.innerHTML = inactivePersonnel.length
+    ? inactivePersonnel.map((record, index) => `
+      <tr>
+        <td>
+          <button class="personnel-history-link" type="button" data-dashboard-personnel-group="inactive" data-dashboard-personnel-index="${index}">
+            ${escapeHtml(getPersonnelName(record))}
+          </button>
+        </td>
+        <td>${escapeHtml(getPersonnelStatus(record))}</td>
+        <td>${escapeHtml(getPersonnelPosition(record))}</td>
+        <td>${escapeHtml(getPersonnelFinishedWork(record))}</td>
+      </tr>
+    `).join("")
+    : '<tr><td class="dashboard-summary-empty" colspan="4">Semua personil memiliki pekerjaan aktif.</td></tr>';
+}
+
+function handleDashboardPersonnelClick(event) {
+  const button = event.target.closest("[data-dashboard-personnel-index]");
+  if (!button) return;
+  const records = button.dataset.dashboardPersonnelGroup === "active"
+    ? state.dashboardActivePersonnelRecords
+    : state.dashboardInactivePersonnelRecords;
+  const record = records?.[Number(button.dataset.dashboardPersonnelIndex)];
+  if (record) openPersonnelDetail(record);
 }
 
 function getPersonnelActiveWork(record) {
@@ -2423,7 +2565,13 @@ function renderPersonnel() {
   tableBody.innerHTML = pageRecords.length
     ? pageRecords.map((record, index) => `
       <tr>
-        ${columns.map(column => `<td data-label="${escapeHtml(humanizeFieldName(column))}">${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}
+        ${columns.map(column => {
+          const value = escapeHtml(getRecordDisplayValue(record, column));
+          const isName = includesAny(normalizeSearchText(column), ["nama personil", "nama lengkap"]);
+          return `<td data-label="${escapeHtml(humanizeFieldName(column))}">${isName
+            ? `<button class="personnel-history-link" type="button" data-personnel-history-index="${index}">${value}</button>`
+            : value}</td>`;
+        }).join("")}
         <td data-label="Aksi" class="personnel-row-actions">
           <div class="personnel-row-dropdown">
             <button class="secondary-button action-dropdown-button" type="button" data-personnel-menu="${index}" aria-expanded="false">
@@ -2493,6 +2641,13 @@ function setPersonnelPaginationButtons(pageCount) {
 }
 
 function handlePersonnelTableClick(event) {
+  const historyButton = event.target.closest("[data-personnel-history-index]");
+  if (historyButton) {
+    const record = state.personnelVisibleRecords?.[Number(historyButton.dataset.personnelHistoryIndex)];
+    if (record) openPersonnelDetail(record);
+    return;
+  }
+
   const menuButton = event.target.closest("[data-personnel-menu]");
   if (menuButton) {
     togglePersonnelRowMenu(menuButton);
@@ -2511,18 +2666,114 @@ function handlePersonnelTableClick(event) {
 }
 
 function openPersonnelDetail(record) {
-  const sheet = getPersonnelSheet();
-  document.getElementById("personnelDetailTitle").textContent = getPersonnelName(record);
-  document.getElementById("personnelDetailSource").textContent = sheet?.label || "Data Personil";
-  document.getElementById("personnelDetailBody").innerHTML = Object.entries(record)
-    .filter(([key]) => key !== "_Sumber Baris")
-    .map(([key, value]) => `
-      <div class="personnel-detail-row">
-        <span>${escapeHtml(humanizeFieldName(key))}</span>
-        <strong>${escapeHtml(getRecordDisplayValue(record, key))}</strong>
+  const sourceId = record?._PersonSource || state.personnelSource;
+  const sheet = getPersonnelSheet(sourceId);
+  const personnelName = getPersonnelName(record);
+  const history = getPersonnelWorkHistory(personnelName);
+  const activeCount = history.filter(item => item.category === "active").length;
+  const finishedCount = history.filter(item => item.category === "finished").length;
+
+  document.getElementById("personnelDetailTitle").textContent = personnelName;
+  document.getElementById("personnelDetailSource").textContent =
+    `${sheet?.label || "Data Personil"} - histori pekerjaan aktif dan selesai`;
+  document.getElementById("personnelDetailBody").innerHTML = `
+    <section class="personnel-history-profile">
+      <div>
+        <span>Status</span>
+        <strong>${escapeHtml(getPersonnelStatus({ ...record, _PersonSource: sourceId }))}</strong>
       </div>
-    `).join("");
+      <div>
+        <span>Jabatan atau Posisi</span>
+        <strong>${escapeHtml(getPersonnelPosition(record))}</strong>
+      </div>
+      <div>
+        <span>Pekerjaan Aktif</span>
+        <strong>${activeCount}</strong>
+      </div>
+      <div>
+        <span>Histori Selesai</span>
+        <strong>${finishedCount}</strong>
+      </div>
+      <div>
+        <span>Total Histori</span>
+        <strong>${history.length}</strong>
+      </div>
+    </section>
+    <section class="personnel-history-section">
+      <div class="personnel-history-section-header">
+        <div>
+          <h3>Histori Pekerjaan</h3>
+          <p>Pekerjaan aktif ditampilkan lebih dahulu, diikuti pekerjaan yang telah selesai.</p>
+        </div>
+      </div>
+      <div class="personnel-history-table-wrap">
+        <table class="personnel-history-table">
+          <thead>
+            <tr>
+              <th>Pekerjaan</th>
+              <th>Tahun</th>
+              <th>Tanggal Mulai</th>
+              <th>Tanggal Selesai</th>
+              <th>Status</th>
+              <th>Keterlibatan</th>
+              <th>Bobot Individual</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${history.length ? history.map(item => `
+              <tr>
+                <td><strong>${escapeHtml(item.pekerjaan)}</strong></td>
+                <td>${escapeHtml(item.tahun)}</td>
+                <td>${escapeHtml(item.tanggalMulai)}</td>
+                <td>${escapeHtml(item.tanggalSelesai)}</td>
+                <td><span class="work-status-badge ${item.category}">${escapeHtml(item.status)}</span></td>
+                <td>${escapeHtml(item.keterlibatan)}</td>
+                <td>${escapeHtml(item.bobot)}</td>
+              </tr>
+            `).join("") : '<tr><td class="dashboard-summary-empty" colspan="7">Belum ada histori pekerjaan yang cocok pada DATA UTAMA.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
   document.getElementById("personnelDetailModal").showModal();
+}
+
+function getPersonnelWorkHistory(personnelName) {
+  const sheet = getDataUtamaSheet();
+  if (!sheet || sheet.status !== "ready") return [];
+
+  return sheet.records
+    .filter(record => {
+      const assignmentName = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
+      return isSamePersonnelName(personnelName, assignmentName);
+    })
+    .map(record => {
+      const isFinished = isFinishedWorkRecord(record);
+      const isActive = isActiveWorkRecord(record);
+      const statusValue = getRecordValue(record, ["status pekerjaan", "status project", "status proyek"]);
+      const years = getRecordYears(record).sort((left, right) => left - right);
+      return {
+        pekerjaan: getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"]) || "-",
+        tahun: years.length
+          ? (years.length === 1 ? String(years[0]) : `${years[0]}-${years[years.length - 1]}`)
+          : "-",
+        tanggalMulai: getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]) || "-",
+        tanggalSelesai: getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"]) || "-",
+        status: statusValue || (isFinished ? "Selesai" : isActive ? "Aktif" : "Belum ditentukan"),
+        keterlibatan: getRecordValue(record, ["keterlibatan"]) || "-",
+        bobot: normalizeSearchText(getRecordValue(record, ["keterlibatan"])) === "ya" ? "1" : "0",
+        category: isFinished ? "finished" : isActive ? "active" : "neutral",
+        sortTime: Math.max(
+          getComparableDate(getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"])),
+          getComparableDate(getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]))
+        )
+      };
+    })
+    .sort((left, right) => {
+      const rank = { active: 0, neutral: 1, finished: 2 };
+      return rank[left.category] - rank[right.category] || right.sortTime - left.sortTime;
+    });
 }
 
 function closePersonnelDetail() {
@@ -3210,6 +3461,7 @@ function render() {
   renderExternalSheetStatus();
   renderPersonnel();
   renderJobs();
+  renderDashboardWorkSummary();
   renderAttentionBanner();
   document.getElementById("todayText").textContent = `Hari ini: ${formatHumanDate(state.today)}`;
   document.getElementById("syncStatus").textContent = state.syncMessage;

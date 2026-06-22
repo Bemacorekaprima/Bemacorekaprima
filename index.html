@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260622180000">
+  <link rel="stylesheet" href="styles.css?v=20260622203000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -226,6 +226,78 @@
               <div id="agendaList" class="agenda-list"></div>
             </section>
           </aside>
+        </section>
+
+        <section class="dashboard-work-summary" aria-label="Ringkasan pekerjaan dan personil">
+          <article class="panel dashboard-summary-panel dashboard-active-jobs-panel">
+            <header class="dashboard-summary-header">
+              <div>
+                <h2>Pekerjaan Aktif</h2>
+                <p id="dashboardWorkSummaryPeriod">Ringkasan tahun berjalan</p>
+              </div>
+              <strong id="dashboardActiveJobsCount" class="dashboard-summary-count">0</strong>
+            </header>
+            <div class="dashboard-summary-table-wrap">
+              <table class="dashboard-summary-table">
+                <thead>
+                  <tr>
+                    <th>Pekerjaan</th>
+                    <th>Tahun</th>
+                    <th>Tanggal Selesai</th>
+                    <th>Personil Aktif</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboardActiveJobsBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel dashboard-summary-panel">
+            <header class="dashboard-summary-header">
+              <div>
+                <h2>Personil Memiliki Pekerjaan Aktif</h2>
+                <p>Klik nama untuk melihat histori pekerjaan.</p>
+              </div>
+              <strong id="dashboardActivePersonnelCount" class="dashboard-summary-count">0</strong>
+            </header>
+            <div class="dashboard-summary-table-wrap">
+              <table class="dashboard-summary-table">
+                <thead>
+                  <tr>
+                    <th>Nama Personil</th>
+                    <th>Status</th>
+                    <th>Pekerjaan Aktif</th>
+                    <th>Akumulasi</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboardActivePersonnelBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel dashboard-summary-panel">
+            <header class="dashboard-summary-header">
+              <div>
+                <h2>Personil Tidak Memiliki Pekerjaan Aktif</h2>
+                <p>Klik nama untuk melihat histori pekerjaan.</p>
+              </div>
+              <strong id="dashboardInactivePersonnelCount" class="dashboard-summary-count">0</strong>
+            </header>
+            <div class="dashboard-summary-table-wrap">
+              <table class="dashboard-summary-table">
+                <thead>
+                  <tr>
+                    <th>Nama Personil</th>
+                    <th>Status</th>
+                    <th>Jabatan atau Posisi</th>
+                    <th>Histori Selesai</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboardInactivePersonnelBody"></tbody>
+              </table>
+            </div>
+          </article>
         </section>
       </section>
 
@@ -689,7 +761,7 @@
   </dialog>
 
   <dialog id="personnelDetailModal">
-    <section class="modal-card personnel-detail-card">
+    <section class="modal-card personnel-detail-card personnel-history-card">
       <header>
         <div>
           <h2 id="personnelDetailTitle">Detail Personil</h2>
@@ -808,6 +880,6 @@
   </dialog>
 
   <script src="firebase-config.js?v=20260622180000"></script>
-  <script type="module" src="app.js?v=20260622180000"></script>
+  <script type="module" src="app.js?v=20260622203000"></script>
 </body>
 </html>
