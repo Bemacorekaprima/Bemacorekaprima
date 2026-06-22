@@ -138,5 +138,10 @@ service cloud.firestore {
           )
         );
     }
+
+    match /appSettings/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if hasRole(["super_admin"]);
+    }
   }
 }

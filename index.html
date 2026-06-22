@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260622130000">
+  <link rel="stylesheet" href="styles.css?v=20260622150000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -476,7 +476,7 @@
                 <div>
                   <strong>Google Drive</strong>
                   <p>Folder untuk menyimpan dokumen, lampiran, laporan, atau file pendukung pekerjaan.</p>
-                  <a class="drive-link" href="https://drive.google.com/drive/folders/1d5-UJScndg70lIXMvM4DrqxAMEOCqkXR?usp=sharing" target="_blank" rel="noopener noreferrer">
+                  <a class="drive-link" id="googleDriveLink" href="https://drive.google.com/drive/folders/1d5-UJScndg70lIXMvM4DrqxAMEOCqkXR?usp=sharing" target="_blank" rel="noopener noreferrer">
                     Buka Folder Google Drive
                   </a>
                 </div>
@@ -492,6 +492,58 @@
                 </div>
               </section>
             </div>
+          </article>
+          <article class="panel system-config-panel hidden" id="dataSourceConfigPanel">
+            <div class="section-header">
+              <div>
+                <h2>Sumber Data</h2>
+                <p>Ubah tautan Google Drive dan CSV publik Google Spreadsheet tanpa mengedit kode.</p>
+              </div>
+              <span class="access-role-badge">Super Admin</span>
+            </div>
+            <form id="dataSourceConfigForm" class="system-config-form">
+              <label class="full">
+                <span>Folder Google Drive</span>
+                <input id="configDriveUrl" type="url" required placeholder="https://drive.google.com/drive/folders/...">
+              </label>
+              <label class="full">
+                <span>CSV Sheet DATA UTAMA</span>
+                <input id="configDataUtamaUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
+              </label>
+              <label class="full">
+                <span>CSV Sheet PERSONIL BMC</span>
+                <input id="configPersonilBmcUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
+              </label>
+              <label class="full">
+                <span>CSV Sheet Outsourcing</span>
+                <input id="configOutsourcingUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
+              </label>
+              <footer class="full">
+                <span id="dataSourceConfigStatus" class="config-status"></span>
+                <button class="primary-button" type="submit">Simpan Sumber Data</button>
+              </footer>
+            </form>
+          </article>
+          <article class="panel system-config-panel hidden" id="menuVisibilityPanel">
+            <div class="section-header">
+              <div>
+                <h2>Visibilitas Menu per Role</h2>
+                <p>Tentukan menu yang dapat dilihat setiap role. Super Admin selalu memiliki akses penuh.</p>
+              </div>
+              <span class="access-role-badge">Super Admin</span>
+            </div>
+            <form id="menuVisibilityForm">
+              <div class="table-wrap menu-visibility-wrap">
+                <table class="menu-visibility-table">
+                  <thead id="menuVisibilityHead"></thead>
+                  <tbody id="menuVisibilityBody"></tbody>
+                </table>
+              </div>
+              <footer class="menu-visibility-footer">
+                <span id="menuVisibilityStatus" class="config-status"></span>
+                <button class="primary-button" type="submit">Simpan Visibilitas Menu</button>
+              </footer>
+            </form>
           </article>
           <article class="panel role-management-panel hidden" id="roleManagementPanel">
             <div class="section-header">
@@ -739,7 +791,7 @@
     </section>
   </dialog>
 
-  <script src="firebase-config.js?v=20260622140000"></script>
-  <script type="module" src="app.js?v=20260622140000"></script>
+  <script src="firebase-config.js?v=20260622150000"></script>
+  <script type="module" src="app.js?v=20260622150000"></script>
 </body>
 </html>

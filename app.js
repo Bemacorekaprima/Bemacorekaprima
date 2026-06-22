@@ -39,13 +39,14 @@ let unsubscribeTasks = null;
 let unsubscribeProfiles = null;
 let unsubscribeRoles = null;
 let unsubscribeCurrentRole = null;
+let unsubscribeAppSettings = null;
 let welcomeTimer = null;
 let aiContextTaskId = null;
 let externalSheetTimer = null;
 let externalSheetLastLoadedAt = 0;
 let currentJobDetail = null;
 
-const EXTERNAL_SHEET_SOURCES = [
+const DEFAULT_EXTERNAL_SHEET_SOURCES = [
   {
     id: "data-utama",
     label: "Sheet DATA UTAMA",
@@ -62,6 +63,35 @@ const EXTERNAL_SHEET_SOURCES = [
     url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq/pub?gid=1030462578&single=true&output=csv"
   }
 ];
+
+const DEFAULT_DRIVE_URL = "https://drive.google.com/drive/folders/1d5-UJScndg70lIXMvM4DrqxAMEOCqkXR?usp=sharing";
+const CONFIGURABLE_ROLES = ["admin", "editor", "author", "contributor", "moderator", "member"];
+const MENU_DEFINITIONS = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "jobs", label: "Pekerjaan" },
+  { id: "personnel", label: "Personil" },
+  { id: "tasks", label: "Tugas" },
+  { id: "reports", label: "Laporan" },
+  { id: "settings", label: "Pengaturan" }
+];
+const DEFAULT_MENU_ROLES = {
+  dashboard: [...CONFIGURABLE_ROLES],
+  jobs: [...CONFIGURABLE_ROLES],
+  personnel: [...CONFIGURABLE_ROLES],
+  tasks: [...CONFIGURABLE_ROLES],
+  reports: [...CONFIGURABLE_ROLES],
+  settings: ["admin", "editor", "author", "contributor"]
+};
+
+function createDefaultAppConfig() {
+  return {
+    driveUrl: DEFAULT_DRIVE_URL,
+    sheetUrls: Object.fromEntries(DEFAULT_EXTERNAL_SHEET_SOURCES.map(source => [source.id, source.url])),
+    menuRoles: Object.fromEntries(
+      Object.entries(DEFAULT_MENU_ROLES).map(([menu, roles]) => [menu, [...roles]])
+    )
+  };
+}
 
 const BOOTSTRAP_SUPER_ADMIN_EMAIL = "o.supriyadi630@gmail.com";
 const ACCESS_ROLES = {
@@ -113,7 +143,8 @@ let state = {
   reports: [],
   accessRole: "guest",
   roleAssignments: [],
-  externalSheets: createInitialExternalSheets(),
+  appConfig: createDefaultAppConfig(),
+  externalSheets: createInitialExternalSheets(createDefaultAppConfig()),
   today: getToday(),
   filter: "all",
   activeView: "dashboard",
@@ -184,6 +215,8 @@ function bindControls() {
   document.getElementById("statusFilter").addEventListener("change", render);
   document.getElementById("roleAssignmentForm").addEventListener("submit", saveRoleAssignment);
   document.getElementById("roleAssignmentsBody").addEventListener("click", handleRoleAssignmentAction);
+  document.getElementById("dataSourceConfigForm").addEventListener("submit", saveDataSourceConfig);
+  document.getElementById("menuVisibilityForm").addEventListener("submit", saveMenuVisibilityConfig);
   document.querySelectorAll("[data-personnel-source]").forEach(button => {
     button.addEventListener("click", () => selectPersonnelSource(button.dataset.personnelSource));
   });
@@ -288,6 +321,10 @@ onAuthStateChanged(auth, async user => {
     unsubscribeCurrentRole();
     unsubscribeCurrentRole = null;
   }
+  if (unsubscribeAppSettings) {
+    unsubscribeAppSettings();
+    unsubscribeAppSettings = null;
+  }
   if (externalSheetTimer) {
     window.clearInterval(externalSheetTimer);
     externalSheetTimer = null;
@@ -297,6 +334,7 @@ onAuthStateChanged(auth, async user => {
     currentProfile = await loadUserProfile(user);
     state.accessRole = await loadAccessRole(user);
     watchCurrentAccessRole(user);
+    watchAppSettings();
     renderUserProfile();
     state.tasks = loadCachedTasks();
     state.syncMessage = state.tasks.length
@@ -313,9 +351,10 @@ onAuthStateChanged(auth, async user => {
     currentProfile = null;
     state.accessRole = "guest";
     state.roleAssignments = [];
+    state.appConfig = createDefaultAppConfig();
     state.tasks = [];
     state.people = [];
-    state.externalSheets = createInitialExternalSheets();
+    state.externalSheets = createInitialExternalSheets(state.appConfig);
     externalSheetLastLoadedAt = 0;
     state.syncMessage = "Menunggu login...";
     render();
@@ -489,6 +528,41 @@ function watchCurrentAccessRole(user) {
   });
 }
 
+function normalizeAppConfig(value = {}) {
+  const defaults = createDefaultAppConfig();
+  const sheetUrls = { ...defaults.sheetUrls, ...(value.sheetUrls || {}) };
+  const menuRoles = {};
+
+  MENU_DEFINITIONS.forEach(menu => {
+    const configuredRoles = Array.isArray(value.menuRoles?.[menu.id])
+      ? value.menuRoles[menu.id].filter(role => CONFIGURABLE_ROLES.includes(role))
+      : defaults.menuRoles[menu.id];
+    menuRoles[menu.id] = [...new Set(configuredRoles)];
+  });
+
+  return {
+    driveUrl: String(value.driveUrl || defaults.driveUrl).trim(),
+    sheetUrls,
+    menuRoles
+  };
+}
+
+function watchAppSettings() {
+  unsubscribeAppSettings = onSnapshot(doc(db, "appSettings", "general"), snapshot => {
+    state.appConfig = normalizeAppConfig(snapshot.exists() ? snapshot.data() : {});
+    state.externalSheets = createInitialExternalSheets(state.appConfig);
+    renderSystemConfiguration();
+    renderAccessControl();
+    renderView();
+    loadExternalSheetData();
+  }, () => {
+    state.appConfig = createDefaultAppConfig();
+    state.externalSheets = createInitialExternalSheets(state.appConfig);
+    renderSystemConfiguration();
+    renderAccessControl();
+  });
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -501,12 +575,22 @@ function hasAccessRole(...roles) {
   return roles.includes(state.accessRole);
 }
 
+function canViewMenu(view, role = state.accessRole) {
+  if (role === "super_admin") return true;
+  const allowedRoles = state.appConfig?.menuRoles?.[view] || DEFAULT_MENU_ROLES[view] || [];
+  return allowedRoles.includes(role);
+}
+
 function canViewSettings() {
-  return getAccessRoleDefinition().group <= 2;
+  return canViewMenu("settings");
 }
 
 function canManageRoles() {
   return hasAccessRole("super_admin", "admin");
+}
+
+function canManageSystemConfig() {
+  return hasAccessRole("super_admin");
 }
 
 function canManageAllTasks() {
@@ -576,13 +660,17 @@ function renderUserProfile() {
 
 function renderAccessControl() {
   const role = getAccessRoleDefinition();
-  const settingsNav = document.getElementById("settingsNavButton");
-  const canOpenSettings = canViewSettings();
-  settingsNav.classList.toggle("hidden", !canOpenSettings);
-  document.querySelector(".nav").classList.toggle("restricted-nav", !canOpenSettings);
+  const nav = document.querySelector(".nav");
+  let visibleMenuCount = 0;
+  document.querySelectorAll(".nav-item[data-view]").forEach(button => {
+    const visible = canViewMenu(button.dataset.view);
+    button.classList.toggle("hidden", !visible);
+    if (visible) visibleMenuCount += 1;
+  });
+  nav.style.setProperty("--visible-nav-count", String(Math.max(1, visibleMenuCount)));
 
-  if (!canOpenSettings && state.activeView === "settings") {
-    state.activeView = "dashboard";
+  if (!canViewMenu(state.activeView)) {
+    state.activeView = MENU_DEFINITIONS.find(menu => canViewMenu(menu.id))?.id || "dashboard";
   }
 
   document.getElementById("settingsAccessRole").textContent = role.label;
@@ -590,6 +678,8 @@ function renderAccessControl() {
   document.getElementById("settingsAccessEmail").textContent = currentUser?.email || "";
   document.getElementById("roleManagerBadge").textContent = role.label;
   document.getElementById("roleManagementPanel").classList.toggle("hidden", !canManageRoles());
+  document.getElementById("dataSourceConfigPanel").classList.toggle("hidden", !canManageSystemConfig());
+  document.getElementById("menuVisibilityPanel").classList.toggle("hidden", !canManageSystemConfig());
 
   const canCreate = canCreateTask();
   document.getElementById("newTaskButton").classList.toggle("hidden", !canCreate);
@@ -599,6 +689,7 @@ function renderAccessControl() {
   document.getElementById("createReportButton").classList.toggle("hidden", !canCreateReports());
   document.getElementById("createReportButtonReports").classList.toggle("hidden", !canCreateReports());
   document.getElementById("addPersonnelButton").classList.toggle("hidden", !canManagePersonnel());
+  renderSystemConfiguration();
   renderRoleSelectOptions();
   renderRoleAssignments();
 }
@@ -615,6 +706,121 @@ function renderRoleSelectOptions() {
   document.getElementById("roleManagementNote").textContent = state.accessRole === "super_admin"
     ? "Super Admin dapat menetapkan seluruh role, termasuk Super Admin lainnya."
     : "Administrator hanya dapat menetapkan Editor, Author, Contributor, Moderator, dan Member.";
+}
+
+function renderSystemConfiguration() {
+  const config = normalizeAppConfig(state.appConfig);
+  const driveLink = document.getElementById("googleDriveLink");
+  if (driveLink) driveLink.href = config.driveUrl;
+
+  const fields = {
+    configDriveUrl: config.driveUrl,
+    configDataUtamaUrl: config.sheetUrls["data-utama"],
+    configPersonilBmcUrl: config.sheetUrls["personil-bmc"],
+    configOutsourcingUrl: config.sheetUrls.outsourcing
+  };
+  Object.entries(fields).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input && document.activeElement !== input) input.value = value || "";
+  });
+
+  const head = document.getElementById("menuVisibilityHead");
+  const body = document.getElementById("menuVisibilityBody");
+  if (!head || !body) return;
+
+  head.innerHTML = `
+    <tr>
+      <th>Menu</th>
+      ${CONFIGURABLE_ROLES.map(role => `<th>${escapeHtml(ACCESS_ROLES[role].label)}</th>`).join("")}
+    </tr>
+  `;
+  const menuForm = document.getElementById("menuVisibilityForm");
+  if (menuForm?.contains(document.activeElement)) return;
+  body.innerHTML = MENU_DEFINITIONS.map(menu => `
+    <tr>
+      <td><strong>${escapeHtml(menu.label)}</strong></td>
+      ${CONFIGURABLE_ROLES.map(role => `
+        <td>
+          <input
+            type="checkbox"
+            name="menu-role"
+            data-menu="${escapeHtml(menu.id)}"
+            data-role="${escapeHtml(role)}"
+            ${config.menuRoles[menu.id]?.includes(role) ? "checked" : ""}
+            aria-label="${escapeHtml(`${menu.label} untuk ${ACCESS_ROLES[role].label}`)}"
+          >
+        </td>
+      `).join("")}
+    </tr>
+  `).join("");
+}
+
+function validateHttpsUrl(value, label) {
+  try {
+    const url = new URL(String(value || "").trim());
+    if (url.protocol !== "https:") throw new Error();
+    return url.toString();
+  } catch (error) {
+    throw new Error(`${label} harus berupa tautan HTTPS yang valid.`);
+  }
+}
+
+async function saveDataSourceConfig(event) {
+  event.preventDefault();
+  if (!requirePermission(canManageSystemConfig(), "Hanya Super Admin yang dapat mengubah sumber data.")) return;
+
+  const status = document.getElementById("dataSourceConfigStatus");
+  try {
+    const driveUrl = validateHttpsUrl(document.getElementById("configDriveUrl").value, "Google Drive");
+    const sheetUrls = {
+      "data-utama": validateHttpsUrl(document.getElementById("configDataUtamaUrl").value, "CSV DATA UTAMA"),
+      "personil-bmc": validateHttpsUrl(document.getElementById("configPersonilBmcUrl").value, "CSV PERSONIL BMC"),
+      outsourcing: validateHttpsUrl(document.getElementById("configOutsourcingUrl").value, "CSV Outsourcing")
+    };
+    status.textContent = "Menyimpan...";
+    await setDoc(doc(db, "appSettings", "general"), {
+      driveUrl,
+      sheetUrls,
+      updatedBy: normalizeEmail(currentUser?.email),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    status.textContent = "Sumber data berhasil disimpan.";
+  } catch (error) {
+    status.textContent = error.message || "Sumber data gagal disimpan.";
+  }
+}
+
+async function saveMenuVisibilityConfig(event) {
+  event.preventDefault();
+  if (!requirePermission(canManageSystemConfig(), "Hanya Super Admin yang dapat mengatur visibilitas menu.")) return;
+
+  const menuRoles = Object.fromEntries(MENU_DEFINITIONS.map(menu => [menu.id, []]));
+  document.querySelectorAll('input[name="menu-role"]:checked').forEach(input => {
+    if (menuRoles[input.dataset.menu] && CONFIGURABLE_ROLES.includes(input.dataset.role)) {
+      menuRoles[input.dataset.menu].push(input.dataset.role);
+    }
+  });
+
+  const status = document.getElementById("menuVisibilityStatus");
+  const roleWithoutMenu = CONFIGURABLE_ROLES.find(role =>
+    !MENU_DEFINITIONS.some(menu => menuRoles[menu.id].includes(role))
+  );
+  if (roleWithoutMenu) {
+    status.textContent = `${ACCESS_ROLES[roleWithoutMenu].label} harus memiliki minimal satu menu.`;
+    return;
+  }
+
+  try {
+    status.textContent = "Menyimpan...";
+    await setDoc(doc(db, "appSettings", "general"), {
+      menuRoles,
+      updatedBy: normalizeEmail(currentUser?.email),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    status.textContent = "Visibilitas menu berhasil disimpan.";
+  } catch (error) {
+    status.textContent = `Gagal menyimpan: ${error.message}`;
+  }
 }
 
 function toggleProfileMenu() {
@@ -1055,9 +1261,10 @@ function rankTextMatches(question, items) {
     .map(result => result.item);
 }
 
-function createInitialExternalSheets() {
-  return EXTERNAL_SHEET_SOURCES.map(source => ({
+function createInitialExternalSheets(config = createDefaultAppConfig()) {
+  return DEFAULT_EXTERNAL_SHEET_SOURCES.map(source => ({
     ...source,
+    url: config?.sheetUrls?.[source.id] || source.url,
     records: [],
     status: "idle",
     error: ""
@@ -1083,7 +1290,9 @@ async function loadExternalSheetData() {
   }
 
   const results = await Promise.all(loadingSheets.map(async sheet => {
-    if (Array.isArray(bridgeRecords[sheet.id])) {
+    const defaultSource = DEFAULT_EXTERNAL_SHEET_SOURCES.find(source => source.id === sheet.id);
+    const usesDefaultUrl = !defaultSource || sheet.url === defaultSource.url;
+    if (usesDefaultUrl && Array.isArray(bridgeRecords[sheet.id])) {
       return {
         ...sheet,
         records: bridgeRecords[sheet.id],
@@ -1456,6 +1665,50 @@ function getJobDetailColumnClass(column) {
   return "";
 }
 
+function isRemunerationColumn(column) {
+  const normalized = normalizeSearchText(column);
+  return normalized.includes("remunerasi") || normalized.includes("billing rate");
+}
+
+function parseIndonesianNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const raw = String(value || "").trim();
+  if (!raw || raw === "-") return null;
+  let numeric = raw.replace(/[^\d,.-]/g, "");
+  if (!numeric) return null;
+
+  if (numeric.includes(",")) {
+    numeric = numeric.replace(/\./g, "").replace(",", ".");
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(numeric)) {
+    numeric = numeric.replace(/\./g, "");
+  }
+  const parsed = Number(numeric);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatRupiah(value) {
+  const number = parseIndonesianNumber(value);
+  if (number == null) return String(value || "-");
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(number);
+}
+
+function getRecordDisplayValue(record, column) {
+  const normalized = normalizeSearchText(column);
+  if (normalized === "bobot individual") {
+    const involvementKey = Object.keys(record || {}).find(key =>
+      normalizeSearchText(key) === "keterlibatan"
+    );
+    return normalizeSearchText(record?.[involvementKey]) === "ya" ? "1" : "0";
+  }
+  if (isRemunerationColumn(column)) return formatRupiah(record?.[column]);
+  return String(record?.[column] || "-");
+}
+
 function openJobDetail(job) {
   const modal = document.getElementById("jobDetailModal");
   const title = document.getElementById("jobDetailTitle");
@@ -1489,7 +1742,7 @@ function openJobDetail(job) {
         <tbody>
           ${job.records.map(record => `
             <tr>
-              ${columns.map(column => `<td>${escapeHtml(record[column] || "-")}</td>`).join("")}
+              ${columns.map(column => `<td>${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}
             </tr>
           `).join("")}
         </tbody>
@@ -1527,7 +1780,7 @@ function buildJobDetailExportTable(data) {
       </thead>
       <tbody>
         ${data.records.map(record => `
-          <tr>${data.columns.map(column => `<td>${escapeHtml(record[column] || "-")}</td>`).join("")}</tr>
+          <tr>${data.columns.map(column => `<td>${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}</tr>
         `).join("")}
       </tbody>
     </table>
@@ -1921,7 +2174,7 @@ function renderPersonnel() {
   tableBody.innerHTML = pageRecords.length
     ? pageRecords.map((record, index) => `
       <tr>
-        ${columns.map(column => `<td data-label="${escapeHtml(humanizeFieldName(column))}">${escapeHtml(record[column] || "-")}</td>`).join("")}
+        ${columns.map(column => `<td data-label="${escapeHtml(humanizeFieldName(column))}">${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}
         <td data-label="Aksi" class="personnel-row-actions">
           <div class="personnel-row-dropdown">
             <button class="secondary-button action-dropdown-button" type="button" data-personnel-menu="${index}" aria-expanded="false">
@@ -2188,7 +2441,7 @@ function exportPersonnelCsv() {
   const records = getFilteredPersonnelRecords();
   if (!records.length) return alert("Tidak ada data personil untuk diekspor.");
   const columns = getPersonnelColumns(records);
-  const rows = records.map(record => columns.map(column => record[column] || ""));
+  const rows = records.map(record => columns.map(column => getRecordDisplayValue(record, column)));
   const csv = [columns, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
   const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -2218,7 +2471,7 @@ function buildPersonnelExportTable(data) {
   ).join("");
   const rows = data.records.map(record => `
     <tr>
-      ${data.columns.map(column => `<td>${escapeHtml(record[column] || "-")}</td>`).join("")}
+      ${data.columns.map(column => `<td>${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}
     </tr>
   `).join("");
   return `
@@ -2710,8 +2963,8 @@ function render() {
 }
 
 function setView(view) {
-  if (view === "settings" && !canViewSettings()) {
-    alert("Menu Pengaturan hanya tersedia untuk role tingkat Manajemen Sistem dan Pengelolaan Data/Konten.");
+  if (!canViewMenu(view)) {
+    alert("Role Anda tidak memiliki akses untuk membuka menu ini.");
     return;
   }
   state.activeView = view;
