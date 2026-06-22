@@ -45,6 +45,7 @@ let aiContextTaskId = null;
 let externalSheetTimer = null;
 let externalSheetLastLoadedAt = 0;
 let currentJobDetail = null;
+let jobDetailResizeObserver = null;
 
 const DEFAULT_EXTERNAL_SHEET_SOURCES = [
   {
@@ -1543,6 +1544,13 @@ function buildJobsFromDataUtama() {
   return Array.from(groups.values());
 }
 
+function getJobStatus(job) {
+  const statuses = [...new Set((job?.records || [])
+    .map(record => getRecordValue(record, ["status pekerjaan", "status project", "status proyek"]))
+    .filter(Boolean))];
+  return statuses.length ? statuses.join(", ") : "-";
+}
+
 function getFilteredJobs() {
   const queryText = normalizeSearchText(state.jobsSearch);
   const queryTokens = getMeaningfulTokens(queryText);
@@ -1552,6 +1560,7 @@ function getFilteredJobs() {
       job.pekerjaan,
       job.tanggalMulai,
       job.tanggalSelesai,
+      getJobStatus(job),
       ...job.records.map(record => objectSearchText(record))
     ].join(" "));
     return queryTokens.every(token => haystack.includes(token));
@@ -1601,7 +1610,7 @@ function renderJobs() {
 
   if (resultCount) resultCount.textContent = `${jobs.length} pekerjaan ditemukan`;
   if (!visible.length) {
-    tableBody.innerHTML = '<tr><td class="personnel-empty" colspan="4">Tidak ada pekerjaan yang cocok.</td></tr>';
+    tableBody.innerHTML = '<tr><td class="personnel-empty" colspan="5">Tidak ada pekerjaan yang cocok.</td></tr>';
   } else {
     tableBody.innerHTML = visible.map((job, index) => `
       <tr class="clickable-row" data-job-index="${startIndex + index}" tabindex="0">
@@ -1609,6 +1618,7 @@ function renderJobs() {
         <td data-label="Tanggal Mulai">${escapeHtml(job.tanggalMulai || "-")}</td>
         <td data-label="Tanggal Selesai">${escapeHtml(job.tanggalSelesai || "-")}</td>
         <td data-label="Jumlah Personil">${job.records.length}</td>
+        <td data-label="Status Pekerjaan">${escapeHtml(getJobStatus(job))}</td>
       </tr>
     `).join("");
   }
@@ -1729,6 +1739,9 @@ function openJobDetail(job) {
       <div><span>Tanggal Selesai</span><strong>${escapeHtml(job.tanggalSelesai || "-")}</strong></div>
       <div><span>Jumlah Personil</span><strong>${job.records.length}</strong></div>
     </div>
+    <div class="job-detail-scrollbar" aria-label="Geser tabel secara horizontal">
+      <div class="job-detail-scrollbar-track"></div>
+    </div>
     <div class="job-detail-table-surface">
       <table class="job-detail-wide-table">
         <colgroup>
@@ -1750,11 +1763,42 @@ function openJobDetail(job) {
     </div>
   `;
   modal.showModal();
+  setupJobDetailScrollSync(body);
 }
 
 function closeJobDetail() {
   const modal = document.getElementById("jobDetailModal");
+  jobDetailResizeObserver?.disconnect();
+  jobDetailResizeObserver = null;
   if (modal?.open) modal.close();
+}
+
+function setupJobDetailScrollSync(container) {
+  const topScroller = container.querySelector(".job-detail-scrollbar");
+  const topTrack = container.querySelector(".job-detail-scrollbar-track");
+  const tableScroller = container.querySelector(".job-detail-table-surface");
+  const table = container.querySelector(".job-detail-wide-table");
+  if (!topScroller || !topTrack || !tableScroller || !table) return;
+
+  let syncing = false;
+  const updateTrackWidth = () => {
+    topTrack.style.width = `${table.scrollWidth}px`;
+  };
+  const syncScroll = (source, target) => {
+    if (syncing) return;
+    syncing = true;
+    target.scrollLeft = source.scrollLeft;
+    window.requestAnimationFrame(() => {
+      syncing = false;
+    });
+  };
+
+  topScroller.addEventListener("scroll", () => syncScroll(topScroller, tableScroller));
+  tableScroller.addEventListener("scroll", () => syncScroll(tableScroller, topScroller));
+  jobDetailResizeObserver?.disconnect();
+  jobDetailResizeObserver = new ResizeObserver(updateTrackWidth);
+  jobDetailResizeObserver.observe(table);
+  window.requestAnimationFrame(updateTrackWidth);
 }
 
 function getCurrentJobDetailExportData() {
@@ -1964,12 +2008,13 @@ function getJobsExportData() {
   }
   return {
     title: "Daftar Pekerjaan",
-    columns: ["Pekerjaan", "Tanggal Mulai", "Tanggal Selesai", "Jumlah Personil"],
+    columns: ["Pekerjaan", "Tanggal Mulai", "Tanggal Selesai", "Jumlah Personil", "Status Pekerjaan"],
     records: jobs.map(job => ({
       Pekerjaan: job.pekerjaan,
       "Tanggal Mulai": job.tanggalMulai || "-",
       "Tanggal Selesai": job.tanggalSelesai || "-",
-      "Jumlah Personil": job.records.length
+      "Jumlah Personil": job.records.length,
+      "Status Pekerjaan": getJobStatus(job)
     }))
   };
 }
