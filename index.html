@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260622203000">
+  <link rel="stylesheet" href="styles.css?v=20260622220000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -99,6 +99,7 @@
       </div>
       <nav class="nav">
         <button class="nav-item active" data-view="dashboard">Dashboard</button>
+        <button class="nav-item" data-view="tenders">Tender</button>
         <button class="nav-item" data-view="jobs">Pekerjaan</button>
         <button class="nav-item" data-view="personnel">Personil</button>
         <button class="nav-item" data-view="tasks">Tugas</button>
@@ -522,6 +523,135 @@
         </section>
       </section>
 
+      <section id="tendersView" class="view">
+        <section class="tender-stats-grid">
+          <article class="stat-card"><span>Total Paket</span><strong id="tenderStatTotal">0</strong></article>
+          <article class="stat-card blue"><span>Persiapan</span><strong id="tenderStatPreparation">0</strong></article>
+          <article class="stat-card green"><span>Siap/Final</span><strong id="tenderStatReady">0</strong></article>
+          <article class="stat-card red"><span>Deadline Dekat</span><strong id="tenderStatUrgent">0</strong></article>
+        </section>
+
+        <section class="tender-workspace">
+          <article class="panel tender-list-panel">
+            <div class="section-header">
+              <div>
+                <h2>Monitoring Paket Tender</h2>
+                <p>Pantau kelengkapan dokumen jasa konsultansi per paket.</p>
+              </div>
+              <button class="primary-button" id="newTenderButton" type="button">+ Paket Tender</button>
+            </div>
+            <div class="tender-filter-row">
+              <input id="tenderSearch" type="search" placeholder="Cari paket, instansi, lokasi, atau penanggung jawab...">
+              <select id="tenderStatusFilter">
+                <option value="all">Semua Status</option>
+                <option>Persiapan</option>
+                <option>Proses Seleksi</option>
+                <option>Klarifikasi/Negosiasi</option>
+                <option>Siap/Final</option>
+                <option>Kontrak</option>
+                <option>Arsip</option>
+              </select>
+            </div>
+            <div class="table-wrap tender-table-wrap">
+              <table class="tender-table">
+                <thead>
+                  <tr>
+                    <th>Paket</th>
+                    <th>Instansi/Satker</th>
+                    <th>Deadline</th>
+                    <th>Progres</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tenderTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside class="panel tender-detail-panel" id="tenderDetailPanel">
+            <div class="tender-empty-state" id="tenderEmptyState">
+              <strong>Pilih paket tender</strong>
+              <p>Detail, checklist, dan template dokumen akan tampil di sini.</p>
+            </div>
+            <div class="hidden" id="tenderDetailContent">
+              <header class="tender-detail-header">
+                <div>
+                  <span class="tender-status-badge" id="tenderDetailStatus">Persiapan</span>
+                  <h2 id="tenderDetailTitle">Nama Paket</h2>
+                  <p id="tenderDetailMeta"></p>
+                </div>
+                <div class="tender-detail-actions">
+                  <button class="secondary-button" id="editTenderButton" type="button">Edit Paket</button>
+                  <button class="secondary-button danger-text" id="deleteTenderButton" type="button">Hapus</button>
+                </div>
+              </header>
+
+              <section class="tender-progress-section">
+                <div class="tender-progress-copy">
+                  <strong id="tenderProgressLabel">0% lengkap</strong>
+                  <span id="tenderDocumentCount">0 dari 0 dokumen final</span>
+                </div>
+                <div class="tender-progress-track"><span id="tenderProgressBar"></span></div>
+              </section>
+
+              <section class="tender-info-grid" id="tenderInfoGrid"></section>
+
+              <section class="tender-checklist-section">
+                <div class="section-header">
+                  <div>
+                    <h3>Monitoring Dokumen</h3>
+                    <p>Status, penanggung jawab, deadline, dan tautan dokumen.</p>
+                  </div>
+                  <button class="primary-button" id="saveTenderChecklistButton" type="button">Simpan Monitoring</button>
+                </div>
+                <div class="table-wrap tender-checklist-wrap">
+                  <table class="tender-checklist-table">
+                    <thead>
+                      <tr>
+                        <th>Kelompok</th>
+                        <th>Dokumen</th>
+                        <th>Status</th>
+                        <th>Penanggung Jawab</th>
+                        <th>Deadline</th>
+                        <th>Dokumen</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tenderChecklistBody"></tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section class="tender-template-section">
+                <div class="section-header">
+                  <div>
+                    <h3>Template Dokumen</h3>
+                    <p>Buat draf dari informasi paket, lalu edit sebelum dicetak.</p>
+                  </div>
+                </div>
+                <div class="template-generator-controls">
+                  <select id="tenderTemplateType">
+                    <option value="surat-penawaran">Surat Penawaran</option>
+                    <option value="pakta-integritas">Pakta Integritas</option>
+                    <option value="daftar-personel">Daftar Personel</option>
+                    <option value="jadwal-penugasan">Jadwal Penugasan Personel</option>
+                    <option value="metodologi">Kerangka Pendekatan dan Metodologi</option>
+                  </select>
+                  <button class="secondary-button" id="generateTenderTemplateButton" type="button">Buat Template</button>
+                  <button class="secondary-button" id="saveTenderTemplateButton" type="button">Simpan Draf</button>
+                  <button class="primary-button" id="printTenderTemplateButton" type="button">Cetak / Simpan PDF</button>
+                </div>
+                <p class="tender-template-note">
+                  Template merupakan draf kerja. Periksa dan sesuaikan kembali dengan Dokumen Pemilihan, adendum, serta ketentuan paket yang berlaku.
+                </p>
+                <div id="tenderTemplatePreview" class="tender-template-preview" contenteditable="true" aria-label="Dokumen template yang dapat diedit">
+                  Pilih jenis dokumen lalu klik Buat Template.
+                </div>
+              </section>
+            </div>
+          </aside>
+        </section>
+      </section>
+
       <section id="settingsView" class="view">
         <section class="panel access-summary-panel">
           <div>
@@ -848,6 +978,77 @@
     </form>
   </dialog>
 
+  <dialog id="tenderFormModal">
+    <form method="dialog" class="modal-card tender-form-card" id="tenderForm">
+      <header>
+        <div>
+          <h2 id="tenderFormTitle">Paket Tender Baru</h2>
+          <p>Isi informasi pokok paket jasa konsultansi.</p>
+        </div>
+        <button type="button" class="icon-button" id="closeTenderFormButton">x</button>
+      </header>
+      <input id="tenderId" type="hidden">
+      <div class="tender-form-grid">
+        <label class="full">Nama Paket
+          <input id="tenderName" required placeholder="Nama paket pekerjaan">
+        </label>
+        <label>Instansi / Satker
+          <input id="tenderAgency" placeholder="Nama instansi atau satuan kerja">
+        </label>
+        <label>Lokasi
+          <input id="tenderLocation" placeholder="Lokasi pekerjaan">
+        </label>
+        <label>Sumber Dana
+          <input id="tenderFunding" placeholder="APBN/APBD/Loan/dll.">
+        </label>
+        <label>Tahun Anggaran
+          <input id="tenderBudgetYear" type="number" min="2000" max="2200">
+        </label>
+        <label>Pagu
+          <input id="tenderBudgetCeiling" type="number" min="0" step="1" placeholder="0">
+        </label>
+        <label>HPS
+          <input id="tenderHps" type="number" min="0" step="1" placeholder="0">
+        </label>
+        <label>Metode Seleksi
+          <input id="tenderMethod" placeholder="Seleksi kualitas dan biaya">
+        </label>
+        <label>Jenis Kontrak
+          <input id="tenderContractType" placeholder="Waktu penugasan/lumsum">
+        </label>
+        <label>Deadline Penawaran
+          <input id="tenderDeadline" type="datetime-local">
+        </label>
+        <label>Status
+          <select id="tenderStatus">
+            <option>Persiapan</option>
+            <option>Proses Seleksi</option>
+            <option>Klarifikasi/Negosiasi</option>
+            <option>Siap/Final</option>
+            <option>Kontrak</option>
+            <option>Arsip</option>
+          </select>
+        </label>
+        <label>Penanggung Jawab
+          <input id="tenderOwner" placeholder="Nama PIC/tim">
+        </label>
+        <label>Email PIC
+          <input id="tenderOwnerEmail" type="email" placeholder="nama@email.com">
+        </label>
+        <label class="full">Tautan Folder Dokumen
+          <input id="tenderDriveUrl" type="url" placeholder="https://drive.google.com/...">
+        </label>
+        <label class="full">Catatan
+          <textarea id="tenderNotes" rows="3" placeholder="Catatan paket atau persyaratan khusus"></textarea>
+        </label>
+      </div>
+      <footer>
+        <button class="secondary-button" id="cancelTenderFormButton" type="button">Batal</button>
+        <button class="primary-button" type="submit">Simpan Paket</button>
+      </footer>
+    </form>
+  </dialog>
+
   <button class="ai-chat-launcher hidden" id="aiChatLauncher" type="button" aria-label="Buka percakapan AI">
     <span class="chat-icon" aria-hidden="true"></span>
     <span class="chat-launcher-label">Chat</span>
@@ -880,6 +1081,6 @@
   </dialog>
 
   <script src="firebase-config.js?v=20260622180000"></script>
-  <script type="module" src="app.js?v=20260622203000"></script>
+  <script type="module" src="app.js?v=20260622220000"></script>
 </body>
 </html>

@@ -101,6 +101,15 @@ service cloud.firestore {
         (hasRole(["author"]) && ownsExistingTask());
     }
 
+    match /tenders/{tenderId} {
+      allow read: if signedIn();
+      allow create, update, delete: if hasRole([
+        "super_admin",
+        "admin",
+        "editor"
+      ]);
+    }
+
     match /profiles/{userId} {
       allow read: if signedIn();
       allow create, update: if signedIn() && request.auth.uid == userId;

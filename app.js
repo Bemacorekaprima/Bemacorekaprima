@@ -40,6 +40,7 @@ let unsubscribeProfiles = null;
 let unsubscribeRoles = null;
 let unsubscribeCurrentRole = null;
 let unsubscribeAppSettings = null;
+let unsubscribeTenders = null;
 let welcomeTimer = null;
 let aiContextTaskId = null;
 let externalSheetTimer = null;
@@ -69,6 +70,7 @@ const DEFAULT_DRIVE_URL = "https://drive.google.com/drive/folders/1d5-UJScndg70l
 const CONFIGURABLE_ROLES = ["admin", "editor", "author", "contributor", "moderator", "member"];
 const MENU_DEFINITIONS = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "tenders", label: "Tender" },
   { id: "jobs", label: "Pekerjaan" },
   { id: "personnel", label: "Personil" },
   { id: "tasks", label: "Tugas" },
@@ -77,12 +79,47 @@ const MENU_DEFINITIONS = [
 ];
 const DEFAULT_MENU_ROLES = {
   dashboard: [...CONFIGURABLE_ROLES],
+  tenders: [...CONFIGURABLE_ROLES],
   jobs: [...CONFIGURABLE_ROLES],
   personnel: [...CONFIGURABLE_ROLES],
   tasks: [...CONFIGURABLE_ROLES],
   reports: [...CONFIGURABLE_ROLES],
   settings: ["admin", "editor", "author", "contributor"]
 };
+
+const TENDER_DOCUMENT_BLUEPRINT = [
+  ["Persiapan", "Kerangka Acuan Kerja (KAK)"],
+  ["Persiapan", "HPS dan rincian perhitungan"],
+  ["Persiapan", "Rancangan kontrak dan syarat kontrak"],
+  ["Kualifikasi", "Akta perusahaan dan perubahan"],
+  ["Kualifikasi", "NIB, perizinan, dan sertifikat badan usaha"],
+  ["Kualifikasi", "Data pengalaman perusahaan"],
+  ["Kualifikasi", "Pakta integritas"],
+  ["Administrasi", "Surat penawaran"],
+  ["Administrasi", "Surat kuasa (jika diperlukan)"],
+  ["Teknis", "Pendekatan dan metodologi"],
+  ["Teknis", "Rencana kerja dan jadwal pelaksanaan"],
+  ["Teknis", "Organisasi dan komposisi tim"],
+  ["Personel", "Daftar personel tenaga ahli"],
+  ["Personel", "CV dan pengalaman personel"],
+  ["Personel", "Ijazah dan sertifikat kompetensi"],
+  ["Personel", "Surat pernyataan ketersediaan personel"],
+  ["Personel", "Jadwal penugasan personel"],
+  ["Biaya", "Rekapitulasi penawaran biaya"],
+  ["Biaya", "Rincian remunerasi personel"],
+  ["Biaya", "Rincian biaya langsung non-personel"],
+  ["Finalisasi", "Berita acara klarifikasi/negosiasi"],
+  ["Finalisasi", "SPPBJ dan dokumen kontrak"]
+];
+
+const TENDER_DOCUMENT_STATUSES = [
+  "Belum Ada",
+  "Draf",
+  "Pemeriksaan",
+  "Revisi",
+  "Disetujui",
+  "Final"
+];
 
 function createDefaultAppConfig() {
   return {
@@ -142,6 +179,7 @@ let state = {
   tasks: [],
   people: [],
   reports: [],
+  tenders: [],
   accessRole: "guest",
   roleAssignments: [],
   appConfig: createDefaultAppConfig(),
@@ -166,7 +204,10 @@ let state = {
   jobsPageSize: 25,
   jobsVisibleRecords: [],
   dashboardActivePersonnelRecords: [],
-  dashboardInactivePersonnelRecords: []
+  dashboardInactivePersonnelRecords: [],
+  selectedTenderId: "",
+  tenderSearch: "",
+  tenderStatusFilter: "all"
 };
 
 const statusToList = {
@@ -305,6 +346,25 @@ function bindControls() {
   document.getElementById("taskDate").addEventListener("change", event => closeDatePicker(event.target));
   document.getElementById("taskDeadline").addEventListener("input", event => closeDatePicker(event.target));
   document.getElementById("taskDeadline").addEventListener("change", event => closeDatePicker(event.target));
+  document.getElementById("newTenderButton").addEventListener("click", () => openTenderForm());
+  document.getElementById("tenderForm").addEventListener("submit", saveTender);
+  document.getElementById("closeTenderFormButton").addEventListener("click", closeTenderForm);
+  document.getElementById("cancelTenderFormButton").addEventListener("click", closeTenderForm);
+  document.getElementById("tenderSearch").addEventListener("input", event => {
+    state.tenderSearch = event.target.value;
+    renderTenders();
+  });
+  document.getElementById("tenderStatusFilter").addEventListener("change", event => {
+    state.tenderStatusFilter = event.target.value;
+    renderTenders();
+  });
+  document.getElementById("tenderTableBody").addEventListener("click", handleTenderTableClick);
+  document.getElementById("editTenderButton").addEventListener("click", editSelectedTender);
+  document.getElementById("deleteTenderButton").addEventListener("click", deleteSelectedTender);
+  document.getElementById("saveTenderChecklistButton").addEventListener("click", saveTenderChecklist);
+  document.getElementById("generateTenderTemplateButton").addEventListener("click", generateTenderTemplate);
+  document.getElementById("saveTenderTemplateButton").addEventListener("click", saveTenderTemplateDraft);
+  document.getElementById("printTenderTemplateButton").addEventListener("click", printTenderTemplate);
 
   document.querySelectorAll(".nav-item").forEach(button => {
     button.addEventListener("click", () => setView(button.dataset.view));
@@ -342,6 +402,10 @@ onAuthStateChanged(auth, async user => {
     unsubscribeAppSettings();
     unsubscribeAppSettings = null;
   }
+  if (unsubscribeTenders) {
+    unsubscribeTenders();
+    unsubscribeTenders = null;
+  }
   if (externalSheetTimer) {
     window.clearInterval(externalSheetTimer);
     externalSheetTimer = null;
@@ -359,6 +423,7 @@ onAuthStateChanged(auth, async user => {
       : "Memuat data dari Firebase...";
     render();
     watchTasks();
+    watchTenders();
     watchProfiles();
     if (canManageRoles()) watchRoleAssignments();
     loadExternalSheetData();
@@ -370,6 +435,7 @@ onAuthStateChanged(auth, async user => {
     state.roleAssignments = [];
     state.appConfig = createDefaultAppConfig();
     state.tasks = [];
+    state.tenders = [];
     state.people = [];
     state.externalSheets = createInitialExternalSheets(state.appConfig);
     externalSheetLastLoadedAt = 0;
@@ -655,6 +721,10 @@ function canManagePersonnel() {
   return hasAccessRole("super_admin", "editor", "author");
 }
 
+function canManageTenders() {
+  return hasAccessRole("super_admin", "admin", "editor");
+}
+
 function requirePermission(condition, message = "Anda tidak memiliki izin untuk tindakan ini.") {
   if (condition) return true;
   alert(message);
@@ -706,6 +776,11 @@ function renderAccessControl() {
   document.getElementById("createReportButton").classList.toggle("hidden", !canCreateReports());
   document.getElementById("createReportButtonReports").classList.toggle("hidden", !canCreateReports());
   document.getElementById("addPersonnelButton").classList.toggle("hidden", !canManagePersonnel());
+  document.getElementById("newTenderButton").classList.toggle("hidden", !canManageTenders());
+  document.getElementById("editTenderButton").classList.toggle("hidden", !canManageTenders());
+  document.getElementById("deleteTenderButton").classList.toggle("hidden", !canManageTenders());
+  document.getElementById("saveTenderChecklistButton").classList.toggle("hidden", !canManageTenders());
+  document.getElementById("saveTenderTemplateButton").classList.toggle("hidden", !canManageTenders());
   renderSystemConfiguration();
   renderRoleSelectOptions();
   renderRoleAssignments();
@@ -3334,6 +3409,460 @@ function watchTasks() {
   });
 }
 
+function watchTenders() {
+  unsubscribeTenders = onSnapshot(query(collection(db, "tenders")), snapshot => {
+    state.tenders = snapshot.docs
+      .map(item => ({ id: item.id, ...item.data() }))
+      .sort((left, right) =>
+        String(right.updatedAt?.seconds || right.createdAt?.seconds || "")
+          .localeCompare(String(left.updatedAt?.seconds || left.createdAt?.seconds || ""))
+      );
+    if (state.selectedTenderId && !state.tenders.some(item => item.id === state.selectedTenderId)) {
+      state.selectedTenderId = "";
+    }
+    if (!state.selectedTenderId && state.tenders.length) {
+      state.selectedTenderId = state.tenders[0].id;
+    }
+    renderTenders();
+  }, error => {
+    state.tenders = [];
+    renderTenders();
+    console.error("Tender gagal disinkronkan:", error);
+  });
+}
+
+function createTenderChecklist(existing = []) {
+  const existingMap = new Map((existing || []).map(item => [item.id, item]));
+  return TENDER_DOCUMENT_BLUEPRINT.map(([group, name], index) => {
+    const id = `doc-${index + 1}`;
+    return {
+      id,
+      group,
+      name,
+      status: "Belum Ada",
+      owner: "",
+      deadline: "",
+      url: "",
+      ...(existingMap.get(id) || {})
+    };
+  });
+}
+
+function getSelectedTender() {
+  return state.tenders.find(item => item.id === state.selectedTenderId) || null;
+}
+
+function getTenderProgress(tender) {
+  const documents = createTenderChecklist(tender?.documents);
+  const finalCount = documents.filter(item => item.status === "Final").length;
+  return {
+    documents,
+    finalCount,
+    total: documents.length,
+    percent: documents.length ? Math.round((finalCount / documents.length) * 100) : 0
+  };
+}
+
+function getFilteredTenders() {
+  const keyword = normalizeSearchText(state.tenderSearch);
+  return state.tenders.filter(tender => {
+    const matchesStatus = state.tenderStatusFilter === "all" ||
+      tender.status === state.tenderStatusFilter;
+    const searchable = normalizeSearchText([
+      tender.name,
+      tender.agency,
+      tender.location,
+      tender.owner,
+      tender.ownerEmail,
+      tender.status,
+      tender.budgetYear
+    ].join(" "));
+    return matchesStatus && (!keyword || searchable.includes(keyword));
+  });
+}
+
+function isTenderDeadlineUrgent(tender) {
+  if (!tender?.deadline || ["Kontrak", "Arsip", "Siap/Final"].includes(tender.status)) return false;
+  const deadline = new Date(tender.deadline).getTime();
+  if (!Number.isFinite(deadline)) return false;
+  const remainingDays = (deadline - Date.now()) / 86400000;
+  return remainingDays >= 0 && remainingDays <= 7;
+}
+
+function renderTenders() {
+  const body = document.getElementById("tenderTableBody");
+  if (!body) return;
+  const filtered = getFilteredTenders();
+  const selected = getSelectedTender();
+
+  document.getElementById("tenderStatTotal").textContent = state.tenders.length;
+  document.getElementById("tenderStatPreparation").textContent =
+    state.tenders.filter(item => item.status === "Persiapan").length;
+  document.getElementById("tenderStatReady").textContent =
+    state.tenders.filter(item => ["Siap/Final", "Kontrak", "Arsip"].includes(item.status)).length;
+  document.getElementById("tenderStatUrgent").textContent =
+    state.tenders.filter(isTenderDeadlineUrgent).length;
+
+  body.innerHTML = filtered.length
+    ? filtered.map(tender => {
+      const progress = getTenderProgress(tender);
+      return `
+        <tr class="clickable-row ${tender.id === state.selectedTenderId ? "selected" : ""}" data-tender-id="${escapeHtml(tender.id)}">
+          <td>
+            <strong>${escapeHtml(tender.name || "Tanpa nama")}</strong>
+            <small>${escapeHtml(tender.location || tender.budgetYear || "")}</small>
+          </td>
+          <td>${escapeHtml(tender.agency || "-")}</td>
+          <td>${escapeHtml(formatTenderDateTime(tender.deadline))}</td>
+          <td>
+            <div class="tender-table-progress">
+              <span style="width:${progress.percent}%"></span>
+            </div>
+            <small>${progress.percent}%</small>
+          </td>
+          <td><span class="tender-status-badge">${escapeHtml(tender.status || "Persiapan")}</span></td>
+        </tr>
+      `;
+    }).join("")
+    : '<tr><td colspan="5" class="personnel-empty">Belum ada paket tender yang cocok.</td></tr>';
+
+  document.getElementById("tenderEmptyState").classList.toggle("hidden", Boolean(selected));
+  document.getElementById("tenderDetailContent").classList.toggle("hidden", !selected);
+  if (selected) renderTenderDetail(selected);
+}
+
+function handleTenderTableClick(event) {
+  const row = event.target.closest("[data-tender-id]");
+  if (!row) return;
+  state.selectedTenderId = row.dataset.tenderId;
+  renderTenders();
+}
+
+function openTenderForm(tender = null) {
+  if (!requirePermission(canManageTenders(), "Role Anda tidak dapat mengubah paket tender.")) return;
+  document.getElementById("tenderForm").reset();
+  document.getElementById("tenderId").value = tender?.id || "";
+  document.getElementById("tenderFormTitle").textContent = tender ? "Edit Paket Tender" : "Paket Tender Baru";
+  document.getElementById("tenderName").value = tender?.name || "";
+  document.getElementById("tenderAgency").value = tender?.agency || "";
+  document.getElementById("tenderLocation").value = tender?.location || "";
+  document.getElementById("tenderFunding").value = tender?.funding || "";
+  document.getElementById("tenderBudgetYear").value = tender?.budgetYear || new Date().getFullYear();
+  document.getElementById("tenderBudgetCeiling").value = tender?.budgetCeiling || "";
+  document.getElementById("tenderHps").value = tender?.hps || "";
+  document.getElementById("tenderMethod").value = tender?.method || "Seleksi kualitas dan biaya";
+  document.getElementById("tenderContractType").value = tender?.contractType || "";
+  document.getElementById("tenderDeadline").value = tender?.deadline || "";
+  document.getElementById("tenderStatus").value = tender?.status || "Persiapan";
+  document.getElementById("tenderOwner").value = tender?.owner || "";
+  document.getElementById("tenderOwnerEmail").value = tender?.ownerEmail || "";
+  document.getElementById("tenderDriveUrl").value = tender?.driveUrl || state.appConfig?.driveUrl || "";
+  document.getElementById("tenderNotes").value = tender?.notes || "";
+  document.getElementById("tenderFormModal").showModal();
+}
+
+function closeTenderForm() {
+  document.getElementById("tenderFormModal").close();
+}
+
+async function saveTender(event) {
+  event.preventDefault();
+  if (!requirePermission(canManageTenders(), "Role Anda tidak dapat menyimpan paket tender.")) return;
+
+  const tenderId = document.getElementById("tenderId").value;
+  const existing = state.tenders.find(item => item.id === tenderId);
+  const payload = {
+    name: document.getElementById("tenderName").value.trim(),
+    agency: document.getElementById("tenderAgency").value.trim(),
+    location: document.getElementById("tenderLocation").value.trim(),
+    funding: document.getElementById("tenderFunding").value.trim(),
+    budgetYear: document.getElementById("tenderBudgetYear").value,
+    budgetCeiling: Number(document.getElementById("tenderBudgetCeiling").value || 0),
+    hps: Number(document.getElementById("tenderHps").value || 0),
+    method: document.getElementById("tenderMethod").value.trim(),
+    contractType: document.getElementById("tenderContractType").value.trim(),
+    deadline: document.getElementById("tenderDeadline").value,
+    status: document.getElementById("tenderStatus").value,
+    owner: document.getElementById("tenderOwner").value.trim(),
+    ownerEmail: normalizeEmail(document.getElementById("tenderOwnerEmail").value),
+    driveUrl: document.getElementById("tenderDriveUrl").value.trim(),
+    notes: document.getElementById("tenderNotes").value.trim(),
+    documents: createTenderChecklist(existing?.documents),
+    updatedBy: normalizeEmail(currentUser?.email),
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    const reference = tenderId ? doc(db, "tenders", tenderId) : doc(collection(db, "tenders"));
+    await setDoc(reference, {
+      ...payload,
+      ownerUid: existing?.ownerUid || currentUser?.uid || "",
+      createdBy: existing?.createdBy || normalizeEmail(currentUser?.email),
+      createdAt: existing?.createdAt || serverTimestamp()
+    }, { merge: true });
+    state.selectedTenderId = reference.id;
+    closeTenderForm();
+  } catch (error) {
+    alert(`Paket tender gagal disimpan: ${error.message}`);
+  }
+}
+
+function editSelectedTender() {
+  const tender = getSelectedTender();
+  if (tender) openTenderForm(tender);
+}
+
+async function deleteSelectedTender() {
+  const tender = getSelectedTender();
+  if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat menghapus paket tender.")) return;
+  if (!confirm(`Hapus paket tender "${tender.name}" beserta checklist monitoringnya?`)) return;
+  try {
+    await deleteDoc(doc(db, "tenders", tender.id));
+    state.selectedTenderId = "";
+  } catch (error) {
+    alert(`Paket tender gagal dihapus: ${error.message}`);
+  }
+}
+
+function renderTenderDetail(tender) {
+  const progress = getTenderProgress(tender);
+  document.getElementById("tenderDetailStatus").textContent = tender.status || "Persiapan";
+  document.getElementById("tenderDetailTitle").textContent = tender.name || "Paket Tender";
+  document.getElementById("tenderDetailMeta").textContent =
+    [tender.agency, tender.location, tender.budgetYear].filter(Boolean).join(" - ") || "Informasi paket belum lengkap";
+  document.getElementById("tenderProgressLabel").textContent = `${progress.percent}% lengkap`;
+  document.getElementById("tenderDocumentCount").textContent =
+    `${progress.finalCount} dari ${progress.total} dokumen final`;
+  document.getElementById("tenderProgressBar").style.width = `${progress.percent}%`;
+  document.getElementById("tenderInfoGrid").innerHTML = [
+    ["Sumber Dana", escapeHtml(tender.funding || "-")],
+    ["Pagu", escapeHtml(formatRupiah(tender.budgetCeiling))],
+    ["HPS", escapeHtml(formatRupiah(tender.hps))],
+    ["Metode Seleksi", escapeHtml(tender.method || "-")],
+    ["Jenis Kontrak", escapeHtml(tender.contractType || "-")],
+    ["Deadline", escapeHtml(formatTenderDateTime(tender.deadline))],
+    ["Penanggung Jawab", escapeHtml(tender.owner || "-")],
+    ["Folder Dokumen", tender.driveUrl
+      ? `<a href="${escapeHtml(tender.driveUrl)}" target="_blank" rel="noopener noreferrer">Buka folder</a>`
+      : "-"]
+  ].map(([label, value]) => `
+    <div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>
+  `).join("");
+
+  document.getElementById("tenderChecklistBody").innerHTML = progress.documents.map(item => `
+    <tr data-tender-document-id="${escapeHtml(item.id)}">
+      <td>${escapeHtml(item.group)}</td>
+      <td><strong>${escapeHtml(item.name)}</strong></td>
+      <td>
+        <select data-document-field="status" ${canManageTenders() ? "" : "disabled"}>
+          ${TENDER_DOCUMENT_STATUSES.map(status =>
+            `<option ${status === item.status ? "selected" : ""}>${escapeHtml(status)}</option>`
+          ).join("")}
+        </select>
+      </td>
+      <td><input data-document-field="owner" value="${escapeHtml(item.owner)}" ${canManageTenders() ? "" : "disabled"}></td>
+      <td><input data-document-field="deadline" type="date" value="${escapeHtml(item.deadline)}" ${canManageTenders() ? "" : "disabled"}></td>
+      <td class="tender-document-link-cell">
+        <input data-document-field="url" type="url" value="${escapeHtml(item.url)}" placeholder="https://..." ${canManageTenders() ? "" : "disabled"}>
+        ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Buka</a>` : ""}
+      </td>
+    </tr>
+  `).join("");
+}
+
+async function saveTenderChecklist() {
+  const tender = getSelectedTender();
+  if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat mengubah monitoring dokumen.")) return;
+  const documents = [...document.querySelectorAll("[data-tender-document-id]")].map(row => ({
+    id: row.dataset.tenderDocumentId,
+    group: createTenderChecklist().find(item => item.id === row.dataset.tenderDocumentId)?.group || "",
+    name: createTenderChecklist().find(item => item.id === row.dataset.tenderDocumentId)?.name || "",
+    status: row.querySelector('[data-document-field="status"]').value,
+    owner: row.querySelector('[data-document-field="owner"]').value.trim(),
+    deadline: row.querySelector('[data-document-field="deadline"]').value,
+    url: row.querySelector('[data-document-field="url"]').value.trim()
+  }));
+  try {
+    await setDoc(doc(db, "tenders", tender.id), {
+      documents,
+      updatedBy: normalizeEmail(currentUser?.email),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    alert("Monitoring dokumen berhasil disimpan.");
+  } catch (error) {
+    alert(`Monitoring dokumen gagal disimpan: ${error.message}`);
+  }
+}
+
+function formatTenderDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: value.includes("T") ? "2-digit" : undefined,
+    minute: value.includes("T") ? "2-digit" : undefined
+  }).format(date);
+}
+
+function getTenderPersonnel(tender) {
+  const sheet = getDataUtamaSheet();
+  if (!sheet || sheet.status !== "ready") return [];
+  const target = normalizeSearchText(tender?.name);
+  return sheet.records.filter(record =>
+    normalizeSearchText(getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"])) === target
+  );
+}
+
+function buildTenderTemplate(tender, type) {
+  const personnel = getTenderPersonnel(tender);
+  const companyName = "PT. BEMACO REKAPRIMA";
+  const commonHeader = `
+    <div class="template-letterhead">
+      <strong>${companyName}</strong>
+      <span>Dokumen Tender Jasa Konsultansi</span>
+    </div>
+  `;
+  const identity = `
+    <table>
+      <tr><th>Nama Paket</th><td>${escapeHtml(tender.name || "-")}</td></tr>
+      <tr><th>Instansi/Satker</th><td>${escapeHtml(tender.agency || "-")}</td></tr>
+      <tr><th>Lokasi</th><td>${escapeHtml(tender.location || "-")}</td></tr>
+      <tr><th>Tahun Anggaran</th><td>${escapeHtml(tender.budgetYear || "-")}</td></tr>
+    </table>
+  `;
+  const signature = `
+    <div class="template-signature">
+      <p>[Kota], [Tanggal Dokumen]</p>
+      <p>${companyName}</p>
+      <br><br><br>
+      <strong>[Nama Penandatangan]</strong>
+      <p>[Jabatan]</p>
+    </div>
+  `;
+
+  if (type === "pakta-integritas") {
+    return `${commonHeader}<h1>PAKTA INTEGRITAS</h1>${identity}
+      <p>Kami yang bertanda tangan di bawah ini menyatakan bahwa dalam proses pengadaan untuk paket tersebut:</p>
+      <ol>
+        <li>Tidak akan melakukan praktik korupsi, kolusi, dan nepotisme.</li>
+        <li>Akan melaporkan indikasi penyimpangan yang diketahui.</li>
+        <li>Akan mengikuti proses pengadaan secara bersih, transparan, dan profesional.</li>
+        <li>Bersedia dikenakan sanksi apabila melanggar pernyataan ini.</li>
+      </ol>${signature}`;
+  }
+
+  if (type === "daftar-personel" || type === "jadwal-penugasan") {
+    const isSchedule = type === "jadwal-penugasan";
+    return `${commonHeader}<h1>${isSchedule ? "JADWAL PENUGASAN PERSONEL" : "DAFTAR PERSONEL TENAGA AHLI"}</h1>${identity}
+      <table>
+        <thead><tr><th>No.</th><th>Nama Personel</th><th>Posisi/Jabatan</th>${isSchedule
+          ? "<th>Mulai</th><th>Selesai</th>"
+          : "<th>Bidang Keahlian</th><th>Status</th>"}</tr></thead>
+        <tbody>${personnel.length ? personnel.map((record, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(getRecordValue(record, ["nama personil", "nama lengkap", "nama"]) || "-")}</td>
+            <td>${escapeHtml(getRecordValue(record, ["posisi jabatan kontrak", "jabatan", "posisi"]) || "-")}</td>
+            ${isSchedule
+              ? `<td>${escapeHtml(getRecordValue(record, ["tanggal mulai", "mulai"]) || "-")}</td><td>${escapeHtml(getRecordValue(record, ["tanggal selesai", "selesai"]) || "-")}</td>`
+              : `<td>${escapeHtml(getRecordValue(record, ["ska bidang keahlian", "bidang keahlian", "ska"]) || "-")}</td><td>${escapeHtml(getRecordValue(record, ["status kontrak", "status"]) || "-")}</td>`}
+          </tr>`).join("") : '<tr><td colspan="6">Tambahkan data personel paket pada DATA UTAMA atau isi tabel ini secara manual.</td></tr>'}</tbody>
+      </table>${signature}`;
+  }
+
+  if (type === "metodologi") {
+    return `${commonHeader}<h1>PENDEKATAN DAN METODOLOGI</h1>${identity}
+      <h2>1. Pemahaman terhadap Kerangka Acuan Kerja</h2>
+      <p>[Jelaskan pemahaman tujuan, keluaran, lokasi, ruang lingkup, dan kondisi pekerjaan.]</p>
+      <h2>2. Pendekatan Teknis</h2>
+      <p>[Uraikan pendekatan teknis yang relevan dengan paket dan standar PUPR/Cipta Karya.]</p>
+      <h2>3. Metodologi Pelaksanaan</h2>
+      <p>[Uraikan tahapan pengumpulan data, analisis, perencanaan, koordinasi, pengendalian mutu, dan pelaporan.]</p>
+      <h2>4. Rencana Kerja dan Organisasi Tim</h2>
+      <p>[Jelaskan jadwal, pembagian peran, mekanisme komunikasi, serta pengendalian risiko.]</p>
+      <h2>5. Keluaran dan Pengendalian Mutu</h2>
+      <p>[Tuliskan daftar keluaran dan mekanisme pemeriksaan sebelum penyerahan.]</p>`;
+  }
+
+  return `${commonHeader}<h1>SURAT PENAWARAN</h1>
+    <p>Nomor: [Nomor Surat]</p>
+    <p>Kepada Yth.<br><strong>Pokja Pemilihan / Pejabat Pengadaan</strong><br>${escapeHtml(tender.agency || "[Nama Instansi/Satker]")}</p>
+    <p>Dengan hormat,</p>
+    <p>Sehubungan dengan proses pemilihan penyedia jasa konsultansi untuk paket berikut:</p>
+    ${identity}
+    <p>Kami mengajukan penawaran sesuai Dokumen Pemilihan beserta seluruh adendum. Nilai penawaran biaya kami adalah <strong>${formatRupiah(tender.hps || tender.budgetCeiling)}</strong> atau sesuai rincian penawaran biaya terlampir.</p>
+    <p>Penawaran ini berlaku selama [masa berlaku penawaran] hari kalender sejak batas akhir pemasukan penawaran.</p>
+    ${signature}`;
+}
+
+function generateTenderTemplate() {
+  const tender = getSelectedTender();
+  if (!tender) return alert("Pilih paket tender terlebih dahulu.");
+  const type = document.getElementById("tenderTemplateType").value;
+  document.getElementById("tenderTemplatePreview").innerHTML =
+    sanitizeTenderTemplateHtml(tender.templates?.[type] || buildTenderTemplate(tender, type));
+}
+
+async function saveTenderTemplateDraft() {
+  const tender = getSelectedTender();
+  if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat menyimpan draf template.")) return;
+  const type = document.getElementById("tenderTemplateType").value;
+  const content = sanitizeTenderTemplateHtml(
+    document.getElementById("tenderTemplatePreview").innerHTML.trim()
+  );
+  if (!content) return alert("Buat atau isi template terlebih dahulu.");
+  try {
+    await setDoc(doc(db, "tenders", tender.id), {
+      templates: {
+        ...(tender.templates || {}),
+        [type]: content
+      },
+      updatedBy: normalizeEmail(currentUser?.email),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    alert("Draf template berhasil disimpan pada paket tender.");
+  } catch (error) {
+    alert(`Draf template gagal disimpan: ${error.message}`);
+  }
+}
+
+function sanitizeTenderTemplateHtml(value) {
+  const documentFragment = new DOMParser().parseFromString(String(value || ""), "text/html");
+  documentFragment.querySelectorAll("script, style, iframe, object, embed, form").forEach(node => node.remove());
+  documentFragment.querySelectorAll("*").forEach(node => {
+    [...node.attributes].forEach(attribute => {
+      const name = attribute.name.toLowerCase();
+      const content = attribute.value.trim().toLowerCase();
+      if (name.startsWith("on") || ((name === "href" || name === "src") && content.startsWith("javascript:"))) {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+  return documentFragment.body.innerHTML;
+}
+
+function printTenderTemplate() {
+  const tender = getSelectedTender();
+  const preview = document.getElementById("tenderTemplatePreview");
+  if (!tender || !preview.textContent.trim()) return alert("Buat template terlebih dahulu.");
+  const html = `
+    <!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(tender.name)} - Dokumen Tender</title>
+    <style>
+      @page { size: A4; margin: 20mm; }
+      body { color:#111827; font:12pt Arial,sans-serif; line-height:1.55; }
+      h1 { margin:22px 0; font-size:16pt; text-align:center; }
+      h2 { margin-top:20px; font-size:13pt; }
+      table { width:100%; border-collapse:collapse; margin:14px 0; }
+      th,td { border:1px solid #9ca3af; padding:7px; text-align:left; vertical-align:top; }
+      .template-letterhead { display:flex; justify-content:space-between; border-bottom:2px solid #1d4ed8; padding-bottom:10px; }
+      .template-signature { width:42%; margin:30px 0 0 auto; }
+    </style></head><body>${sanitizeTenderTemplateHtml(preview.innerHTML)}</body></html>`;
+  printHtmlDocument(html);
+}
+
 function watchProfiles() {
   unsubscribeProfiles = onSnapshot(query(collection(db, "profiles")), snapshot => {
     state.people = snapshot.docs
@@ -3461,6 +3990,7 @@ function render() {
   renderExternalSheetStatus();
   renderPersonnel();
   renderJobs();
+  renderTenders();
   renderDashboardWorkSummary();
   renderAttentionBanner();
   document.getElementById("todayText").textContent = `Hari ini: ${formatHumanDate(state.today)}`;
@@ -3479,6 +4009,7 @@ function setView(view) {
 function renderView() {
   const titles = {
     dashboard: "Dashboard",
+    tenders: "Tender",
     jobs: "Pekerjaan",
     personnel: "Personil",
     tasks: "Tugas",
