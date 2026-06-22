@@ -120,6 +120,7 @@ const TENDER_DOCUMENT_STATUSES = [
   "Disetujui",
   "Final"
 ];
+const TENDER_STORAGE_COLLECTION = "tasks";
 
 function createDefaultAppConfig() {
   return {
@@ -3389,6 +3390,7 @@ function watchTasks() {
   unsubscribeTasks = onSnapshot(tasksQuery, snapshot => {
     const remoteTasks = snapshot.docs
       .map(item => ({ id: item.id, ...item.data() }))
+      .filter(item => item.entityType !== "tender")
       .sort((a, b) => String(b.tanggal || "").localeCompare(String(a.tanggal || "")));
     const cachedTasks = loadCachedTasks();
 
@@ -3410,9 +3412,10 @@ function watchTasks() {
 }
 
 function watchTenders() {
-  unsubscribeTenders = onSnapshot(query(collection(db, "tenders")), snapshot => {
+  unsubscribeTenders = onSnapshot(query(collection(db, TENDER_STORAGE_COLLECTION)), snapshot => {
     state.tenders = snapshot.docs
       .map(item => ({ id: item.id, ...item.data() }))
+      .filter(item => item.entityType === "tender")
       .sort((left, right) =>
         String(right.updatedAt?.seconds || right.createdAt?.seconds || "")
           .localeCompare(String(left.updatedAt?.seconds || left.createdAt?.seconds || ""))
@@ -3572,6 +3575,7 @@ async function saveTender(event) {
   const tenderId = document.getElementById("tenderId").value;
   const existing = state.tenders.find(item => item.id === tenderId);
   const payload = {
+    entityType: "tender",
     name: document.getElementById("tenderName").value.trim(),
     agency: document.getElementById("tenderAgency").value.trim(),
     location: document.getElementById("tenderLocation").value.trim(),
@@ -3593,7 +3597,9 @@ async function saveTender(event) {
   };
 
   try {
-    const reference = tenderId ? doc(db, "tenders", tenderId) : doc(collection(db, "tenders"));
+    const reference = tenderId
+      ? doc(db, TENDER_STORAGE_COLLECTION, tenderId)
+      : doc(collection(db, TENDER_STORAGE_COLLECTION));
     await setDoc(reference, {
       ...payload,
       ownerUid: existing?.ownerUid || currentUser?.uid || "",
@@ -3617,7 +3623,7 @@ async function deleteSelectedTender() {
   if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat menghapus paket tender.")) return;
   if (!confirm(`Hapus paket tender "${tender.name}" beserta checklist monitoringnya?`)) return;
   try {
-    await deleteDoc(doc(db, "tenders", tender.id));
+    await deleteDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id));
     state.selectedTenderId = "";
   } catch (error) {
     alert(getTenderFirestoreErrorMessage(error, "Paket tender gagal dihapus."));
@@ -3683,7 +3689,7 @@ async function saveTenderChecklist() {
     url: row.querySelector('[data-document-field="url"]').value.trim()
   }));
   try {
-    await setDoc(doc(db, "tenders", tender.id), {
+    await setDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id), {
       documents,
       updatedBy: normalizeEmail(currentUser?.email),
       updatedAt: serverTimestamp()
@@ -3815,7 +3821,7 @@ async function saveTenderTemplateDraft() {
   );
   if (!content) return alert("Buat atau isi template terlebih dahulu.");
   try {
-    await setDoc(doc(db, "tenders", tender.id), {
+    await setDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id), {
       templates: {
         ...(tender.templates || {}),
         [type]: content
