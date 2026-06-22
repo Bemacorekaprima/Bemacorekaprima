@@ -331,7 +331,7 @@ function bindControls() {
   });
   document.getElementById("refreshJobsButton").addEventListener("click", refreshJobsData);
   document.getElementById("jobsToolsButton").addEventListener("click", toggleJobsToolsMenu);
-  document.getElementById("addJobButton").addEventListener("click", addJobFromPrompt);
+  document.getElementById("addJobButton").addEventListener("click", () => openJobRecordForm());
   document.getElementById("exportJobsPdfButton").addEventListener("click", exportJobsPdf);
   document.getElementById("exportJobsExcelButton").addEventListener("click", exportJobsExcel);
   document.getElementById("exportJobsCsvButton").addEventListener("click", exportJobsCsv);
@@ -341,6 +341,11 @@ function bindControls() {
   document.getElementById("jobsTableBody").addEventListener("click", handleJobsTableClick);
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
   document.getElementById("closeJobDetailFooter").addEventListener("click", closeJobDetail);
+  document.getElementById("addJobDetailRowButton").addEventListener("click", () => openJobRecordForm(null, currentJobDetail));
+  document.getElementById("jobDetailBody").addEventListener("click", handleJobDetailAction);
+  document.getElementById("jobRecordForm").addEventListener("submit", saveJobRecord);
+  document.getElementById("closeJobRecordFormButton").addEventListener("click", closeJobRecordForm);
+  document.getElementById("cancelJobRecordFormButton").addEventListener("click", closeJobRecordForm);
   document.getElementById("exportJobDetailPdfButton").addEventListener("click", exportCurrentJobDetailPdf);
   document.getElementById("exportJobDetailExcelButton").addEventListener("click", exportCurrentJobDetailExcel);
   document.getElementById("taskDate").addEventListener("input", event => closeDatePicker(event.target));
@@ -777,6 +782,8 @@ function renderAccessControl() {
   document.getElementById("createReportButton").classList.toggle("hidden", !canCreateReports());
   document.getElementById("createReportButtonReports").classList.toggle("hidden", !canCreateReports());
   document.getElementById("addPersonnelButton").classList.toggle("hidden", !canManagePersonnel());
+  document.getElementById("addJobButton").classList.toggle("hidden", !canManagePersonnel());
+  document.getElementById("addJobDetailRowButton").classList.toggle("hidden", !canManagePersonnel());
   document.getElementById("newTenderButton").classList.toggle("hidden", !canManageTenders());
   document.getElementById("editTenderButton").classList.toggle("hidden", !canManageTenders());
   document.getElementById("deleteTenderButton").classList.toggle("hidden", !canManageTenders());
@@ -959,7 +966,9 @@ function closePersonnelMenus() {
   });
 }
 
-function toggleJobsToolsMenu() {
+function toggleJobsToolsMenu(event) {
+  event?.preventDefault();
+  event?.stopPropagation();
   const menu = document.getElementById("jobsToolsMenu");
   const button = document.getElementById("jobsToolsButton");
   const willOpen = menu.classList.contains("hidden");
@@ -1907,12 +1916,19 @@ function openJobDetail(job) {
         <thead>
           <tr>
             ${columns.map(column => `<th>${escapeHtml(humanizeFieldName(column))}</th>`).join("")}
+            ${canManagePersonnel() ? "<th>AKSI</th>" : ""}
           </tr>
         </thead>
         <tbody>
-          ${job.records.map(record => `
+          ${job.records.map((record, recordIndex) => `
             <tr>
               ${columns.map(column => `<td>${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}
+              ${canManagePersonnel() ? `
+                <td class="job-detail-row-actions">
+                  <button type="button" class="text-button" data-job-record-action="edit" data-job-record-index="${recordIndex}">Edit</button>
+                  <button type="button" class="text-button danger-text" data-job-record-action="delete" data-job-record-index="${recordIndex}">Hapus</button>
+                </td>
+              ` : ""}
             </tr>
           `).join("")}
         </tbody>
@@ -1922,7 +1938,7 @@ function openJobDetail(job) {
       <div class="job-detail-scrollbar-track"></div>
     </div>
   `;
-  modal.showModal();
+  if (!modal.open) modal.showModal();
   setupJobDetailScrollSync(body);
 }
 
@@ -2096,10 +2112,56 @@ function exportCurrentJobDetailPdf() {
   printHtmlDocument(html);
 }
 
-async function addJobFromPrompt() {
+function isJobComputedColumn(column) {
+  return includesAny(normalizeSearchText(column), [
+    "bobot",
+    "beban",
+    "jumlah bulan",
+    "jumlah bulan overtime",
+    "bobot individual"
+  ]);
+}
+
+function getEditableJobColumns(records) {
+  return getPersonnelColumns(records).filter(column =>
+    column !== "_Sumber Baris" && !isJobComputedColumn(column)
+  );
+}
+
+function renderJobRecordInput(column, value) {
+  const normalized = normalizeSearchText(column);
+  const escapedValue = escapeHtml(value || "");
+  if (normalized === "keterlibatan") {
+    return `
+      <select name="${escapeHtml(column)}">
+        <option value=""></option>
+        <option value="YA" ${normalizeSearchText(value) === "ya" ? "selected" : ""}>YA</option>
+        <option value="TIDAK" ${normalizeSearchText(value) === "tidak" ? "selected" : ""}>TIDAK</option>
+      </select>
+    `;
+  }
+  if (normalized === "id" || normalized.includes("status personil")) {
+    return `
+      <select name="${escapeHtml(column)}">
+        <option value=""></option>
+        <option value="Bemaco" ${includesAny(normalizeSearchText(value), ["bemaco", "bmc"]) ? "selected" : ""}>Bemaco</option>
+        <option value="Outsourcing" ${normalizeSearchText(value).includes("outsour") ? "selected" : ""}>Outsourcing</option>
+      </select>
+    `;
+  }
+  if (normalized.includes("status pekerjaan")) {
+    return `
+      <input name="${escapeHtml(column)}" value="${escapedValue}" list="jobStatusOptions" autocomplete="off">
+    `;
+  }
+  return `<input name="${escapeHtml(column)}" value="${escapedValue}" autocomplete="off">`;
+}
+
+function openJobRecordForm(record = null, job = null) {
+  closeJobsMenus();
   if (!requirePermission(
     canManagePersonnel(),
-    "Hanya Super Admin, Editor, atau Author yang dapat menambah data pekerjaan."
+    "Hanya Super Admin, Editor, atau Author yang dapat mengubah data pekerjaan."
   )) return;
 
   const sheet = getDataUtamaSheet();
@@ -2107,25 +2169,87 @@ async function addJobFromPrompt() {
     alert("DATA UTAMA belum terbaca. Klik Refresh lalu coba lagi.");
     return;
   }
+  const columns = getEditableJobColumns(sheet.records);
+  const jobColumn = columns.find(column =>
+    includesAny(normalizeSearchText(column), ["pekerjaan", "nama pekerjaan", "project", "proyek"])
+  );
+  if (!jobColumn) return alert("Kolom PEKERJAAN tidak ditemukan pada DATA UTAMA.");
 
-  const columns = getPersonnelColumns(sheet.records);
-  const columnLookup = Object.fromEntries(columns.map(column => [column, column]));
-  const jobColumn = findRecordColumn(columnLookup, ["pekerjaan", "nama pekerjaan", "project", "proyek"]) || "PEKERJAAN";
-  const startColumn = findRecordColumn(columnLookup, ["tanggal mulai", "tgl mulai", "mulai"]) || "TANGGAL MULAI";
-  const finishColumn = findRecordColumn(columnLookup, ["tanggal selesai", "tgl selesai", "selesai"]) || "TANGGAL SELESAI";
+  const initialRecord = { ...(record || {}) };
+  if (!record && job?.pekerjaan) initialRecord[jobColumn] = job.pekerjaan;
+  document.getElementById("jobRecordFormTitle").textContent = record
+    ? "Edit Rincian Pekerjaan"
+    : job
+      ? "Tambah Rincian Pekerjaan"
+      : "Tambah Pekerjaan Lengkap";
+  document.getElementById("jobRecordFormSource").textContent =
+    job?.pekerjaan || record?.[jobColumn] || "Sheet DATA UTAMA";
+  document.getElementById("jobRecordRowNumber").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("jobRecordFormStatus").textContent = "";
+  document.getElementById("jobRecordFormFields").innerHTML = `
+    <datalist id="jobStatusOptions">
+      <option value="Upcoming">
+      <option value="Active">
+      <option value="Progress">
+      <option value="Finish">
+      <option value="Finish, Overtime">
+    </datalist>
+    ${columns.map(column => `
+      <label class="${column === jobColumn ? "full" : ""}">
+        <span>${escapeHtml(humanizeFieldName(column))}</span>
+        ${renderJobRecordInput(column, initialRecord[column] || "")}
+      </label>
+    `).join("")}
+  `;
+  document.getElementById("jobRecordFormFields")
+    .querySelector(`[name="${CSS.escape(jobColumn)}"]`)
+    ?.setAttribute("required", "");
+  document.getElementById("jobRecordFormModal").showModal();
+}
 
-  const pekerjaan = prompt("Nama pekerjaan baru:");
-  if (!pekerjaan) return;
-  const tanggalMulai = prompt("Tanggal mulai, contoh 15 Mei 2025:", "");
-  const tanggalSelesai = prompt("Tanggal selesai, contoh 24 Desember 2025:", "");
+function closeJobRecordForm() {
+  const modal = document.getElementById("jobRecordFormModal");
+  if (modal?.open) modal.close();
+}
 
-  await sendJobMutation("add", {
-    data: {
-      [jobColumn]: pekerjaan.trim(),
-      [startColumn]: String(tanggalMulai || "").trim(),
-      [finishColumn]: String(tanggalSelesai || "").trim()
-    }
-  });
+async function saveJobRecord(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const rowNumber = Number(document.getElementById("jobRecordRowNumber").value) || 0;
+  const data = Object.fromEntries(
+    Array.from(new FormData(form).entries())
+      .filter(([key]) => key !== "")
+      .map(([key, value]) => [key, String(value).trim()])
+  );
+  document.getElementById("jobRecordFormStatus").textContent = "Mengirim perubahan...";
+  document.getElementById("saveJobRecordButton").disabled = true;
+  await sendJobMutation(rowNumber ? "update" : "add", { rowNumber, data });
+}
+
+function handleJobDetailAction(event) {
+  const button = event.target.closest("[data-job-record-action]");
+  if (!button || !currentJobDetail) return;
+  const record = currentJobDetail.records?.[Number(button.dataset.jobRecordIndex)];
+  if (!record) return;
+  if (button.dataset.jobRecordAction === "edit") {
+    openJobRecordForm(record, currentJobDetail);
+    return;
+  }
+  if (button.dataset.jobRecordAction === "delete") {
+    deleteJobRecord(record);
+  }
+}
+
+async function deleteJobRecord(record) {
+  if (!requirePermission(
+    canManagePersonnel(),
+    "Hanya Super Admin, Editor, atau Author yang dapat menghapus rincian pekerjaan."
+  )) return;
+  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
+  if (!rowNumber) return alert("Nomor baris DATA UTAMA tidak ditemukan.");
+  const personName = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]) || "baris ini";
+  if (!confirm(`Hapus rincian "${personName}" dari pekerjaan ${currentJobDetail?.pekerjaan || ""}?`)) return;
+  await sendJobMutation("delete", { rowNumber, data: {} });
 }
 
 async function sendJobMutation(action, payload) {
@@ -2135,6 +2259,7 @@ async function sendJobMutation(action, payload) {
   }
   if (!currentUser) return alert("Silakan login kembali.");
 
+  const selectedJobName = currentJobDetail?.pekerjaan || "";
   try {
     const firebaseIdToken = await currentUser.getIdToken(true);
     await fetch(window.PERSONNEL_BRIDGE_URL, {
@@ -2152,11 +2277,25 @@ async function sendJobMutation(action, payload) {
       })
     });
 
-    alert("Permintaan perubahan pekerjaan dikirim ke Google Spreadsheet.");
+    if (action !== "delete") closeJobRecordForm();
+    alert(action === "delete"
+      ? "Permintaan hapus rincian dikirim ke Google Spreadsheet."
+      : "Data pekerjaan dikirim ke Google Spreadsheet.");
     await new Promise(resolve => window.setTimeout(resolve, 1400));
     await loadExternalSheetData();
+    if (selectedJobName && document.getElementById("jobDetailModal")?.open) {
+      const updatedJob = buildJobsFromDataUtama().find(job =>
+        normalizeSearchText(job.pekerjaan) === normalizeSearchText(selectedJobName)
+      );
+      if (updatedJob) openJobDetail(updatedJob);
+      else closeJobDetail();
+    }
   } catch (error) {
     alert(`Data pekerjaan gagal dikirim: ${error.message}`);
+    document.getElementById("jobRecordFormStatus").textContent = error.message || "Perubahan gagal dikirim.";
+  } finally {
+    const saveButton = document.getElementById("saveJobRecordButton");
+    if (saveButton) saveButton.disabled = false;
   }
 }
 

@@ -10,7 +10,7 @@
       display: none !important;
     }
   </style>
-  <link rel="stylesheet" href="styles.css?v=20260622234500">
+  <link rel="stylesheet" href="styles.css?v=20260623003000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -316,7 +316,7 @@
                   Pilihan <span class="dropdown-chevron" aria-hidden="true"></span>
                 </button>
                 <div class="action-dropdown-menu personnel-tools-menu hidden" id="jobsToolsMenu">
-                  <button id="addJobButton" type="button">Tambah Pekerjaan</button>
+                  <button id="addJobButton" type="button">Tambah Pekerjaan Lengkap</button>
                   <button id="exportJobsPdfButton" type="button">Export PDF</button>
                   <button id="exportJobsExcelButton" type="button">Export Excel</button>
                   <button id="exportJobsCsvButton" type="button">Export CSV</button>
@@ -866,6 +866,7 @@
       <div id="jobDetailBody" class="job-detail-body"></div>
       <footer>
         <div class="job-detail-export-actions">
+          <button type="button" class="primary-button hidden" id="addJobDetailRowButton">+ Tambah Rincian</button>
           <button type="button" class="secondary-button" id="exportJobDetailPdfButton">Export PDF</button>
           <button type="button" class="secondary-button" id="exportJobDetailExcelButton">Export Excel</button>
         </div>
@@ -889,6 +890,26 @@
         <button type="button" class="primary-button" id="previewSendButton">Kirim Email</button>
       </footer>
     </div>
+  </dialog>
+
+  <dialog id="jobRecordFormModal">
+    <form method="dialog" class="modal-card job-record-form-card" id="jobRecordForm">
+      <header>
+        <div>
+          <h2 id="jobRecordFormTitle">Tambah Pekerjaan</h2>
+          <p id="jobRecordFormSource">Data akan disimpan ke Sheet DATA UTAMA.</p>
+        </div>
+        <button type="button" class="icon-button" id="closeJobRecordFormButton">x</button>
+      </header>
+      <input id="jobRecordRowNumber" type="hidden">
+      <div id="jobRecordFormFields" class="job-record-form-fields"></div>
+      <p class="personnel-form-note">Kolom formula spreadsheet tidak ditimpa. Isi minimal nama pekerjaan dan data personil yang diperlukan.</p>
+      <footer>
+        <span id="jobRecordFormStatus" class="config-status"></span>
+        <button type="button" class="secondary-button" id="cancelJobRecordFormButton">Batal</button>
+        <button class="primary-button" id="saveJobRecordButton" type="submit">Simpan ke Spreadsheet</button>
+      </footer>
+    </form>
   </dialog>
 
   <dialog id="personnelDetailModal">
@@ -1083,6 +1104,6 @@
   </dialog>
 
   <script src="firebase-config.js?v=20260622180000"></script>
-  <script type="module" src="app.js?v=20260622234500"></script>
+  <script type="module" src="app.js?v=20260623003000"></script>
 </body>
 </html>
