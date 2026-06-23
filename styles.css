@@ -475,20 +475,64 @@ button { cursor: pointer; }
 .profile-popover .danger-menu-button { color: var(--red); }
 
 .nav-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   width: auto;
   min-width: 86px;
-  padding: 10px 13px;
+  min-height: 52px;
+  padding: 7px 13px 6px;
   border: 0;
   border-radius: 8px;
   color: #cbd5e1;
   background: transparent;
   font-size: 13px;
+  line-height: 1.1;
   text-align: center;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-icon {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: #94a3b8;
+  line-height: 1;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.nav-icon svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.9;
+}
+
+.nav-icon-fallback {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.nav-icon svg + .nav-icon-fallback {
+  display: none;
 }
 
 .nav-item.active, .nav-item:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active .nav-icon,
+.nav-item:hover .nav-icon {
+  color: #38bdf8;
+  transform: translateY(1px);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
 }
 
 .main {
@@ -3487,7 +3531,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   .brand-row.compact .brand-mark { width: 38px; height: 38px; }
   .brand-row.compact strong { font-size: 13px; }
   .nav { justify-content: flex-start; overflow-x: auto; }
-  .nav-item { min-width: 76px; padding-inline: 9px; font-size: 12px; }
+  .nav-item { min-width: 76px; min-height: 50px; padding-inline: 9px; font-size: 12px; }
   .main {
     margin-top: 68px;
     margin-left: 0;
@@ -3590,9 +3634,16 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 
   .nav-item {
     min-width: 0;
-    padding: 8px 4px;
+    min-height: 48px;
+    padding: 6px 4px 5px;
     font-size: 11px;
     text-align: center;
+  }
+
+  .nav-icon,
+  .nav-icon svg {
+    width: 16px;
+    height: 16px;
   }
 
   .personnel-source-grid { gap: 10px; }

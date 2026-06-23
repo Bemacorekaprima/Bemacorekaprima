@@ -33,7 +33,7 @@
       showAppBootError("Koneksi memerlukan waktu terlalu lama. Silakan refresh halaman.");
     }, 15000);
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260623061000">
+  <link rel="stylesheet" href="styles.css?v=20260623103000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -121,13 +121,34 @@
         </div>
       </div>
       <nav class="nav">
-        <button class="nav-item active" data-view="dashboard">Dashboard</button>
-        <button class="nav-item" data-view="tenders">Tender</button>
-        <button class="nav-item" data-view="jobs">Portofolio</button>
-        <button class="nav-item" data-view="personnel">Personil</button>
-        <button class="nav-item" data-view="tasks">Tugas</button>
-        <button class="nav-item" data-view="reports">Laporan</button>
-        <button class="nav-item" id="settingsNavButton" data-view="settings">Pengaturan</button>
+        <button class="nav-item active" data-view="dashboard">
+          <span>Dashboard</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="layout-dashboard"></i><span class="nav-icon-fallback">▦</span></span>
+        </button>
+        <button class="nav-item" data-view="tenders">
+          <span>Tender</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="clipboard-check"></i><span class="nav-icon-fallback">✓</span></span>
+        </button>
+        <button class="nav-item" data-view="jobs">
+          <span>Portofolio</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="briefcase-business"></i><span class="nav-icon-fallback">◇</span></span>
+        </button>
+        <button class="nav-item" data-view="personnel">
+          <span>Personil</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="users"></i><span class="nav-icon-fallback">♙</span></span>
+        </button>
+        <button class="nav-item" data-view="tasks">
+          <span>Tugas</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="list-checks"></i><span class="nav-icon-fallback">≡</span></span>
+        </button>
+        <button class="nav-item" data-view="reports">
+          <span>Laporan</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="chart-no-axes-combined"></i><span class="nav-icon-fallback">▥</span></span>
+        </button>
+        <button class="nav-item" id="settingsNavButton" data-view="settings">
+          <span>Pengaturan</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="settings"></i><span class="nav-icon-fallback">⚙</span></span>
+        </button>
       </nav>
       <div class="sidebar-profile-wrap">
         <button class="sidebar-profile" id="profileMenuButton" type="button" aria-expanded="false">
@@ -1295,6 +1316,12 @@
   </dialog>
 
   <script src="firebase-config.js?v=20260622180000"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      if (window.lucide) window.lucide.createIcons();
+    });
+  </script>
   <script type="module" src="app.js?v=20260623063000"></script>
 </body>
 </html>
