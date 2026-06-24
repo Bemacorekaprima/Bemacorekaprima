@@ -1769,7 +1769,8 @@ function jobMatchesStatusFilter(job, filter) {
   const status = getNormalizedJobStatus(job);
   if (filter === "tender") return status.includes("tender");
   if (filter === "completed") {
-    return status.includes("finish") || status.includes("selesai");
+    return (status.includes("finish") || status.includes("selesai")) &&
+      !status.includes("overtime");
   }
   if (filter === "finish-overtime") {
     return (status.includes("finish") || status.includes("selesai")) &&
@@ -1786,6 +1787,7 @@ function jobMatchesStatusFilter(job, filter) {
     return status.includes("ongoing") ||
       status.includes("aktif") ||
       status.includes("active") ||
+      status.includes("overtime") ||
       status.includes("progress") ||
       status.includes("proses") ||
       status.includes("berjalan") ||
@@ -1826,7 +1828,7 @@ function getPortfolioCounts(jobs) {
   return {
     total: jobs.length,
     active: jobs.filter(job => getPortfolioStatusKey(job) === "active").length,
-    finish: jobs.filter(job => ["finish", "finish-overtime"].includes(getPortfolioStatusKey(job))).length,
+    finish: jobs.filter(job => getPortfolioStatusKey(job) === "finish").length,
     tender: jobs.filter(job => getPortfolioStatusKey(job) === "tender").length,
     upcoming: jobs.filter(job => getPortfolioStatusKey(job) === "upcoming").length
   };
@@ -1834,7 +1836,7 @@ function getPortfolioCounts(jobs) {
 
 function getPortfolioStatusKey(job) {
   if (jobMatchesStatusFilter(job, "tender")) return "tender";
-  if (jobMatchesStatusFilter(job, "finish-overtime")) return "finish-overtime";
+  if (jobMatchesStatusFilter(job, "finish-overtime")) return "active";
   if (jobMatchesStatusFilter(job, "finish")) return "finish";
   if (jobMatchesStatusFilter(job, "upcoming")) return "upcoming";
   if (jobMatchesStatusFilter(job, "ongoing") ||
