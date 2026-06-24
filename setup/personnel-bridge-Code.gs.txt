@@ -10,12 +10,26 @@ const PERSONNEL_SHEETS = {
 };
 
 const PERSONNEL_WRITE_ROLES = ['super_admin', 'editor', 'author'];
+const PERSONNEL_CACHE_TTL_SECONDS = 180;
+const PERSONNEL_CACHE_PREFIX = 'personnelBridge:v2:';
+const PERSONNEL_CACHE_CHUNK_SIZE = 85000;
+const PERSONNEL_CACHE_MAX_CHUNKS = 30;
 
 function doGet(e) {
   const callback = String((e && e.parameter && e.parameter.callback) || 'personnelBridgeCallback');
 
   try {
     validateBridgeToken_((e && e.parameter && e.parameter.token) || '');
+    const cachedSheets = getCachedSheets_();
+    if (cachedSheets) {
+      return javascriptResponse_(callback, {
+        ok: true,
+        sheets: cachedSheets,
+        cache: 'hit',
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     const spreadsheet = getBoundSpreadsheet_();
     const sheets = {};
 
@@ -23,10 +37,12 @@ function doGet(e) {
       const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
       sheets[sourceId] = readSheet_(sheet);
     });
+    setCachedSheets_(sheets);
 
     return javascriptResponse_(callback, {
       ok: true,
       sheets: sheets,
+      cache: 'miss',
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -79,6 +95,7 @@ function doPost(e) {
       } else {
         throw new Error('Aksi personil tidak dikenali.');
       }
+      clearPersonnelCache_();
     } finally {
       lock.releaseLock();
     }
@@ -98,6 +115,123 @@ function doPost(e) {
       error: error.message || String(error)
     });
   }
+}
+
+function getCachedSheets_() {
+  const sheets = {};
+  const sourceIds = Object.keys(PERSONNEL_SHEETS);
+
+  for (let index = 0; index < sourceIds.length; index += 1) {
+    const sourceId = sourceIds[index];
+    const cachedRecords = getCacheJson_('sheet:' + sourceId);
+    if (!Array.isArray(cachedRecords)) return null;
+    sheets[sourceId] = cachedRecords;
+  }
+
+  return sheets;
+}
+
+function setCachedSheets_(sheets) {
+  Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
+    if (Array.isArray(sheets[sourceId])) {
+      setCacheJson_('sheet:' + sourceId, sheets[sourceId], PERSONNEL_CACHE_TTL_SECONDS);
+    }
+  });
+}
+
+function clearPersonnelCache_() {
+  Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
+    clearCacheValue_('sheet:' + sourceId);
+  });
+}
+
+function getCacheJson_(key) {
+  const text = getCacheText_(key);
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    clearCacheValue_(key);
+    return null;
+  }
+}
+
+function setCacheJson_(key, value, ttlSeconds) {
+  setCacheText_(key, JSON.stringify(value), ttlSeconds);
+}
+
+function getCacheText_(key) {
+  const cache = CacheService.getScriptCache();
+  const baseKey = PERSONNEL_CACHE_PREFIX + key;
+  const metaText = cache.get(baseKey + ':meta');
+  if (!metaText) return '';
+
+  let meta;
+  try {
+    meta = JSON.parse(metaText);
+  } catch (error) {
+    clearCacheValue_(key);
+    return '';
+  }
+
+  if (!meta || !Number.isInteger(meta.chunks) || meta.chunks < 1 || meta.chunks > PERSONNEL_CACHE_MAX_CHUNKS) {
+    clearCacheValue_(key);
+    return '';
+  }
+
+  const keys = [];
+  for (let index = 0; index < meta.chunks; index += 1) {
+    keys.push(baseKey + ':chunk:' + index);
+  }
+
+  const chunks = cache.getAll(keys);
+  const parts = [];
+  for (let index = 0; index < keys.length; index += 1) {
+    const chunk = chunks[keys[index]];
+    if (typeof chunk !== 'string') {
+      clearCacheValue_(key);
+      return '';
+    }
+    parts.push(chunk);
+  }
+
+  return parts.join('');
+}
+
+function setCacheText_(key, text, ttlSeconds) {
+  const cache = CacheService.getScriptCache();
+  const baseKey = PERSONNEL_CACHE_PREFIX + key;
+  const chunks = [];
+
+  for (let start = 0; start < text.length; start += PERSONNEL_CACHE_CHUNK_SIZE) {
+    chunks.push(text.slice(start, start + PERSONNEL_CACHE_CHUNK_SIZE));
+  }
+
+  if (!chunks.length || chunks.length > PERSONNEL_CACHE_MAX_CHUNKS) {
+    clearCacheValue_(key);
+    return;
+  }
+
+  const payload = {};
+  chunks.forEach(function(chunk, index) {
+    payload[baseKey + ':chunk:' + index] = chunk;
+  });
+  payload[baseKey + ':meta'] = JSON.stringify({
+    chunks: chunks.length,
+    storedAt: new Date().toISOString()
+  });
+
+  cache.putAll(payload, ttlSeconds);
+}
+
+function clearCacheValue_(key) {
+  const cache = CacheService.getScriptCache();
+  const baseKey = PERSONNEL_CACHE_PREFIX + key;
+  const keys = [baseKey + ':meta'];
+  for (let index = 0; index < PERSONNEL_CACHE_MAX_CHUNKS; index += 1) {
+    keys.push(baseKey + ':chunk:' + index);
+  }
+  cache.removeAll(keys);
 }
 
 function getBoundSpreadsheet_() {

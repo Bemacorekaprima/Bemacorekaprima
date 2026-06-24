@@ -8,6 +8,8 @@ Personnel Bridge menghubungkan web dengan tiga sheet sumber:
 
 Bridge membaca ketiga sheet secara langsung. Ini memperbaiki DATA UTAMA yang tidak dapat dibaca melalui URL CSV. Bridge juga menerima tambah, edit, dan hapus dari web untuk role **Super Admin**, **Editor**, dan **Author**.
 
+Bridge memakai cache Apps Script selama 180 detik agar pembacaan data lebih cepat. Cache dibuat per sheet dan otomatis dibersihkan setelah ada tambah, edit, atau hapus dari web, sehingga perubahan dari web tetap cepat terlihat.
+
 ## 1. Buat Apps Script dari spreadsheet
 
 1. Buka Google Spreadsheet yang berisi ketiga sheet tersebut.
@@ -66,6 +68,13 @@ Tunggu GitHub Pages sekitar 1-3 menit, lalu buka URL baru yang ditampilkan oleh 
 4. Klik **Tambah Personil**, isi data, lalu simpan.
 5. Periksa baris baru pada Google Spreadsheet.
 6. Coba tombol **Edit** dan **Hapus**.
+
+## Catatan cache
+
+- Pembacaan pertama setelah deploy atau setelah cache habis akan tetap membaca langsung dari Google Spreadsheet.
+- Pembacaan berikutnya dalam 180 detik memakai cache, sehingga dashboard dan tabel terasa lebih cepat.
+- Jika data diubah dari web, cache langsung dibersihkan otomatis.
+- Jika data diubah langsung dari Google Spreadsheet, web dapat menunggu sampai cache 180 detik habis, atau klik tombol **Refresh** setelah cache lama habis.
 
 ## Memperbarui Apps Script
 
