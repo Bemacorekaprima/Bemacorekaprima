@@ -1,4 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -728,7 +728,7 @@ function watchAppSettings() {
 }
 
 function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value == null ? "" : value).trim().toLowerCase();
 }
 
 function getAccessRoleDefinition(role = state.accessRole) {
@@ -1253,7 +1253,7 @@ function includesAny(value, keywords) {
 }
 
 function normalizeSearchText(value) {
-  return String(value || "")
+  return String(value == null ? "" : value)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -1420,7 +1420,7 @@ function summarizeDynamicRecord(record, index) {
 }
 
 function humanizeFieldName(value) {
-  return String(value || "")
+  return String(value == null ? "" : value)
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, character => character.toUpperCase());
@@ -1658,7 +1658,7 @@ function renderExternalSheetStatus() {
           : "Menunggu";
     return `
       <div class="sheet-status-row">
-        <span class="sheet-status-dot ${escapeHtml(sheet.status)}"></span>
+        <span class="sheet-status-dot ${safeClassToken(sheet.status, "unknown")}"></span>
         <span>${escapeHtml(sheet.label)}</span>
         <strong>${escapeHtml(statusLabel)}</strong>
       </div>
@@ -2006,7 +2006,7 @@ function renderPortfolioOverview(filteredJobs) {
           ? `${progress}% dokumen`
           : job.tanggalSelesai || `${personCount} personil`;
         return `
-          <button class="portfolio-job-card status-${escapeHtml(statusKey)}" type="button" data-portfolio-job-index="${index}">
+          <button class="portfolio-job-card status-${safeClassToken(statusKey)}" type="button" data-portfolio-job-index="${index}">
             <span class="portfolio-card-accent"></span>
             <span class="portfolio-card-heading">
               <strong>${escapeHtml(job.pekerjaan)}</strong>
@@ -2091,7 +2091,7 @@ function renderPortfolioActivityItems(activities) {
   return activities.length
     ? activities.slice(0, 3).map(activity => `
         <div class="portfolio-activity-item">
-          <span class="portfolio-activity-avatar ${escapeHtml(activity.tone)}">${escapeHtml(activity.initials)}</span>
+          <span class="portfolio-activity-avatar ${safeClassToken(activity.tone)}">${escapeHtml(activity.initials)}</span>
           <span>
             <strong>${escapeHtml(activity.title)}</strong>
             <small>${escapeHtml(activity.meta)}</small>
@@ -2171,7 +2171,7 @@ function renderPortfolioJobCard(job, index, dataAttribute) {
     ? `${progress}% dokumen`
     : job.tanggalSelesai || `${personCount} personil`;
   return `
-    <button class="portfolio-job-card status-${escapeHtml(statusKey)}" type="button" data-${dataAttribute}="${index}">
+    <button class="portfolio-job-card status-${safeClassToken(statusKey)}" type="button" data-${dataAttribute}="${index}">
       <span class="portfolio-card-accent"></span>
       <span class="portfolio-card-heading">
         <strong>${escapeHtml(job.pekerjaan)}</strong>
@@ -2648,7 +2648,7 @@ function getEditableJobColumns(records) {
 
 function renderJobRecordInput(column, value) {
   const normalized = normalizeSearchText(column);
-  const escapedValue = escapeHtml(value || "");
+  const escapedValue = escapeHtml(value);
   if (includesAny(normalized, ["nama personil", "nama lengkap"])) {
     return `<input name="${escapeHtml(column)}" value="${escapedValue}" list="personnelNameSuggestions" autocomplete="off" placeholder="Ketik nama personil dari Bemaco atau Outsourcing">`;
   }
@@ -2860,7 +2860,7 @@ function renderTenderPersonnelMembersFromForm() {
     <article class="tender-personnel-member-item">
       <div>
         <strong>${escapeHtml(member.name)}</strong>
-        <span>${escapeHtml(member.position || "-")} · Keterlibatan: ${escapeHtml(member.involvement || "-")}</span>
+        <span>${escapeHtml(member.position || "-")} Â· Keterlibatan: ${escapeHtml(member.involvement || "-")}</span>
       </div>
       <div class="tender-personnel-member-actions">
         <span class="tender-personnel-member-source">${escapeHtml(member.source)}</span>
@@ -3568,7 +3568,7 @@ function renderPersonnel() {
   state.personnelVisibleRecords = pageRecords;
 
   document.getElementById("personnelSyncText").textContent =
-    `${sheet.records.length} data tersinkron · kategori ${state.personnelYear === "all" ? "semua tahun" : state.personnelYear} · diperbarui ${formatSyncTime(externalSheetLastLoadedAt)}`;
+    `${sheet.records.length} data tersinkron Â· kategori ${state.personnelYear === "all" ? "semua tahun" : state.personnelYear} Â· diperbarui ${formatSyncTime(externalSheetLastLoadedAt)}`;
   document.getElementById("personnelResultCount").textContent =
     `${filteredRecords.length} data ditemukan`;
   document.getElementById("personnelPageInfo").textContent =
@@ -3842,7 +3842,7 @@ function renderPersonnelInput(column, value, required) {
   return `
     <input
       name="${escapeHtml(column)}"
-      value="${escapeHtml(value || "")}"
+      value="${escapeHtml(value)}"
       autocomplete="off"
       ${required ? "required" : ""}
     >
@@ -5293,7 +5293,7 @@ function renderRecipientOptions() {
             <strong>${escapeHtml(item.name)}</strong>
             <small>${escapeHtml(item.email)}${item.role ? ` - ${escapeHtml(item.role)}` : ""} - ${item.taskCount} tugas aktif</small>
           </span>
-          <span class="recipient-option-check">${item.email === state.selectedRecipientEmail ? "✓" : ""}</span>
+          <span class="recipient-option-check">${item.email === state.selectedRecipientEmail ? "âœ“" : ""}</span>
         </button>
       `).join("")
     : '<div class="recipient-empty">Nama atau email tidak ditemukan.</div>';
@@ -6014,10 +6014,19 @@ function getInitials(value) {
 }
 
 function escapeHtml(value) {
-  return String(value || "")
+  return String(value == null ? "" : value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+function safeClassToken(value, fallback = "neutral") {
+  const token = String(value == null ? "" : value)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return token || fallback;
+}
+
