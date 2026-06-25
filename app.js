@@ -1181,13 +1181,13 @@ function answerLocalAiQuestion(question) {
     return `Saya menemukan ${matchedTasks.length} tugas yang sesuai:\n${matchedTasks.slice(0, 8).map(task => formatTaskLine(task)).join("\n")}`;
   }
 
+  const unifiedAnswer = answerUnifiedAiQuestion(normalized, aiSnapshot);
+  if (unifiedAnswer) return unifiedAnswer;
+
   const matchedPeople = findPeopleFromQuestion(normalized, people);
   if (matchedPeople.length) {
     return matchedPeople.slice(0, 5).map(person => formatPersonDetails(person, tasks)).join("\n\n");
   }
-
-  const unifiedAnswer = answerUnifiedAiQuestion(normalized, aiSnapshot);
-  if (unifiedAnswer) return unifiedAnswer;
 
   if (includesAny(normalized, ["fokus", "prioritas", "kerjakan dulu", "utama"])) {
     if (!top) return "Belum ada tugas aktif yang perlu diprioritaskan.";
@@ -1447,9 +1447,10 @@ function buildAiTenderRecord(tender) {
 
 function answerUnifiedAiQuestion(question, snapshot) {
   if (includesAny(question, ["data apa", "semua data", "database", "sumber data", "data yang tersedia"])) return answerAiDataOverview(snapshot);
+  const asksJobScope = includesAny(question, ["pekerjaan", "portofolio", "portfolio", "proyek", "project"]);
+  if (asksJobScope) return answerAiJobQuestion(question, snapshot);
   if (includesAny(question, ["tender", "paket tender", "dokumen tender"])) return answerAiTenderQuestion(question, snapshot);
   if (includesAny(question, ["personil", "pegawai", "anggota tim", "tim proyek", "staf", "staff", "karyawan"])) return answerAiPersonnelQuestion(question, snapshot);
-  if (includesAny(question, ["pekerjaan", "portofolio", "portfolio", "proyek", "project"])) return answerAiJobQuestion(question, snapshot);
   return answerAiCrossDatasetSearch(question, snapshot);
 }
 
@@ -1483,6 +1484,14 @@ function answerAiJobQuestion(question, snapshot) {
 
   const list = (matches.length ? matches.map(item => item.record) : filteredJobs).slice(0, 8);
   if (!list.length) return "Belum ada data pekerjaan/portofolio yang cocok.";
+
+  if (includesAny(question, ["berapa", "jumlah", "total"])) {
+    const label = statusFilter ? ` berstatus ${statusFilter}` : "";
+    return [
+      `Ada ${filteredJobs.length} pekerjaan/portofolio${label}.`,
+      formatAiBulletList(list, item => `${item.pekerjaan} - ${item.status || "-"} - ${item.jumlahPersonil || 0} personil`)
+    ].join("\n");
+  }
 
   return [
     `Pekerjaan/portofolio yang terbaca: ${filteredJobs.length} data${statusFilter ? ` dengan filter ${statusFilter}` : ""}.`,
