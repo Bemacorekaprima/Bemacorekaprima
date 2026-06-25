@@ -1135,8 +1135,7 @@ function answerLocalAiQuestion(question) {
   const late = active.filter(task => task.terlambat);
   const done = tasks.filter(task => task.status === "Selesai");
   const people = buildPeopleDirectory(tasks);
-  const aiSnapshot = buildUnifiedAiSnapshot(tasks, people);
-  const liveContext = buildLiveAiContext(tasks, people, aiSnapshot);
+  const liveContext = buildLiveAiContext(tasks, people);
   const matchedTasks = findTasksFromQuestion(normalized, tasks);
   const contextualTask = matchedTasks[0] ||
     tasks.find(task => task.id === aiContextTaskId) ||
@@ -1185,9 +1184,6 @@ function answerLocalAiQuestion(question) {
   if (matchedPeople.length) {
     return matchedPeople.slice(0, 5).map(person => formatPersonDetails(person, tasks)).join("\n\n");
   }
-
-  const unifiedAnswer = answerUnifiedAiQuestion(normalized, aiSnapshot);
-  if (unifiedAnswer) return unifiedAnswer;
 
   if (includesAny(normalized, ["fokus", "prioritas", "kerjakan dulu", "utama"])) {
     if (!top) return "Belum ada tugas aktif yang perlu diprioritaskan.";
@@ -1290,8 +1286,19 @@ function findTasksFromQuestion(question, tasks) {
     .map(item => item.task);
 }
 
-function buildLiveAiContext(tasks, people, snapshot) {
-  const datasets = buildUnifiedAiDatasets(snapshot || buildUnifiedAiSnapshot(tasks, people));
+function buildLiveAiContext(tasks, people) {
+  const reports = state.reports.map((report, index) => ({
+    urutan: index + 1,
+    isi: report
+  }));
+  const datasets = [
+    { label: "Tugas", records: tasks },
+    { label: "Orang/Profil", records: people },
+    { label: "Laporan", records: reports },
+    ...state.externalSheets
+      .filter(sheet => sheet.status === "ready")
+      .map(sheet => ({ label: sheet.label, records: sheet.records }))
+  ];
   const fields = Array.from(new Set(datasets.flatMap(dataset =>
     dataset.records.flatMap(record => Object.keys(record || {}))
   ))).sort((a, b) => a.localeCompare(b));
@@ -1308,349 +1315,6 @@ function buildLiveAiContext(tasks, people, snapshot) {
     interfaceItems,
     capturedAt: new Date()
   };
-}
-
-const AI_SEARCH_STOP_WORDS = new Set([
-  "apa", "ada", "yang", "dan", "atau", "dari", "untuk", "dengan", "bisa",
-  "tolong", "saya", "anda", "ini", "itu", "semua", "siapa", "berapa",
-  "mana", "dalam", "pada", "tentang", "kasih", "beri", "tahu", "data"
-]);
-
-function buildUnifiedAiSnapshot(tasks, taskPeople) {
-  const selectedYear = getCurrentSummaryYear();
-  const jobs = safeAiRead("pekerjaan/portofolio", () => buildJobsFromAllSources(), []);
-  const personnel = safeAiRead("personil", () => getAllIntegratedPersonnelRecords(selectedYear), []);
-  const tenders = (state.tenders || []).map(buildAiTenderRecord);
-  const reports = (state.reports || []).map((report, index) => ({ urutan: index + 1, isi: report }));
-  const externalSheets = (state.externalSheets || []).filter(sheet => sheet.status === "ready");
-  const portfolioCounts = safeAiRead("ringkasan portofolio", () => getPortfolioCounts(jobs), {
-    total: jobs.length,
-    active: 0,
-    finish: 0,
-    tender: 0,
-    upcoming: 0
-  });
-
-  return {
-    tasks,
-    taskPeople,
-    jobs,
-    personnel,
-    tenders,
-    reports,
-    externalSheets,
-    portfolioCounts,
-    selectedYear,
-    capturedAt: new Date()
-  };
-}
-
-function safeAiRead(label, callback, fallback) {
-  try {
-    return callback();
-  } catch (error) {
-    console.warn(`AI gagal membaca ${label}:`, error);
-    return fallback;
-  }
-}
-
-function buildUnifiedAiDatasets(snapshot) {
-  return [
-    { label: "Tugas", records: snapshot.tasks || [] },
-    { label: "Orang/Profil Tugas", records: snapshot.taskPeople || [] },
-    { label: "Pekerjaan/Portofolio", records: (snapshot.jobs || []).map(buildAiJobRecord) },
-    { label: "Personil Spreadsheet", records: (snapshot.personnel || []).map(record => buildAiPersonnelRecord(record, snapshot.selectedYear)) },
-    { label: "Tender", records: snapshot.tenders || [] },
-    { label: "Laporan", records: snapshot.reports || [] },
-    ...(snapshot.externalSheets || []).map(sheet => ({ label: sheet.label, records: sheet.records || [] }))
-  ];
-}
-
-function buildAiJobRecord(job) {
-  const personnelNames = getAiJobPersonnelNames(job);
-  const status = safeAiRead("status pekerjaan", () => getPortfolioStatusLabel(job), getJobStatus(job));
-
-  return {
-    id: job.id || "",
-    pekerjaan: job.pekerjaan || "",
-    tahun: safeAiRead("tahun pekerjaan", () => getJobYears(job).join(", "), ""),
-    tanggalMulai: job.tanggalMulai || "-",
-    tanggalSelesai: job.tanggalSelesai || "-",
-    status,
-    statusKategori: safeAiRead("kategori status pekerjaan", () => getPortfolioStatusKey(job), ""),
-    jumlahPersonil: job.personnelCount || personnelNames.length || (job.records || []).length,
-    progress: `${safeAiRead("progress pekerjaan", () => getPortfolioProgress(job), 0)}%`,
-    personil: personnelNames.join(", "),
-    sumber: job.sourceType === "tender" ? "Tender" : "DATA UTAMA"
-  };
-}
-
-function getAiJobPersonnelNames(job) {
-  const names = new Map();
-  (job.records || []).forEach(record => {
-    const name = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
-    const key = normalizeSearchText(name);
-    if (name && key && !names.has(key)) names.set(key, name);
-  });
-
-  if (!names.size && job.sourceType === "tender" && job.tenderId) {
-    const tender = (state.tenders || []).find(item => item.id === job.tenderId);
-    getTenderPersonnel(tender).forEach(member => {
-      const key = normalizeSearchText(member.name);
-      if (member.name && key && !names.has(key)) names.set(key, member.name);
-    });
-  }
-
-  return [...names.values()];
-}
-
-function buildAiPersonnelRecord(record, year) {
-  return {
-    nama: getPersonnelName(record),
-    status: getPersonnelStatus(record),
-    jabatan: getPersonnelPosition(record),
-    pekerjaanAktif: getPersonnelActiveWork(record),
-    pekerjaanSelesai: getPersonnelFinishedWork(record),
-    akumulasi: getPersonnelAccumulation(record),
-    tahun: year,
-    sumber: record && record._PersonSource === "outsourcing" ? "Outsourcing" : "Personil BMC",
-    raw: record
-  };
-}
-
-function buildAiTenderRecord(tender) {
-  const progress = safeAiRead("progress tender", () => getTenderProgress(tender), { percent: 0, documents: [] });
-  const personnel = safeAiRead("personil tender", () => getTenderPersonnel(tender), []);
-
-  return {
-    id: tender.id || "",
-    paket: tender.name || "",
-    instansi: tender.agency || "",
-    lokasi: tender.location || "",
-    tahunAnggaran: tender.budgetYear || "",
-    sumberDana: tender.source || "",
-    pagu: tender.budget || "",
-    hps: tender.hps || "",
-    metodeSeleksi: tender.selectionMethod || "",
-    jenisKontrak: tender.contractType || "",
-    status: tender.status || "Persiapan",
-    deadline: tender.deadline ? formatTenderDateTime(tender.deadline) : "",
-    penanggungJawab: tender.owner || "",
-    emailPic: tender.picEmail || "",
-    folderDokumen: tender.folderUrl || "",
-    progress: `${progress.percent || 0}%`,
-    jumlahDokumenFinal: (progress.documents || []).filter(item => item.status === "Final").length,
-    jumlahPersonil: personnel.length || tender.sourcePersonnelCount || 0,
-    personil: personnel.map(member => member.name).filter(Boolean).join(", ")
-  };
-}
-
-function answerUnifiedAiQuestion(question, snapshot) {
-  if (includesAny(question, ["data apa", "semua data", "database", "sumber data", "data yang tersedia"])) return answerAiDataOverview(snapshot);
-  if (includesAny(question, ["tender", "paket tender", "dokumen tender"])) return answerAiTenderQuestion(question, snapshot);
-  if (includesAny(question, ["personil", "pegawai", "anggota tim", "tim proyek", "staf", "staff", "karyawan"])) return answerAiPersonnelQuestion(question, snapshot);
-  if (includesAny(question, ["pekerjaan", "portofolio", "portfolio", "proyek", "project"])) return answerAiJobQuestion(question, snapshot);
-  return answerAiCrossDatasetSearch(question, snapshot);
-}
-
-function answerAiDataOverview(snapshot) {
-  const sheets = (snapshot.externalSheets || []).map(sheet => `- ${sheet.label}: ${(sheet.records || []).length} data`).join("\n");
-
-  return [
-    "Data yang saya baca saat ini:",
-    `- Tugas: ${(snapshot.tasks || []).length} data`,
-    `- Pekerjaan/Portofolio: ${(snapshot.jobs || []).length} data`,
-    `- Personil: ${(snapshot.personnel || []).length} data`,
-    `- Tender: ${(snapshot.tenders || []).length} paket`,
-    `- Laporan: ${(snapshot.reports || []).length} data`,
-    `- Ringkasan portofolio: ${snapshot.portfolioCounts.total || 0} total, ${snapshot.portfolioCounts.active || 0} aktif, ${snapshot.portfolioCounts.finish || 0} finish, ${snapshot.portfolioCounts.tender || 0} tender, ${snapshot.portfolioCounts.upcoming || 0} upcoming`,
-    sheets ? `Sheet eksternal:\n${sheets}` : "Sheet eksternal: belum ada yang siap dibaca."
-  ].join("\n");
-}
-
-function answerAiJobQuestion(question, snapshot) {
-  const jobs = (snapshot.jobs || []).map(buildAiJobRecord);
-  const statusFilter = getAiStatusFilter(question);
-  const filteredJobs = statusFilter
-    ? jobs.filter(job => job.statusKategori === statusFilter || normalizeSearchText(job.status).includes(statusFilter))
-    : jobs;
-  const matches = findAiRecordsByQuestion(question, filteredJobs, record => record.pekerjaan);
-  const selected = matches[0]?.record;
-
-  if (selected && matches[0].score >= 2 && includesAny(question, ["detail", "rincian", "siapa", "personil", "status", "progress"])) {
-    return formatAiJobDetail(selected);
-  }
-
-  const list = (matches.length ? matches.map(item => item.record) : filteredJobs).slice(0, 8);
-  if (!list.length) return "Belum ada data pekerjaan/portofolio yang cocok.";
-
-  return [
-    `Pekerjaan/portofolio yang terbaca: ${filteredJobs.length} data${statusFilter ? ` dengan filter ${statusFilter}` : ""}.`,
-    formatAiBulletList(list, item => `${item.pekerjaan} - ${item.status} - ${item.jumlahPersonil} personil - progress ${item.progress}`)
-  ].join("\n");
-}
-
-function answerAiPersonnelQuestion(question, snapshot) {
-  const personnel = (snapshot.personnel || []).map(record => buildAiPersonnelRecord(record, snapshot.selectedYear));
-  const wantsNoActiveWork = includesAny(question, ["tidak memiliki pekerjaan aktif", "tanpa pekerjaan aktif", "belum ada pekerjaan aktif"]);
-  const wantsActiveWork = includesAny(question, ["memiliki pekerjaan aktif", "pekerjaan aktif", "sedang bekerja"]);
-  const scoped = wantsNoActiveWork
-    ? personnel.filter(person => parseAiNumber(person.pekerjaanAktif) <= 0)
-    : wantsActiveWork
-      ? personnel.filter(person => parseAiNumber(person.pekerjaanAktif) > 0)
-      : personnel;
-  const matches = findAiRecordsByQuestion(question, scoped, record => record.nama);
-  const selected = matches[0]?.record;
-
-  if (selected && matches[0].score >= 2) return formatAiPersonnelDetail(selected, snapshot.jobs || []);
-
-  const list = (matches.length ? matches.map(item => item.record) : scoped).slice(0, 10);
-  if (!list.length) return "Belum ada data personil yang cocok.";
-
-  return [
-    `Personil yang terbaca: ${scoped.length} data${wantsActiveWork ? " dengan pekerjaan aktif" : wantsNoActiveWork ? " tanpa pekerjaan aktif" : ""}.`,
-    formatAiBulletList(list, item => `${item.nama} - ${item.status} - ${item.jabatan} - aktif ${item.pekerjaanAktif || 0} - selesai ${item.pekerjaanSelesai || 0}`)
-  ].join("\n");
-}
-
-function answerAiTenderQuestion(question, snapshot) {
-  const tenders = snapshot.tenders || [];
-  const matches = findAiRecordsByQuestion(question, tenders, record => record.paket);
-  const selected = matches[0]?.record;
-
-  if (selected && matches[0].score >= 2) {
-    return [
-      `Detail tender: ${selected.paket}`,
-      `- Status: ${selected.status}`,
-      `- Instansi/Satker: ${selected.instansi || "-"}`,
-      `- Lokasi: ${selected.lokasi || "-"}`,
-      `- Tahun anggaran: ${selected.tahunAnggaran || "-"}`,
-      `- Deadline: ${selected.deadline || "-"}`,
-      `- Progress dokumen: ${selected.progress}`,
-      `- Dokumen final: ${selected.jumlahDokumenFinal}`,
-      `- Personil: ${selected.personil || "belum tercatat"}`
-    ].join("\n");
-  }
-
-  const list = (matches.length ? matches.map(item => item.record) : tenders).slice(0, 8);
-  if (!list.length) return "Belum ada paket tender yang cocok.";
-
-  return [
-    `Tender yang terbaca: ${tenders.length} paket.`,
-    formatAiBulletList(list, item => `${item.paket} - ${item.status} - progress ${item.progress} - ${item.jumlahPersonil} personil`)
-  ].join("\n");
-}
-
-function answerAiCrossDatasetSearch(question, snapshot) {
-  const tokens = getAiSearchTokens(question);
-  if (tokens.length < 2) return "";
-
-  const matches = buildUnifiedAiDatasets(snapshot)
-    .flatMap(dataset => findAiRecordsByQuestion(question, dataset.records || [], summarizeAiRecord)
-      .slice(0, 3)
-      .map(item => ({ ...item, dataset: dataset.label })))
-    .filter(item => item.score >= 2)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
-
-  if (!matches.length) return "";
-
-  return [
-    "Saya menemukan data terkait di beberapa sumber:",
-    matches.map(item => `- ${item.dataset}: ${summarizeAiRecord(item.record)}`).join("\n")
-  ].join("\n");
-}
-
-function formatAiJobDetail(job) {
-  return [
-    `Detail pekerjaan: ${job.pekerjaan}`,
-    `- Status: ${job.status || "-"}`,
-    `- Tahun: ${job.tahun || "-"}`,
-    `- Tanggal mulai: ${job.tanggalMulai || "-"}`,
-    `- Tanggal selesai: ${job.tanggalSelesai || "-"}`,
-    `- Jumlah personil: ${job.jumlahPersonil || 0}`,
-    `- Progress: ${job.progress || "0%"}`,
-    `- Sumber: ${job.sumber || "-"}`,
-    `- Personil: ${job.personil || "belum tercatat"}`
-  ].join("\n");
-}
-
-function formatAiPersonnelDetail(person, jobs) {
-  const nameKey = normalizeSearchText(person.nama);
-  const relatedJobs = (jobs || [])
-    .map(buildAiJobRecord)
-    .filter(job => normalizeSearchText(job.personil).includes(nameKey))
-    .slice(0, 8);
-
-  return [
-    `Detail personil: ${person.nama}`,
-    `- Status: ${person.status || "-"}`,
-    `- Jabatan/posisi: ${person.jabatan || "-"}`,
-    `- Pekerjaan aktif: ${person.pekerjaanAktif || 0}`,
-    `- Keterlibatan selesai: ${person.pekerjaanSelesai || 0}`,
-    `- Akumulasi: ${person.akumulasi || 0}`,
-    `- Tahun ringkasan: ${person.tahun || "-"}`,
-    relatedJobs.length
-      ? `- Riwayat/pekerjaan terkait:\n${formatAiBulletList(relatedJobs, job => `${job.pekerjaan} - ${job.status} - ${job.tanggalSelesai || "-"}`)}`
-      : "- Riwayat/pekerjaan terkait: belum ditemukan di DATA UTAMA."
-  ].join("\n");
-}
-
-function findAiRecordsByQuestion(question, records, labelGetter) {
-  const tokens = getAiSearchTokens(question);
-  if (!tokens.length) return [];
-
-  return (records || [])
-    .map(record => {
-      const label = String(labelGetter(record) || "");
-      const haystack = normalizeSearchText(`${label} ${objectSearchText(record)}`);
-      const labelText = normalizeSearchText(label);
-      let score = labelText && question.includes(labelText) ? 20 : 0;
-      tokens.forEach(token => {
-        if (labelText.includes(token)) score += 5;
-        else if (haystack.includes(token)) score += 1;
-      });
-      return { record, score };
-    })
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score);
-}
-
-function getAiSearchTokens(question) {
-  return String(question || "")
-    .split(/\s+/)
-    .map(token => token.trim())
-    .filter(token => token.length >= 3 && !AI_SEARCH_STOP_WORDS.has(token));
-}
-
-function getAiStatusFilter(question) {
-  if (includesAny(question, ["tender"])) return "tender";
-  if (includesAny(question, ["upcoming", "akan mulai", "jadwal depan"])) return "upcoming";
-  if (includesAny(question, ["finish overtime", "overtime"])) return "active";
-  if (includesAny(question, ["finish", "selesai"])) return "finish";
-  if (includesAny(question, ["aktif", "ongoing", "berjalan"])) return "active";
-  return "";
-}
-
-function parseAiNumber(value) {
-  const number = Number.parseFloat(String(value ?? "0").replace(",", ".").replace(/[^\d.-]/g, ""));
-  return Number.isFinite(number) ? number : 0;
-}
-
-function summarizeAiRecord(record) {
-  if (!record) return "-";
-  const direct = record.pekerjaan || record.paket || record.nama || record.namaTugas || record.name;
-  if (direct) return String(direct);
-
-  return Object.keys(record)
-    .filter(key => key !== "raw" && record[key] !== "" && record[key] != null)
-    .slice(0, 4)
-    .map(key => `${humanizeFieldName(key)}: ${String(record[key]).slice(0, 60)}`)
-    .join("; ") || "-";
-}
-
-function formatAiBulletList(items, formatter) {
-  return items.map(item => `- ${formatter(item)}`).join("\n");
 }
 
 function answerFromLiveContext(question, context) {
@@ -6366,8 +6030,5 @@ function safeClassToken(value, fallback = "neutral") {
     .replace(/^-+|-+$/g, "");
   return token || fallback;
 }
-
-
-
 
 
