@@ -942,11 +942,11 @@ input:focus, select:focus, textarea:focus {
   width: fit-content;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--kpi-color, #087d8f) 32%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kpi-color, #087d8f) 24%, #ffffff);
   border-radius: 8px;
   padding: 4px 8px;
-  background: color-mix(in srgb, var(--kpi-color, #087d8f) 14%, #111827);
-  color: color-mix(in srgb, var(--kpi-color, #087d8f) 72%, #ffffff);
+  background: color-mix(in srgb, var(--kpi-color, #087d8f) 10%, #ffffff);
+  color: color-mix(in srgb, var(--kpi-color, #087d8f) 76%, #0f172a);
   font-size: 11px;
   font-style: normal;
   font-weight: 800;
@@ -982,11 +982,11 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dashboard-card-header .text-button {
-  border: 1px solid rgba(8, 125, 143, 0.18);
+  border: 1px solid rgba(8, 125, 143, 0.24);
   border-radius: 8px;
   padding: 7px 10px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(17, 24, 39, 0.86));
-  color: #34d399;
+  background: #eef9fb;
+  color: #087384;
   font-size: 12px;
   font-weight: 900;
   text-decoration: none;
@@ -994,7 +994,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dashboard-card-header .text-button:hover {
-  color: #67e8f9;
+  background: #e0f4f7;
+  color: #055b68;
   transform: translateY(-1px);
 }
 
@@ -1065,11 +1066,11 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-task-row em,
 .dashboard-reminder-row em {
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  border: 1px solid #d9e7ee;
   border-radius: 8px;
   padding: 6px 9px;
-  background: #111827;
-  color: #34d399;
+  background: #f1f7f9;
+  color: #315466;
   font-size: 11px;
   font-style: normal;
   font-weight: 800;
@@ -1077,21 +1078,21 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-task-row .urgency-late,
 .dashboard-reminder-row em {
-  border-color: rgba(248, 113, 113, 0.24);
-  background: #261316;
-  color: #fb7185;
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
 }
 
 .dashboard-task-row .urgency-today {
-  border-color: rgba(251, 191, 36, 0.24);
-  background: #251a08;
-  color: #fbbf24;
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .dashboard-task-row .urgency-high {
-  border-color: rgba(34, 211, 238, 0.24);
-  background: #082027;
-  color: #22d3ee;
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  color: #0369a1;
 }
 
 .dashboard-card-footer-button {
@@ -1166,26 +1167,26 @@ input:focus, select:focus, textarea:focus {
 .dashboard-status-pill,
 .dashboard-priority-badge {
   display: inline-flex;
-  border: 1px solid rgba(34, 211, 238, 0.2);
+  border: 1px solid #bae6fd;
   border-radius: 8px;
   padding: 6px 8px;
-  background: #0f172a;
-  color: #22d3ee;
+  background: #f0f9ff;
+  color: #0369a1;
   font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .dashboard-priority-badge.priority-tinggi {
-  border-color: rgba(251, 113, 133, 0.28);
-  background: #2a1116;
-  color: #fb7185;
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
 }
 
 .dashboard-priority-badge.priority-sedang {
-  border-color: rgba(251, 191, 36, 0.28);
-  background: #291d09;
-  color: #fbbf24;
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .dashboard-progress-line {
