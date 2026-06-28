@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8">
@@ -111,36 +111,50 @@
   <div id="appView" class="app-shell hidden">
     <aside class="sidebar">
       <div class="brand-row compact">
-        <img class="brand-company-logos" src="assets/company-logos-transparent.webp" alt="Logo PT Bemaco Rekaprima dan mitra">
+        <span class="sidebar-menu-mark" aria-hidden="true"><i data-lucide="menu"></i></span>
+        <img class="brand-company-logos sidebar-brand-logo" src="assets/company-logos-transparent.webp" alt="Logo PT Bemaco Rekaprima dan mitra">
+        <strong class="sidebar-brand-title">Portfolio Workspace</strong>
       </div>
       <nav class="nav">
         <button class="nav-item active" data-view="dashboard">
           <span>Dashboard</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="layout-dashboard"></i><span class="nav-icon-fallback">â–¦</span></span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="layout-dashboard"></i><span class="nav-icon-fallback">▦</span></span>
+        </button>
+        <button class="nav-item" data-view="tasks">
+          <span>Tugas Harian</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="calendar-check"></i><span class="nav-icon-fallback">□</span></span>
         </button>
         <button class="nav-item" data-view="tenders">
           <span>Tender</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="clipboard-check"></i><span class="nav-icon-fallback">âœ“</span></span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="clipboard-check"></i><span class="nav-icon-fallback">✓</span></span>
         </button>
         <button class="nav-item" data-view="jobs">
           <span>Portofolio</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="briefcase-business"></i><span class="nav-icon-fallback">â—‡</span></span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="briefcase-business"></i><span class="nav-icon-fallback">◇</span></span>
         </button>
         <button class="nav-item" data-view="personnel">
           <span>Personil</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="users"></i><span class="nav-icon-fallback">â™™</span></span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="users"></i><span class="nav-icon-fallback">♙</span></span>
         </button>
         <button class="nav-item" data-view="tasks">
-          <span>Tugas</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="list-checks"></i><span class="nav-icon-fallback">â‰¡</span></span>
+          <span>Pengingat Email</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="list-checks"></i><span class="nav-icon-fallback">≡</span></span>
+        </button>
+        <button class="nav-item" data-view="tenders">
+          <span>Dokumen</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="file-text"></i><span class="nav-icon-fallback">▧</span></span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span>Google Drive</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="hard-drive"></i><span class="nav-icon-fallback">△</span></span>
         </button>
         <button class="nav-item" data-view="reports">
           <span>Laporan</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="chart-no-axes-combined"></i><span class="nav-icon-fallback">â–¥</span></span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="chart-no-axes-combined"></i><span class="nav-icon-fallback">▥</span></span>
         </button>
         <button class="nav-item" id="settingsNavButton" data-view="settings">
           <span>Pengaturan</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="settings"></i><span class="nav-icon-fallback">âš™</span></span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="settings"></i><span class="nav-icon-fallback">⚙</span></span>
         </button>
       </nav>
       <div class="sidebar-profile-wrap">
@@ -204,229 +218,220 @@
           <button type="button" id="closeWelcomeToast" aria-label="Tutup sapaan">x</button>
         </aside>
 
-        <section class="portfolio-workspace-shell dashboard-bento-home">
-          <header class="portfolio-workspace-header">
+        <section class="dashboard-executive" aria-label="Dashboard ringkasan operasional">
+          <header class="dashboard-executive-header">
             <div>
-              <span class="portfolio-eyebrow">Portfolio Home</span>
-              <h2>Dashboard Workspace</h2>
-              <p>Proyek, aktivitas, kapasitas tim, dan fokus harian dalam satu tampilan.</p>
+              <h2>Dashboard</h2>
+              <p>Ringkasan aktivitas dan monitoring portfolio hari ini.</p>
             </div>
-            <button class="primary-button portfolio-add-button" id="dashboardAddItemButton" type="button">+ Tambah Item</button>
+            <div class="dashboard-executive-actions">
+              <select id="dashboardProjectScope" aria-label="Filter proyek dashboard">
+                <option value="all">Semua Proyek</option>
+                <option value="active">Proyek Aktif</option>
+                <option value="tender">Tender</option>
+              </select>
+              <button class="primary-button dashboard-create-task" id="dashboardTaskAddButton" type="button">
+                <i data-lucide="plus" aria-hidden="true"></i>
+                <span>Buat Tugas</span>
+              </button>
+            </div>
           </header>
 
-          <section class="portfolio-bento-top">
-            <article class="portfolio-summary-card" id="dashboardPortfolioSummary">
-              <span id="dashboardPortfolioYearLabel">Seluruh portofolio</span>
-              <button class="portfolio-total-line portfolio-summary-trigger" type="button" data-portfolio-summary-filter="all" data-portfolio-summary-context="dashboard" aria-label="Buka seluruh pekerjaan">
-                <strong id="dashboardPortfolioTotal">0</strong>
-                <small>total pekerjaan</small>
+          <section class="dashboard-kpi-grid" id="dashboardPortfolioSummary">
+            <button class="dashboard-kpi-card accent-teal" type="button" data-portfolio-summary-filter="all" data-portfolio-summary-context="dashboard">
+              <span class="dashboard-kpi-icon"><i data-lucide="clipboard-list"></i></span>
+              <span class="dashboard-kpi-copy">
+                <small>Tugas Harian</small>
+                <strong id="dashKpiTasks">0</strong>
+                <em id="dashKpiTasksMeta">0 selesai hari ini</em>
+              </span>
+            </button>
+            <button class="dashboard-kpi-card accent-blue" type="button" data-portfolio-summary-filter="tender" data-portfolio-summary-context="dashboard">
+              <span class="dashboard-kpi-icon"><i data-lucide="briefcase-business"></i></span>
+              <span class="dashboard-kpi-copy">
+                <small>Tender Aktif</small>
+                <strong id="dashKpiTenders">0</strong>
+                <em id="dashKpiTendersMeta">0 akan closing</em>
+              </span>
+            </button>
+            <button class="dashboard-kpi-card accent-green" type="button" data-dashboard-open="personnel">
+              <span class="dashboard-kpi-icon"><i data-lucide="users"></i></span>
+              <span class="dashboard-kpi-copy">
+                <small>Personil</small>
+                <strong id="dashKpiPersonnel">0</strong>
+                <em id="dashKpiPersonnelMeta">0 tidak aktif</em>
+              </span>
+            </button>
+            <button class="dashboard-kpi-card accent-indigo" type="button" data-dashboard-open="tenders">
+              <span class="dashboard-kpi-icon"><i data-lucide="folder-open"></i></span>
+              <span class="dashboard-kpi-copy">
+                <small>Dokumen</small>
+                <strong id="dashKpiDocuments">0</strong>
+                <em id="dashKpiDocumentsMeta">0 final</em>
+              </span>
+            </button>
+            <button class="dashboard-kpi-card accent-amber" type="button" data-dashboard-open="jobs">
+              <span class="dashboard-kpi-icon"><i data-lucide="star"></i></span>
+              <span class="dashboard-kpi-copy">
+                <small>Paket Prioritas</small>
+                <strong id="dashKpiPriority">0</strong>
+                <em id="dashKpiPriorityMeta">0 tinggi</em>
+              </span>
+            </button>
+            <button class="dashboard-kpi-card accent-cyan" type="button" data-dashboard-open="reports">
+              <span class="dashboard-kpi-icon"><i data-lucide="line-chart"></i></span>
+              <span class="dashboard-kpi-copy">
+                <small>Status Hari Ini</small>
+                <strong id="dashKpiStatus">0%</strong>
+                <em>Progress keseluruhan</em>
+              </span>
+            </button>
+          </section>
+
+          <section class="dashboard-main-grid">
+            <article class="dashboard-card dashboard-task-card">
+              <header class="dashboard-card-header">
+                <h3><i data-lucide="list-checks" aria-hidden="true"></i> Tugas Harian</h3>
+                <button class="text-button" type="button" data-dashboard-open="tasks">Lihat Semua</button>
+              </header>
+              <div id="dashDailyTasks" class="dashboard-task-list"></div>
+              <button class="dashboard-card-footer-button" id="dashboardAddItemButton" type="button">
+                <i data-lucide="plus" aria-hidden="true"></i>
+                Tambah Item
               </button>
-              <div class="portfolio-metrics" aria-label="Ringkasan pekerjaan">
-                <button class="portfolio-metric-card active" type="button" data-portfolio-summary-filter="ongoing" data-portfolio-summary-context="dashboard" aria-label="Buka pekerjaan aktif">
-                  <strong id="dashboardPortfolioActive">0</strong>
-                  <span>Aktif</span>
-                </button>
-                <button class="portfolio-metric-card finish" type="button" data-portfolio-summary-filter="completed" data-portfolio-summary-context="dashboard" aria-label="Buka seluruh pekerjaan selesai">
-                  <strong id="dashboardPortfolioFinish">0</strong>
-                  <span>Finish</span>
-                </button>
-                <button class="portfolio-metric-card tender" type="button" data-portfolio-summary-filter="tender" data-portfolio-summary-context="dashboard" aria-label="Buka pekerjaan tender">
-                  <strong id="dashboardPortfolioTender">0</strong>
-                  <span>Tender</span>
-                </button>
-                <button class="portfolio-metric-card upcoming" type="button" data-portfolio-summary-filter="upcoming" data-portfolio-summary-context="dashboard" aria-label="Buka pekerjaan mendatang">
-                  <strong id="dashboardPortfolioUpcoming">0</strong>
-                  <span>Upcoming</span>
-                </button>
-              </div>
-              <p class="portfolio-summary-hint">Klik angka ringkasan untuk membuka daftar yang sudah difilter.</p>
             </article>
 
-            <article class="portfolio-activity-card">
-              <div class="portfolio-card-title-row">
-                <div>
-                  <h3>Aktivitas Terbaru</h3>
-                  <p>Perubahan terbaru dari proyek, Tender, dan tugas.</p>
+            <article class="dashboard-card dashboard-tender-card">
+              <header class="dashboard-card-header">
+                <h3><i data-lucide="briefcase-business" aria-hidden="true"></i> Tender Aktif</h3>
+                <button class="text-button" type="button" data-dashboard-open="tenders">Lihat Semua</button>
+              </header>
+              <div class="dashboard-table-wrap">
+                <table class="dashboard-mini-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Tender</th>
+                      <th>Proyek</th>
+                      <th>Instansi</th>
+                      <th>Nilai HPS</th>
+                      <th>Batas Akhir</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashTenderRows"></tbody>
+                </table>
+              </div>
+              <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tenders">Lihat Semua Tender</button>
+            </article>
+
+            <aside class="dashboard-side-stack">
+              <article class="dashboard-card">
+                <header class="dashboard-card-header">
+                  <h3><i data-lucide="user-round" aria-hidden="true"></i> Personil</h3>
+                  <button class="text-button" type="button" data-dashboard-open="personnel">Lihat Semua</button>
+                </header>
+                <div class="dashboard-personnel-summary">
+                  <div>
+                    <span>Total Personil</span>
+                    <strong id="dashPersonnelTotal">0</strong>
+                  </div>
+                  <div id="dashPersonnelRing" class="dashboard-donut" aria-hidden="true"></div>
+                  <dl id="dashPersonnelLegend"></dl>
                 </div>
-                <span class="portfolio-live-badge">Live</span>
+                <button class="dashboard-card-footer-button" type="button" data-dashboard-open="personnel">Kelola Personil</button>
+              </article>
+
+              <article class="dashboard-card">
+                <header class="dashboard-card-header">
+                  <h3><i data-lucide="file-text" aria-hidden="true"></i> Dokumen</h3>
+                  <button class="text-button" type="button" data-dashboard-open="tenders">Lihat Semua</button>
+                </header>
+                <div class="dashboard-document-summary">
+                  <div class="dashboard-document-total">
+                    <i data-lucide="files" aria-hidden="true"></i>
+                    <span>Total Dokumen</span>
+                    <strong id="dashDocumentTotal">0</strong>
+                    <em id="dashDocumentFinal">0 final</em>
+                  </div>
+                  <div id="dashDocumentBreakdown" class="dashboard-document-breakdown"></div>
+                </div>
+                <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tenders">Kelola Dokumen</button>
+              </article>
+
+              <article class="dashboard-card">
+                <header class="dashboard-card-header">
+                  <h3><i data-lucide="bell" aria-hidden="true"></i> Pengingat Email</h3>
+                  <button class="text-button" type="button" data-dashboard-open="tasks">Lihat Semua</button>
+                </header>
+                <div id="dashReminderList" class="dashboard-reminder-list"></div>
+                <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tasks">Lihat Semua Pengingat</button>
+              </article>
+            </aside>
+
+            <article class="dashboard-card dashboard-priority-card">
+              <header class="dashboard-card-header">
+                <h3><i data-lucide="star" aria-hidden="true"></i> Paket Prioritas</h3>
+              </header>
+              <div class="dashboard-table-wrap">
+                <table class="dashboard-mini-table">
+                  <thead>
+                    <tr>
+                      <th>Paket</th>
+                      <th>Proyek</th>
+                      <th>Prioritas</th>
+                      <th>Progress</th>
+                      <th>PIC</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboardFeaturedJobs"></tbody>
+                </table>
               </div>
-              <div id="dashboardActivityList" class="portfolio-activity-list"></div>
+              <button class="dashboard-card-footer-button" id="dashboardOpenPortfolioButton" type="button">Lihat Semua Paket Prioritas</button>
             </article>
           </section>
 
-          <section class="portfolio-featured-section">
-            <div class="portfolio-section-heading">
-              <div>
-                <h2>Koleksi Pilihan</h2>
-                <p>Proyek yang perlu perhatian atau memiliki tahap aktif.</p>
-              </div>
-              <button class="text-button" id="dashboardOpenPortfolioButton" type="button">Lihat semua Portofolio</button>
-            </div>
-            <div id="dashboardFeaturedJobs" class="portfolio-featured-grid"></div>
-          </section>
-
-          <section class="portfolio-lower-grid">
-            <article class="portfolio-brief-panel">
-              <span class="portfolio-brief-icon">AI</span>
-              <div>
-                <h2>AI Brief</h2>
-                <p id="dashboardPortfolioBrief">Memuat ringkasan dashboard...</p>
-              </div>
-            </article>
-            <article class="portfolio-agenda-panel">
-              <div class="portfolio-card-title-row">
-                <h2>Agenda Tim</h2>
-                <span class="portfolio-agenda-count" id="dashboardAgendaCount">0 agenda</span>
-              </div>
-              <div id="dashboardAgendaBento" class="portfolio-agenda-list"></div>
-            </article>
-          </section>
-        </section>
-
-        <section class="portfolio-workspace-shell dashboard-task-workspace">
-        <header class="portfolio-workspace-header dashboard-operational-heading">
-          <div>
-            <span class="portfolio-eyebrow">Operasional Tugas</span>
-            <h2>Aktivitas Harian</h2>
-            <p>Kanban, filter, laporan, dan rincian tugas tetap tersedia.</p>
+          <div class="dashboard-hidden-sinks" aria-hidden="true">
+            <span id="dashboardPortfolioYearLabel"></span>
+            <strong id="dashboardPortfolioTotal">0</strong>
+            <strong id="dashboardPortfolioActive">0</strong>
+            <strong id="dashboardPortfolioFinish">0</strong>
+            <strong id="dashboardPortfolioTender">0</strong>
+            <strong id="dashboardPortfolioUpcoming">0</strong>
+            <div id="dashboardActivityList"></div>
+            <span id="dashboardAgendaCount">0 agenda</span>
+            <div id="dashboardAgendaBento"></div>
+            <p id="dashboardPortfolioBrief"></p>
+            <strong id="statTotal">0</strong>
+            <strong id="statDone">0</strong>
+            <strong id="statProgress">0</strong>
+            <strong id="statLate">0</strong>
+            <div id="todoList"></div>
+            <div id="progressList"></div>
+            <div id="doneList"></div>
+            <section id="attentionBanner" class="attention-banner hidden"></section>
+            <select id="statusFilter">
+              <option value="all">Semua Status</option>
+              <option>Belum Selesai</option>
+              <option>Proses</option>
+              <option>Selesai</option>
+              <option>Tertunda</option>
+            </select>
+            <button id="createReportButton" type="button">Buat Laporan</button>
+            <div id="localAiSummary"></div>
+            <div id="localAiInsights"></div>
+            <div id="focusList"></div>
+            <div id="reportPreview">Belum ada laporan dibuat pada sesi ini.</div>
+            <div id="agendaList"></div>
+            <table><tbody id="dashboardActiveJobsBody"></tbody></table>
+            <table><tbody id="dashboardActivePersonnelBody"></tbody></table>
+            <table><tbody id="dashboardInactivePersonnelBody"></tbody></table>
+            <span id="dashboardWorkSummaryPeriod"></span>
+            <strong id="dashboardActiveJobsCount">0</strong>
+            <strong id="dashboardActivePersonnelCount">0</strong>
+            <strong id="dashboardInactivePersonnelCount">0</strong>
           </div>
-          <button class="primary-button portfolio-add-button" id="dashboardTaskAddButton" type="button">+ Tugas Baru</button>
-        </header>
-
-        <section id="attentionBanner" class="attention-banner hidden"></section>
-
-        <section class="stats-grid">
-          <article class="stat-card"><span>Total</span><strong id="statTotal">0</strong></article>
-          <article class="stat-card green"><span>Selesai</span><strong id="statDone">0</strong></article>
-          <article class="stat-card blue"><span>Proses</span><strong id="statProgress">0</strong></article>
-          <article class="stat-card red"><span>Terlambat</span><strong id="statLate">0</strong></article>
         </section>
 
-        <section class="content-grid">
-          <div class="board">
-            <div class="column" data-status="Belum Selesai">
-              <h2>Belum Selesai</h2>
-              <div class="task-list" id="todoList"></div>
-            </div>
-            <div class="column" data-status="Proses">
-              <h2>Proses</h2>
-              <div class="task-list" id="progressList"></div>
-            </div>
-            <div class="column" data-status="Selesai">
-              <h2>Selesai</h2>
-              <div class="task-list" id="doneList"></div>
-            </div>
-          </div>
-          <aside class="right-panel">
-            <section class="toolbar right-toolbar">
-              <div class="segments">
-                <button class="segment active" data-filter="all">Semua</button>
-                <button class="segment" data-filter="today">Hari Ini</button>
-                <button class="segment" data-filter="late">Terlambat</button>
-              </div>
-              <select id="statusFilter">
-                <option value="all">Semua Status</option>
-                <option>Belum Selesai</option>
-                <option>Proses</option>
-                <option>Selesai</option>
-                <option>Tertunda</option>
-              </select>
-              <button class="secondary-button" id="createReportButton">Buat Laporan</button>
-            </section>
-            <section class="panel ai-panel">
-              <div class="ai-panel-header">
-                <h2>AI</h2>
-              </div>
-              <div id="localAiSummary" class="ai-summary"></div>
-              <div id="localAiInsights" class="ai-insights"></div>
-            </section>
-            <section class="panel">
-              <h2>Fokus Hari Ini</h2>
-              <div id="focusList" class="focus-list"></div>
-            </section>
-            <section class="panel">
-              <h2>Ringkasan Laporan</h2>
-              <div id="reportPreview" class="report-preview">Belum ada laporan dibuat pada sesi ini.</div>
-            </section>
-            <section class="panel">
-              <h2>Agenda Aktif</h2>
-              <div id="agendaList" class="agenda-list"></div>
-            </section>
-          </aside>
-        </section>
-        </section>
-
-        <section class="dashboard-work-summary" aria-label="Ringkasan pekerjaan dan personil">
-          <article class="panel dashboard-summary-panel dashboard-active-jobs-panel">
-            <header class="dashboard-summary-header">
-              <div>
-                <h2>Pekerjaan Aktif</h2>
-                <p id="dashboardWorkSummaryPeriod">Ringkasan tahun berjalan</p>
-              </div>
-              <strong id="dashboardActiveJobsCount" class="dashboard-summary-count">0</strong>
-            </header>
-            <div class="dashboard-summary-table-wrap">
-              <table class="dashboard-summary-table">
-                <thead>
-                  <tr>
-                    <th>Pekerjaan</th>
-                    <th>Tahun</th>
-                    <th>Tanggal Selesai</th>
-                    <th>Personil Aktif</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="dashboardActiveJobsBody"></tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="panel dashboard-summary-panel">
-            <header class="dashboard-summary-header">
-              <div>
-                <h2>Personil Memiliki Pekerjaan Aktif</h2>
-                <p>Klik nama untuk melihat histori pekerjaan.</p>
-              </div>
-              <strong id="dashboardActivePersonnelCount" class="dashboard-summary-count">0</strong>
-            </header>
-            <div class="dashboard-summary-table-wrap">
-              <table class="dashboard-summary-table">
-                <thead>
-                  <tr>
-                    <th>Nama Personil</th>
-                    <th>Status</th>
-                    <th>Pekerjaan Aktif</th>
-                    <th>Akumulasi</th>
-                  </tr>
-                </thead>
-                <tbody id="dashboardActivePersonnelBody"></tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="panel dashboard-summary-panel">
-            <header class="dashboard-summary-header">
-              <div>
-                <h2>Personil Tidak Memiliki Pekerjaan Aktif</h2>
-                <p>Klik nama untuk melihat histori pekerjaan.</p>
-              </div>
-              <strong id="dashboardInactivePersonnelCount" class="dashboard-summary-count">0</strong>
-            </header>
-            <div class="dashboard-summary-table-wrap">
-              <table class="dashboard-summary-table">
-                <thead>
-                  <tr>
-                    <th>Nama Personil</th>
-                    <th>Status</th>
-                    <th>Jabatan atau Posisi</th>
-                    <th>Histori Selesai</th>
-                  </tr>
-                </thead>
-                <tbody id="dashboardInactivePersonnelBody"></tbody>
-              </table>
-            </div>
-          </article>
-        </section>
       </section>
 
       <section id="jobsView" class="view">
@@ -1390,7 +1395,7 @@
         </label>
         <label>Penanggung Jawab
           <span class="input-search-group">
-            <span class="input-search-icon" aria-hidden="true">âŒ•</span>
+            <span class="input-search-icon" aria-hidden="true">⌕</span>
             <input id="tenderOwner" list="tenderPersonnelNameSuggestions" autocomplete="off" placeholder="Cari nama PIC/tim">
           </span>
         </label>
@@ -1399,7 +1404,7 @@
         </label>
         <label>Nama Personil
           <span class="input-search-group">
-            <span class="input-search-icon" aria-hidden="true">âŒ•</span>
+            <span class="input-search-icon" aria-hidden="true">⌕</span>
             <input id="tenderPersonnelName" list="tenderPersonnelNameSuggestions" autocomplete="off" placeholder="Cari dari Personil Bemaco/Outsourcing">
           </span>
         </label>
