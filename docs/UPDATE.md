@@ -33,7 +33,7 @@ File yang perlu di-upload ulang ke GitHub:
 Setelah upload, buka website dengan tambahan cache buster, contoh:
 
 ```text
-https://osupriyadi630.github.io/daily-report-web/?v=9
+https://bemacorekaprima.github.io/Bemacorekaprima/?v=9
 ```
 
 ## Update Firebase Rules
@@ -58,7 +58,7 @@ diunggah ke GitHub, lakukan langkah berikut satu kali:
 7. Klik `Publish`.
 8. Keluar lalu login kembali ke web.
 
-Email `o.supriyadi630@gmail.com` ditetapkan sebagai Super Admin utama melalui
+Email `bemacorekaprima.kaltim@gmail.com` ditetapkan sebagai Super Admin utama melalui
 rules dan kode aplikasi. Akun ini tidak dapat diturunkan atau dihapus melalui
 panel role.
 
@@ -66,7 +66,7 @@ Collection role memakai email huruf kecil sebagai ID dokumen:
 
 ```text
 roles
-  o.supriyadi630@gmail.com
+  bemacorekaprima.kaltim@gmail.com
     role: super_admin
 ```
 

@@ -1,7 +1,7 @@
 const PERSONNEL_BRIDGE_TOKEN = 'Ospr630-personnel-bridge';
 const FIREBASE_API_KEY = 'AIzaSyCKmFdf3aiNaUKkRGcnWOKMO2YPFl-WRbw';
 const FIREBASE_PROJECT_ID = 'daily-report-ospr';
-const BOOTSTRAP_SUPER_ADMIN_EMAIL = 'o.supriyadi630@gmail.com';
+const BOOTSTRAP_SUPER_ADMIN_EMAIL = 'bemacorekaprima.kaltim@gmail.com';
 
 const PERSONNEL_SHEETS = {
   'data-utama': 2034016714,

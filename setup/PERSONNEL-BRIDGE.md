@@ -62,7 +62,7 @@ Tunggu GitHub Pages sekitar 1-3 menit, lalu buka URL baru yang ditampilkan oleh 
 
 ## 5. Tes
 
-1. Login menggunakan `o.supriyadi630@gmail.com`.
+1. Login menggunakan `bemacorekaprima.kaltim@gmail.com`.
 2. Buka **Personil**.
 3. Pastikan DATA UTAMA berstatus terbaca pada menu Pengaturan.
 4. Klik **Tambah Personil**, isi data, lalu simpan.

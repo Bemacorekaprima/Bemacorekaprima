@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     function isBootstrapSuperAdmin() {
-      return userEmail() == "o.supriyadi630@gmail.com";
+      return userEmail() == "bemacorekaprima.kaltim@gmail.com";
     }
 
     function assignedRole() {
@@ -123,13 +123,13 @@ service cloud.firestore {
         hasRole(["super_admin", "admin"])
       );
 
-      allow create: if roleEmail != "o.supriyadi630@gmail.com" &&
+      allow create: if roleEmail != "bemacorekaprima.kaltim@gmail.com" &&
         (
           hasRole(["super_admin"]) ||
           adminCanAssignRequestedRole()
         );
 
-      allow update: if roleEmail != "o.supriyadi630@gmail.com" &&
+      allow update: if roleEmail != "bemacorekaprima.kaltim@gmail.com" &&
         (
           hasRole(["super_admin"]) ||
           (
@@ -138,7 +138,7 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if roleEmail != "o.supriyadi630@gmail.com" &&
+      allow delete: if roleEmail != "bemacorekaprima.kaltim@gmail.com" &&
         (
           hasRole(["super_admin"]) ||
           (

@@ -5,6 +5,8 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   sendPasswordResetEmail,
   updateProfile,
   signOut,
@@ -32,6 +34,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 const db = getFirestore(app);
+const GOOGLE_REDIRECT_PENDING_KEY = "daily-report.googleRedirectPending";
 
 function notify(message, options = {}) {
   const text = String(message || "").trim();
@@ -182,7 +185,7 @@ function createDefaultAppConfig() {
   };
 }
 
-const BOOTSTRAP_SUPER_ADMIN_EMAIL = "o.supriyadi630@gmail.com";
+const BOOTSTRAP_SUPER_ADMIN_EMAIL = "bemacorekaprima.kaltim@gmail.com";
 const ACCESS_ROLES = {
   super_admin: {
     label: "Super Admin",
@@ -531,6 +534,8 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
+resolveGoogleRedirectResult();
+
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && currentUser && Date.now() - externalSheetLastLoadedAt > 30 * 1000) {
     loadExternalSheetData();
@@ -622,11 +627,47 @@ async function handleForgotPassword() {
 async function handleGoogleLogin() {
   setAuthMessage("Membuka login Google...");
   try {
+    if (shouldUseGoogleRedirect()) {
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, "1");
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
     await signInWithPopup(auth, googleProvider);
     setAuthMessage("");
   } catch (error) {
+    if (shouldRetryGoogleWithRedirect(error)) {
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, "1");
+      setAuthMessage("Popup Google tidak tersedia. Mengalihkan ke login Google...");
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
     setAuthMessage(getAuthErrorMessage(error));
   }
+}
+
+async function resolveGoogleRedirectResult() {
+  if (!sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY)) return;
+  setAuthMessage("Menyelesaikan login Google...");
+  try {
+    await getRedirectResult(auth);
+    sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
+    setAuthMessage("");
+  } catch (error) {
+    sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY);
+    setAuthMessage(getAuthErrorMessage(error));
+  }
+}
+
+function shouldUseGoogleRedirect() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function shouldRetryGoogleWithRedirect(error) {
+  const code = String(error?.code || "");
+  return code.includes("popup-blocked")
+    || code.includes("popup-closed-by-user")
+    || code.includes("cancelled-popup-request")
+    || code.includes("operation-not-supported-in-this-environment");
 }
 
 async function handleLogout() {
@@ -4679,6 +4720,7 @@ function getAuthErrorMessage(error) {
   if (code.includes("invalid-email")) return "Format email belum benar.";
   if (code.includes("popup-closed-by-user")) return "Login Google dibatalkan.";
   if (code.includes("operation-not-allowed")) return "Provider login ini belum diaktifkan di Firebase Authentication.";
+  if (code.includes("unauthorized-domain")) return "Domain web ini belum diizinkan di Firebase Authentication. Tambahkan localhost dan 127.0.0.1 di Authorized domains.";
   return error.message || "Terjadi masalah login.";
 }
 
