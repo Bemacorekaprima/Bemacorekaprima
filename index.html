@@ -135,9 +135,9 @@
           <span>Personil</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="users"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="tasks">
-          <span>Pengingat Email</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="list-checks"></i><span class="nav-icon-fallback">=</span></span>
+        <button class="nav-item" data-view="finance">
+          <span>Finance</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="wallet-cards"></i><span class="nav-icon-fallback">Rp</span></span>
         </button>
         <button class="nav-item" data-view="tenders">
           <span>Dokumen</span>
@@ -695,6 +695,104 @@
         </section>
       </section>
 
+      <section id="financeView" class="view finance-view">
+        <section class="finance-shell">
+          <header class="finance-header">
+            <div>
+              <span class="section-eyebrow">FINANCE WORKSPACE</span>
+              <h2>Finance Pekerjaan</h2>
+              <p id="financeSyncText">Menunggu sinkronisasi Sheet Finance...</p>
+            </div>
+            <div class="finance-header-actions">
+              <button class="secondary-button" id="refreshFinanceButton" type="button">Refresh</button>
+              <div class="action-dropdown finance-action-dropdown">
+                <button class="secondary-button action-dropdown-button" id="financeToolsButton" type="button" aria-expanded="false">
+                  Pilihan <span class="dropdown-chevron" aria-hidden="true"></span>
+                </button>
+                <div class="action-dropdown-menu finance-tools-menu hidden" id="financeToolsMenu">
+                  <button id="financeAddRecordButton" type="button">Tambah rincian</button>
+                  <button id="financeEditRecordButton" type="button">Edit pilihan</button>
+                  <button id="financeDeleteRecordButton" type="button">Hapus pilihan</button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <section class="finance-kpi-grid">
+            <article class="finance-kpi-card"><span>Total Pekerjaan</span><strong id="financeKpiJobs">0</strong><small id="financeKpiJobsMeta">0 terhubung portofolio</small></article>
+            <article class="finance-kpi-card green"><span>Total Netto</span><strong id="financeKpiNetto">Rp0</strong><small id="financeKpiNettoMeta">Dari Sheet Finance</small></article>
+            <article class="finance-kpi-card amber"><span>Pajak PPH 21</span><strong id="financeKpiTax">Rp0</strong><small id="financeKpiTaxMeta">Akumulasi personil</small></article>
+            <article class="finance-kpi-card blue"><span>Tagihan Aktif</span><strong id="financeKpiActiveBills">0</strong><small id="financeKpiActiveBillsMeta">Berdasarkan progress pekerjaan</small></article>
+          </section>
+
+          <section class="panel finance-panel">
+            <div class="section-header personnel-heading">
+              <div>
+                <h2>Daftar Pekerjaan Finance</h2>
+                <p>Ringkasan nilai, progress, status termin/tagihan, personil, dan tautan pekerjaan.</p>
+              </div>
+              <span id="financeResultCount" class="portfolio-collection-count">0 pekerjaan</span>
+            </div>
+            <div class="personnel-tools finance-tools">
+              <label class="personnel-search">
+                <span>Cari pekerjaan/personil</span>
+                <input id="financeSearch" type="search" placeholder="Cari pekerjaan, pemberi kerja, nama personil...">
+              </label>
+              <label>
+                <span>Status</span>
+                <select id="financeStatusFilter">
+                  <option value="all">Semua Status</option>
+                  <option value="billing">Tagihan berjalan</option>
+                  <option value="complete">Termin selesai</option>
+                  <option value="waiting">Menunggu data Finance</option>
+                </select>
+              </label>
+              <label>
+                <span>Tahun</span>
+                <select id="financeYearFilter">
+                  <option value="all">Semua Tahun</option>
+                </select>
+              </label>
+              <button class="text-button" id="resetFinanceFilters" type="button">Reset filter</button>
+            </div>
+
+            <div class="table-wrap finance-table-wrap">
+              <table class="finance-table">
+                <thead>
+                  <tr>
+                    <th>Pekerjaan</th>
+                    <th>Progress</th>
+                    <th>Status Termin/Tagihan</th>
+                    <th>Total Harga</th>
+                    <th>Pajak</th>
+                    <th>Netto</th>
+                    <th>Personil</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="financeTableBody"></tbody>
+              </table>
+            </div>
+            <div class="finance-mobile-list" id="financeMobileList" aria-label="Daftar finance mobile"></div>
+          </section>
+
+          <section class="panel finance-detail-panel hidden" id="financeDetailPanel">
+            <header class="finance-detail-header">
+              <div>
+                <span class="section-eyebrow">RINCIAN FINANCE</span>
+                <h2 id="financeDetailTitle">Pilih pekerjaan</h2>
+                <p id="financeDetailMeta">Klik pekerjaan pada daftar untuk membuka rincian.</p>
+              </div>
+              <div class="finance-detail-actions">
+                <button class="secondary-button" id="financeDetailAddButton" type="button">Tambah</button>
+                <button class="secondary-button" id="financeDetailEditButton" type="button">Edit</button>
+                <button class="secondary-button danger" id="financeDetailDeleteButton" type="button">Hapus</button>
+              </div>
+            </header>
+            <div id="financeDetailBody" class="finance-detail-body"></div>
+          </section>
+        </section>
+      </section>
       <section id="tasksView" class="view">
         <section class="panel">
           <div class="section-header">

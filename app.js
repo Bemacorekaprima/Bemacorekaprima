@@ -143,6 +143,7 @@ const MENU_DEFINITIONS = [
   { id: "tenders", label: "Tender" },
   { id: "jobs", label: "Portofolio" },
   { id: "personnel", label: "Personil" },
+  { id: "finance", label: "Finance" },
   { id: "tasks", label: "Tugas" },
   { id: "reports", label: "Laporan" },
   { id: "settings", label: "Pengaturan" }
@@ -152,6 +153,7 @@ const DEFAULT_MENU_ROLES = {
   tenders: [...CONFIGURABLE_ROLES],
   jobs: [...CONFIGURABLE_ROLES],
   personnel: [...CONFIGURABLE_ROLES],
+  finance: [...CONFIGURABLE_ROLES],
   tasks: [...CONFIGURABLE_ROLES],
   reports: [...CONFIGURABLE_ROLES],
   settings: ["admin", "editor", "author", "contributor"]
@@ -273,6 +275,10 @@ let state = {
   jobsStatus: "all",
   jobsPage: 1,
   jobsPageSize: 25,
+  financeSearch: "",
+  financeStatusFilter: "all",
+  financeYear: "all",
+  selectedFinanceJobKey: "",
   jobsVisibleRecords: [],
   portfolioFeaturedJobs: [],
   dashboardFeaturedJobs: [],
@@ -434,6 +440,29 @@ function bindControls() {
   document.getElementById("portfolioFeaturedJobs").addEventListener("click", handlePortfolioCardClick);
   document.getElementById("portfolioSummary").addEventListener("click", handlePortfolioSummaryClick);
   document.getElementById("portfolioAddItemButton").addEventListener("click", () => openJobRecordForm());
+  document.getElementById("refreshFinanceButton")?.addEventListener("click", loadExternalSheetData);
+  document.getElementById("financeSearch")?.addEventListener("input", event => {
+    state.financeSearch = event.target.value;
+    renderFinance();
+  });
+  document.getElementById("financeStatusFilter")?.addEventListener("change", event => {
+    state.financeStatusFilter = event.target.value;
+    renderFinance();
+  });
+  document.getElementById("financeYearFilter")?.addEventListener("change", event => {
+    state.financeYear = event.target.value;
+    renderFinance();
+  });
+  document.getElementById("resetFinanceFilters")?.addEventListener("click", resetFinanceFilters);
+  document.getElementById("financeTableBody")?.addEventListener("click", handleFinanceTableClick);
+  document.getElementById("financeMobileList")?.addEventListener("click", handleFinanceMobileClick);
+  document.getElementById("financeToolsButton")?.addEventListener("click", toggleFinanceToolsMenu);
+  document.getElementById("financeAddRecordButton")?.addEventListener("click", () => handleFinanceAction("add"));
+  document.getElementById("financeEditRecordButton")?.addEventListener("click", () => handleFinanceAction("edit"));
+  document.getElementById("financeDeleteRecordButton")?.addEventListener("click", () => handleFinanceAction("delete"));
+  document.getElementById("financeDetailAddButton")?.addEventListener("click", () => handleFinanceAction("add"));
+  document.getElementById("financeDetailEditButton")?.addEventListener("click", () => handleFinanceAction("edit"));
+  document.getElementById("financeDetailDeleteButton")?.addEventListener("click", () => handleFinanceAction("delete"));
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
   document.getElementById("closeJobDetailFooter").addEventListener("click", closeJobDetail);
   document.getElementById("addJobDetailRowButton").addEventListener("click", () => openJobRecordForm(null, currentJobDetail));
@@ -2016,6 +2045,7 @@ async function loadExternalSheetData() {
   renderLocalAI();
   renderPersonnel();
   renderJobs();
+  renderFinance();
   renderTenders();
   renderDashboardPortfolioHome();
   renderDashboardWorkSummary();
@@ -5997,6 +6027,7 @@ function render() {
   renderExternalSheetStatus();
   renderPersonnel();
   renderJobs();
+  renderFinance();
   renderTenders();
   renderDashboardPortfolioHome();
   renderDashboardWorkSummary();
@@ -6020,6 +6051,7 @@ function renderView() {
     tenders: "Tender",
     jobs: "Portofolio",
     personnel: "Personil",
+    finance: "Finance",
     tasks: "Tugas",
     reports: "Laporan",
     settings: "Pengaturan"
@@ -6032,6 +6064,359 @@ function renderView() {
   });
   document.getElementById("pageTitle").textContent = titles[state.activeView] || "Dashboard";
 }
+
+function getFinanceSheet() {
+  return state.externalSheets.find(sheet => sheet.id === "finance") || null;
+}
+
+function parseFinanceNumber(value) {
+  const raw = String(value || "").replace(/[^\d,.-]/g, "").trim();
+  if (!raw) return 0;
+  const normalized = raw.includes(",") && raw.lastIndexOf(",") > raw.lastIndexOf(".")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw.replace(/,/g, "");
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatFinanceMoney(value) {
+  const number = Number(value) || 0;
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0
+  }).format(number);
+}
+
+function getFinanceRecordJobName(record) {
+  return getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"]);
+}
+
+function getFinanceRecordPersonName(record) {
+  return getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
+}
+
+function getFinanceStatusKey(entry) {
+  if (!entry.financeRecords.length) return "waiting";
+  if (entry.progress >= 100) return "complete";
+  return "billing";
+}
+
+function getFinanceStatusLabel(entry) {
+  return {
+    waiting: "Menunggu data Finance",
+    complete: "Termin selesai",
+    billing: "Tagihan berjalan"
+  }[getFinanceStatusKey(entry)] || "Tagihan berjalan";
+}
+
+function buildFinanceEntries() {
+  const financeSheet = getFinanceSheet();
+  const financeRecords = financeSheet?.status === "ready" ? financeSheet.records : [];
+  const grouped = new Map();
+  financeRecords.forEach(record => {
+    const jobName = getFinanceRecordJobName(record) || "Pekerjaan tanpa nama";
+    const key = normalizeSearchText(jobName);
+    const group = grouped.get(key) || {
+      key,
+      pekerjaan: jobName,
+      financeRecords: [],
+      totalHarga: 0,
+      netto: 0,
+      pajak: 0,
+      pemberiKerja: "",
+      tanggalMulai: "",
+      tanggalSelesai: ""
+    };
+    group.financeRecords.push(record);
+    group.totalHarga += parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"]));
+    group.netto += parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"]));
+    group.pajak += parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"]));
+    group.pemberiKerja ||= getRecordValue(record, ["pemberi kerja", "instansi", "klien", "owner"]);
+    group.tanggalMulai ||= getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]);
+    group.tanggalSelesai ||= getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"]);
+    grouped.set(key, group);
+  });
+
+  const entries = [];
+  const seen = new Set();
+  buildJobsFromAllSources().forEach(job => {
+    const key = normalizeSearchText(job.pekerjaan);
+    const finance = grouped.get(key);
+    const progress = getPortfolioProgress(job);
+    const people = getPortfolioPeople(job);
+    entries.push({
+      key,
+      pekerjaan: job.pekerjaan,
+      job,
+      financeRecords: finance?.financeRecords || [],
+      totalHarga: finance?.totalHarga || 0,
+      netto: finance?.netto || 0,
+      pajak: finance?.pajak || 0,
+      pemberiKerja: finance?.pemberiKerja || getRecordValue(job.records?.[0] || {}, ["pemberi kerja", "instansi", "klien", "owner"]),
+      tanggalMulai: finance?.tanggalMulai || job.tanggalMulai || "",
+      tanggalSelesai: finance?.tanggalSelesai || job.tanggalSelesai || "",
+      progress,
+      status: getPortfolioStatusLabel(job),
+      yearLabel: getJobYearLabel(job),
+      personil: people,
+      source: finance ? "Finance + Portofolio" : "Portofolio"
+    });
+    seen.add(key);
+  });
+
+  grouped.forEach((finance, key) => {
+    if (seen.has(key)) return;
+    entries.push({
+      key,
+      pekerjaan: finance.pekerjaan,
+      job: null,
+      financeRecords: finance.financeRecords,
+      totalHarga: finance.totalHarga,
+      netto: finance.netto,
+      pajak: finance.pajak,
+      pemberiKerja: finance.pemberiKerja,
+      tanggalMulai: finance.tanggalMulai,
+      tanggalSelesai: finance.tanggalSelesai,
+      progress: 0,
+      status: "Finance",
+      yearLabel: String(getYearFromDateValue(finance.tanggalMulai) || getYearFromDateValue(finance.tanggalSelesai) || "-"),
+      personil: finance.financeRecords.map(getFinanceRecordPersonName).filter(Boolean),
+      source: "Finance"
+    });
+  });
+
+  return entries.sort((a, b) => a.pekerjaan.localeCompare(b.pekerjaan, "id"));
+}
+
+function getFilteredFinanceEntries() {
+  const query = normalizeSearchText(state.financeSearch);
+  const tokens = getMeaningfulTokens(query);
+  return buildFinanceEntries().filter(entry => {
+    const yearOk = state.financeYear === "all" || String(entry.yearLabel).includes(String(state.financeYear));
+    const statusOk = state.financeStatusFilter === "all" || getFinanceStatusKey(entry) === state.financeStatusFilter;
+    const haystack = normalizeSearchText([
+      entry.pekerjaan,
+      entry.pemberiKerja,
+      entry.status,
+      entry.source,
+      entry.personil.join(" "),
+      entry.financeRecords.map(record => Object.values(record).join(" ")).join(" ")
+    ].join(" "));
+    const queryOk = !tokens.length || tokens.every(token => haystack.includes(token));
+    return yearOk && statusOk && queryOk;
+  });
+}
+
+function renderFinanceYearOptions(entries) {
+  const select = document.getElementById("financeYearFilter");
+  if (!select || document.activeElement === select) return;
+  const years = [...new Set(entries.flatMap(entry => String(entry.yearLabel || "").match(/\b(19|20)\d{2}\b/g) || []))]
+    .sort((a, b) => Number(b) - Number(a));
+  const selected = String(state.financeYear || "all");
+  select.innerHTML = ['<option value="all">Semua Tahun</option>', ...years.map(year => `<option value="${year}">${year}</option>`)].join("");
+  select.value = years.includes(selected) ? selected : "all";
+  state.financeYear = select.value;
+}
+
+function renderFinance() {
+  const tableBody = document.getElementById("financeTableBody");
+  if (!tableBody) return;
+  const sheet = getFinanceSheet();
+  const allEntries = buildFinanceEntries();
+  renderFinanceYearOptions(allEntries);
+  const entries = getFilteredFinanceEntries();
+  const linkedCount = allEntries.filter(entry => entry.job).length;
+  const totalNetto = allEntries.reduce((total, entry) => total + entry.netto, 0);
+  const totalTax = allEntries.reduce((total, entry) => total + entry.pajak, 0);
+  const activeBills = allEntries.filter(entry => getFinanceStatusKey(entry) === "billing").length;
+
+  setTextContent("financeKpiJobs", allEntries.length);
+  setTextContent("financeKpiJobsMeta", `${linkedCount} terhubung portofolio`);
+  setTextContent("financeKpiNetto", formatFinanceMoney(totalNetto));
+  setTextContent("financeKpiTax", formatFinanceMoney(totalTax));
+  setTextContent("financeKpiActiveBills", activeBills);
+  setTextContent("financeResultCount", `${entries.length} pekerjaan`);
+  setTextContent("financeSyncText", sheet?.status === "ready"
+    ? `Sheet Finance tersinkron, ${sheet.records.length} baris terbaca.`
+    : sheet?.status === "loading"
+      ? "Memuat Sheet Finance..."
+      : sheet?.status === "idle"
+        ? "CSV Finance belum diisi. Daftar memakai data Portofolio sebagai kerangka."
+        : "Sheet Finance belum dapat dibaca. Daftar memakai data Portofolio sebagai kerangka.");
+
+  if (!entries.length) {
+    tableBody.innerHTML = '<tr><td class="personnel-empty" colspan="8">Tidak ada pekerjaan finance yang cocok.</td></tr>';
+  } else {
+    tableBody.innerHTML = entries.map(entry => `
+      <tr class="clickable-row" data-finance-key="${escapeHtml(entry.key)}" tabindex="0">
+        <td data-label="Pekerjaan"><strong>${escapeHtml(entry.pekerjaan)}</strong><small>${escapeHtml(entry.pemberiKerja || entry.source)}</small></td>
+        <td data-label="Progress"><div class="finance-progress"><span style="width:${entry.progress}%"></span></div><small>${entry.progress}%</small></td>
+        <td data-label="Status"><span class="finance-status ${getFinanceStatusKey(entry)}">${escapeHtml(getFinanceStatusLabel(entry))}</span></td>
+        <td data-label="Total Harga">${formatFinanceMoney(entry.totalHarga)}</td>
+        <td data-label="Pajak">${formatFinanceMoney(entry.pajak)}</td>
+        <td data-label="Netto"><strong>${formatFinanceMoney(entry.netto)}</strong></td>
+        <td data-label="Personil">${entry.personil.length || entry.financeRecords.length || 0}</td>
+        <td data-label="Aksi"><button class="text-button" type="button" data-finance-open="${escapeHtml(entry.key)}">Rincian</button></td>
+      </tr>
+    `).join("");
+  }
+  renderFinanceMobile(entries);
+
+  const selected = allEntries.find(entry => entry.key === state.selectedFinanceJobKey);
+  if (selected) renderFinanceDetail(selected);
+}
+
+function renderFinanceMobile(entries) {
+  const container = document.getElementById("financeMobileList");
+  if (!container) return;
+  container.innerHTML = entries.length ? entries.map(entry => `
+    <article class="finance-mobile-card" data-finance-key="${escapeHtml(entry.key)}">
+      <header>
+        <strong>${escapeHtml(entry.pekerjaan)}</strong>
+        <span class="finance-status ${getFinanceStatusKey(entry)}">${escapeHtml(getFinanceStatusLabel(entry))}</span>
+      </header>
+      <div class="finance-mobile-values">
+        <span><small>Netto</small><b>${formatFinanceMoney(entry.netto)}</b></span>
+        <span><small>Progress</small><b>${entry.progress}%</b></span>
+        <span><small>Personil</small><b>${entry.personil.length || entry.financeRecords.length || 0}</b></span>
+      </div>
+      <button class="secondary-button" type="button" data-finance-open="${escapeHtml(entry.key)}">Buka rincian</button>
+    </article>
+  `).join("") : '<p class="portfolio-mobile-empty">Tidak ada pekerjaan finance yang cocok.</p>';
+}
+
+function handleFinanceTableClick(event) {
+  const key = event.target.closest("[data-finance-open]")?.dataset.financeOpen || event.target.closest("tr[data-finance-key]")?.dataset.financeKey;
+  if (!key) return;
+  openFinanceDetail(key);
+}
+
+function handleFinanceMobileClick(event) {
+  const key = event.target.closest("[data-finance-open], [data-finance-key]")?.dataset.financeOpen || event.target.closest("[data-finance-key]")?.dataset.financeKey;
+  if (!key) return;
+  openFinanceDetail(key);
+}
+
+function openFinanceDetail(key) {
+  const entry = buildFinanceEntries().find(item => item.key === key);
+  if (!entry) return notify("Rincian Finance tidak ditemukan.");
+  state.selectedFinanceJobKey = key;
+  renderFinanceDetail(entry);
+  document.getElementById("financeDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderFinanceDetail(entry) {
+  const panel = document.getElementById("financeDetailPanel");
+  const body = document.getElementById("financeDetailBody");
+  if (!panel || !body) return;
+  panel.classList.remove("hidden");
+  setTextContent("financeDetailTitle", entry.pekerjaan);
+  setTextContent("financeDetailMeta", `${entry.source} - ${getFinanceStatusLabel(entry)} - ${entry.progress}% progress`);
+  const relatedPersonnel = buildFinanceDetailPersonnel(entry);
+  body.innerHTML = `
+    <section class="finance-detail-kpis">
+      <article><span>Total Harga</span><strong>${formatFinanceMoney(entry.totalHarga)}</strong></article>
+      <article><span>Pajak PPH 21</span><strong>${formatFinanceMoney(entry.pajak)}</strong></article>
+      <article><span>Netto</span><strong>${formatFinanceMoney(entry.netto)}</strong></article>
+      <article><span>Personil</span><strong>${relatedPersonnel.length}</strong></article>
+    </section>
+    <section class="finance-detail-grid">
+      <article>
+        <h3>Identitas Pekerjaan</h3>
+        <dl>
+          <div><dt>Pemberi Kerja</dt><dd>${escapeHtml(entry.pemberiKerja || "-")}</dd></div>
+          <div><dt>Tanggal Mulai</dt><dd>${escapeHtml(entry.tanggalMulai || "-")}</dd></div>
+          <div><dt>Tanggal Selesai</dt><dd>${escapeHtml(entry.tanggalSelesai || "-")}</dd></div>
+          <div><dt>Status Portofolio</dt><dd>${escapeHtml(entry.status || "-")}</dd></div>
+        </dl>
+      </article>
+      <article>
+        <h3>Status Termin/Tagihan</h3>
+        <div class="finance-detail-progress"><span style="width:${entry.progress}%"></span></div>
+        <p>${escapeHtml(getFinanceStatusLabel(entry))}. Data angka diambil dari Sheet Finance, progress dari Portofolio/Tender.</p>
+      </article>
+    </section>
+    <section>
+      <h3>Personil dan Nilai</h3>
+      <div class="table-wrap finance-detail-table-wrap">
+        <table class="finance-detail-table">
+          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Pajak</th><th>Netto</th><th>Keterangan</th></tr></thead>
+          <tbody>${relatedPersonnel.length ? relatedPersonnel.map(row => `
+            <tr>
+              <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
+              <td data-label="Uraian/Jabatan">${escapeHtml(row.uraian)}</td>
+              <td data-label="Bulan">${escapeHtml(row.bulan)}</td>
+              <td data-label="Harga Satuan">${formatFinanceMoney(row.hargaSatuan)}</td>
+              <td data-label="Total">${formatFinanceMoney(row.total)}</td>
+              <td data-label="Pajak">${formatFinanceMoney(row.pajak)}</td>
+              <td data-label="Netto">${formatFinanceMoney(row.netto)}</td>
+              <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
+            </tr>
+          `).join("") : '<tr><td class="personnel-empty" colspan="8">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function buildFinanceDetailPersonnel(entry) {
+  if (entry.financeRecords.length) {
+    return entry.financeRecords.map(record => ({
+      nama: getFinanceRecordPersonName(record) || "Tanpa nama",
+      uraian: getRecordValue(record, ["uraian", "jabatan", "posisi"]) || "-",
+      bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || "-",
+      hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
+      total: parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"])),
+      pajak: parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"])),
+      netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
+      keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-"
+    }));
+  }
+  return (entry.personil || []).map(name => ({
+    nama: name,
+    uraian: "Terhubung dari Portofolio/Personil",
+    bulan: "-",
+    hargaSatuan: 0,
+    total: 0,
+    pajak: 0,
+    netto: 0,
+    keterangan: "Menunggu rincian Sheet Finance"
+  }));
+}
+
+function resetFinanceFilters() {
+  state.financeSearch = "";
+  state.financeStatusFilter = "all";
+  state.financeYear = "all";
+  const search = document.getElementById("financeSearch");
+  const status = document.getElementById("financeStatusFilter");
+  const year = document.getElementById("financeYearFilter");
+  if (search) search.value = "";
+  if (status) status.value = "all";
+  if (year) year.value = "all";
+  renderFinance();
+}
+
+function toggleFinanceToolsMenu() {
+  const menu = document.getElementById("financeToolsMenu");
+  const button = document.getElementById("financeToolsButton");
+  if (!menu || !button) return;
+  const willOpen = menu.classList.contains("hidden");
+  menu.classList.toggle("hidden", !willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+function handleFinanceAction(action) {
+  const labels = { add: "Tambah rincian", edit: "Edit pilihan", delete: "Hapus pilihan" };
+  closeActionMenu();
+  const sheet = getFinanceSheet();
+  if (!sheet?.url && sheet?.status !== "ready") {
+    notify("Isi link CSV Finance di Pengaturan terlebih dahulu agar data Finance terbaca.");
+    return;
+  }
+  notify(`${labels[action] || "Aksi"} Finance disiapkan. Penyimpanan langsung ke spreadsheet perlu Apps Script write-back pada tahap berikutnya.`);
+}
+
 
 function renderStats() {
   const stats = buildStats(getFilteredTasks(false));
