@@ -8,8 +8,6 @@ window.FIREBASE_CONFIG = {
   measurementId: "G-PM0ZB3RC5F"
 };
 
-window.EMAIL_BRIDGE_URL = "https://script.google.com/macros/s/AKfycbzkF2LcBiTjFI-eQGYMl6woKrBPlD9yl60SoT1DPFB4cq8_-Hqcy6UGv4vHPtg8aWv49g/exec";
-window.EMAIL_BRIDGE_TOKEN = "Ospr630-daily-report";
 
-window.PERSONNEL_BRIDGE_URL = "https://script.google.com/macros/s/AKfycbxojFnwfOgIngsGnyuf9-W2olwBW5Y2W9mm-TKWO0ayT7b3C8SncJ4mtFpY4w4ibPuZ/exec";
-window.PERSONNEL_BRIDGE_TOKEN = "Ospr630-personnel-bridge";
+window.PERSONNEL_BRIDGE_URL = "";
+window.PERSONNEL_BRIDGE_TOKEN = "Bemaco-20260630-spreadsheet-bridge";

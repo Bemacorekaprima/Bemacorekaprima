@@ -1,0 +1,469 @@
+﻿const PERSONNEL_BRIDGE_TOKEN = 'Bemaco-20260630-spreadsheet-bridge';
+const FIREBASE_API_KEY = 'AIzaSyAj4yTKTBE41kRq62dUPwSxZFDsoZolJec';
+const FIREBASE_PROJECT_ID = 'bemacorekaprima-1f94e';
+const BOOTSTRAP_SUPER_ADMIN_EMAIL = 'bemacorekaprima.kaltim@gmail.com';
+
+const SPREADSHEET_ID = '1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA';
+
+const PERSONNEL_SHEETS = {
+  'data-utama': { gid: 2034016714, names: ['DATA UTAMA', 'Data Utama'] },
+  'personil-bmc': { gid: 2048149704, names: ['PERSONIL BMC', 'Personil BMC', 'PERSONIL'] },
+  outsourcing: { gid: 1030462578, names: ['Outsourcing', 'OUTSOURCING'] }
+};
+
+const PERSONNEL_WRITE_ROLES = ['super_admin', 'editor', 'author'];
+const PERSONNEL_CACHE_TTL_SECONDS = 180;
+const PERSONNEL_CACHE_PREFIX = 'personnelBridge:v2:';
+const PERSONNEL_CACHE_CHUNK_SIZE = 85000;
+const PERSONNEL_CACHE_MAX_CHUNKS = 30;
+
+function doGet(e) {
+  const callback = String((e && e.parameter && e.parameter.callback) || 'personnelBridgeCallback');
+
+  try {
+    validateBridgeToken_((e && e.parameter && e.parameter.token) || '');
+    const cachedSheets = getCachedSheets_();
+    if (cachedSheets) {
+      return javascriptResponse_(callback, {
+        ok: true,
+        sheets: cachedSheets,
+        cache: 'hit',
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    const spreadsheet = getBoundSpreadsheet_();
+    const sheets = {};
+
+    Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
+      const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
+      sheets[sourceId] = readSheet_(sheet);
+    });
+    setCachedSheets_(sheets);
+
+    return javascriptResponse_(callback, {
+      ok: true,
+      sheets: sheets,
+      cache: 'miss',
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    return javascriptResponse_(callback, {
+      ok: false,
+      error: error.message || String(error)
+    });
+  }
+}
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    validateBridgeToken_(payload.token);
+
+    const firebaseUser = verifyFirebaseUser_(payload.firebaseIdToken);
+    const role = getFirebaseRole_(firebaseUser.email, payload.firebaseIdToken);
+    if (PERSONNEL_WRITE_ROLES.indexOf(role) === -1) {
+      throw new Error('Role ' + role + ' tidak diizinkan mengubah data personil.');
+    }
+
+    const sourceId = String(payload.sourceId || '');
+    if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, sourceId)) {
+      throw new Error('Sumber sheet tidak valid.');
+    }
+
+    const spreadsheet = getBoundSpreadsheet_();
+    const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
+    const targetSourceId = String(payload.targetSourceId || sourceId);
+    if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, targetSourceId)) {
+      throw new Error('Target sheet tidak valid.');
+    }
+    const targetSheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[targetSourceId]);
+    const action = String(payload.action || '');
+    const lock = LockService.getDocumentLock();
+    lock.waitLock(30000);
+
+    try {
+      if (action === 'add') {
+        addPersonnelRow_(targetSheet, payload.data || {});
+      } else if (action === 'update') {
+        if (targetSourceId !== sourceId) {
+          addPersonnelRow_(targetSheet, payload.data || {});
+          deletePersonnelRow_(sheet, Number(payload.rowNumber));
+        } else {
+          updatePersonnelRow_(sheet, Number(payload.rowNumber), payload.data || {});
+        }
+      } else if (action === 'delete') {
+        deletePersonnelRow_(sheet, Number(payload.rowNumber));
+      } else {
+        throw new Error('Aksi personil tidak dikenali.');
+      }
+      clearPersonnelCache_();
+    } finally {
+      lock.releaseLock();
+    }
+
+    return jsonResponse_({
+      ok: true,
+      action: action,
+      sourceId: sourceId,
+      targetSourceId: targetSourceId,
+      email: firebaseUser.email,
+      role: role
+    });
+  } catch (error) {
+    console.error(error);
+    return jsonResponse_({
+      ok: false,
+      error: error.message || String(error)
+    });
+  }
+}
+
+function getCachedSheets_() {
+  const sheets = {};
+  const sourceIds = Object.keys(PERSONNEL_SHEETS);
+
+  for (let index = 0; index < sourceIds.length; index += 1) {
+    const sourceId = sourceIds[index];
+    const cachedRecords = getCacheJson_('sheet:' + sourceId);
+    if (!Array.isArray(cachedRecords)) return null;
+    sheets[sourceId] = cachedRecords;
+  }
+
+  return sheets;
+}
+
+function setCachedSheets_(sheets) {
+  Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
+    if (Array.isArray(sheets[sourceId])) {
+      setCacheJson_('sheet:' + sourceId, sheets[sourceId], PERSONNEL_CACHE_TTL_SECONDS);
+    }
+  });
+}
+
+function clearPersonnelCache_() {
+  Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
+    clearCacheValue_('sheet:' + sourceId);
+  });
+}
+
+function getCacheJson_(key) {
+  const text = getCacheText_(key);
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    clearCacheValue_(key);
+    return null;
+  }
+}
+
+function setCacheJson_(key, value, ttlSeconds) {
+  setCacheText_(key, JSON.stringify(value), ttlSeconds);
+}
+
+function getCacheText_(key) {
+  const cache = CacheService.getScriptCache();
+  const baseKey = PERSONNEL_CACHE_PREFIX + key;
+  const metaText = cache.get(baseKey + ':meta');
+  if (!metaText) return '';
+
+  let meta;
+  try {
+    meta = JSON.parse(metaText);
+  } catch (error) {
+    clearCacheValue_(key);
+    return '';
+  }
+
+  if (!meta || !Number.isInteger(meta.chunks) || meta.chunks < 1 || meta.chunks > PERSONNEL_CACHE_MAX_CHUNKS) {
+    clearCacheValue_(key);
+    return '';
+  }
+
+  const keys = [];
+  for (let index = 0; index < meta.chunks; index += 1) {
+    keys.push(baseKey + ':chunk:' + index);
+  }
+
+  const chunks = cache.getAll(keys);
+  const parts = [];
+  for (let index = 0; index < keys.length; index += 1) {
+    const chunk = chunks[keys[index]];
+    if (typeof chunk !== 'string') {
+      clearCacheValue_(key);
+      return '';
+    }
+    parts.push(chunk);
+  }
+
+  return parts.join('');
+}
+
+function setCacheText_(key, text, ttlSeconds) {
+  const cache = CacheService.getScriptCache();
+  const baseKey = PERSONNEL_CACHE_PREFIX + key;
+  const chunks = [];
+
+  for (let start = 0; start < text.length; start += PERSONNEL_CACHE_CHUNK_SIZE) {
+    chunks.push(text.slice(start, start + PERSONNEL_CACHE_CHUNK_SIZE));
+  }
+
+  if (!chunks.length || chunks.length > PERSONNEL_CACHE_MAX_CHUNKS) {
+    clearCacheValue_(key);
+    return;
+  }
+
+  const payload = {};
+  chunks.forEach(function(chunk, index) {
+    payload[baseKey + ':chunk:' + index] = chunk;
+  });
+  payload[baseKey + ':meta'] = JSON.stringify({
+    chunks: chunks.length,
+    storedAt: new Date().toISOString()
+  });
+
+  cache.putAll(payload, ttlSeconds);
+}
+
+function clearCacheValue_(key) {
+  const cache = CacheService.getScriptCache();
+  const baseKey = PERSONNEL_CACHE_PREFIX + key;
+  const keys = [baseKey + ':meta'];
+  for (let index = 0; index < PERSONNEL_CACHE_MAX_CHUNKS; index += 1) {
+    keys.push(baseKey + ':chunk:' + index);
+  }
+  cache.removeAll(keys);
+}
+
+function getBoundSpreadsheet_() {
+  try {
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
+  } catch (error) {
+    throw new Error('Spreadsheet Bemaco baru tidak dapat dibuka: ' + error.message);
+  }
+}
+
+function getSheetById_(spreadsheet, sheetConfig) {
+  const config = typeof sheetConfig === 'object' ? sheetConfig : { gid: Number(sheetConfig), names: [] };
+  const gid = Number(config.gid || 0);
+  let sheet = spreadsheet.getSheets().find(function(item) {
+    return gid && item.getSheetId() === gid;
+  });
+
+  if (!sheet && Array.isArray(config.names)) {
+    sheet = spreadsheet.getSheets().find(function(item) {
+      const name = String(item.getName() || '').trim().toLowerCase();
+      return config.names.some(function(candidate) {
+        return name === String(candidate || '').trim().toLowerCase();
+      });
+    });
+  }
+
+  if (!sheet) {
+    throw new Error('Sheet tidak ditemukan. Periksa GID atau nama tab: ' + JSON.stringify(config));
+  }
+  return sheet;
+}
+
+function readSheet_(sheet) {
+  const values = sheet.getDataRange().getDisplayValues();
+  if (!values.length) return [];
+
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const records = [];
+
+  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (!row.some(function(value) { return String(value).trim() !== ''; })) continue;
+
+    const record = { '_Sumber Baris': rowIndex + 1 };
+    headers.forEach(function(header, columnIndex) {
+      record[header] = row[columnIndex] || '';
+    });
+    records.push(record);
+  }
+
+  return records;
+}
+
+function addPersonnelRow_(sheet, data) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const targetRow = Math.max(sheet.getLastRow() + 1, headerIndex + 2);
+  const sourceFormulaRow = Math.max(headerIndex + 2, targetRow - 1);
+
+  headers.forEach(function(header, columnIndex) {
+    const column = columnIndex + 1;
+    const targetCell = sheet.getRange(targetRow, column);
+    const sourceCell = sheet.getRange(sourceFormulaRow, column);
+    const formula = sourceFormulaRow < targetRow ? sourceCell.getFormulaR1C1() : '';
+
+    if (Object.prototype.hasOwnProperty.call(data, header) && !isComputedHeader_(header)) {
+      targetCell.setValue(normalizeWriteValue_(data[header]));
+    } else if (formula) {
+      targetCell.setFormulaR1C1(formula);
+    }
+  });
+}
+
+function updatePersonnelRow_(sheet, rowNumber, data) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const firstDataRow = headerIndex + 2;
+
+  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
+    throw new Error('Nomor baris personil tidak valid.');
+  }
+
+  headers.forEach(function(header, columnIndex) {
+    if (!Object.prototype.hasOwnProperty.call(data, header) || isComputedHeader_(header)) return;
+    const cell = sheet.getRange(rowNumber, columnIndex + 1);
+    if (cell.getFormula()) return;
+    cell.setValue(normalizeWriteValue_(data[header]));
+  });
+}
+
+function deletePersonnelRow_(sheet, rowNumber) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const firstDataRow = findHeaderRow_(values) + 2;
+  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
+    throw new Error('Nomor baris personil tidak valid.');
+  }
+  sheet.deleteRow(rowNumber);
+}
+
+function findHeaderRow_(rows) {
+  let bestIndex = 0;
+  let bestScore = -1;
+  const limit = Math.min(rows.length, 35);
+
+  for (let index = 0; index < limit; index += 1) {
+    const row = rows[index].map(function(value) {
+      return String(value || '').trim();
+    });
+    const nonEmpty = row.filter(Boolean).length;
+    const text = normalizeText_(row.join(' '));
+    const keywordScore = [
+      'nama',
+      'personil',
+      'jabatan',
+      'posisi',
+      'status',
+      'pekerjaan',
+      'tanggal'
+    ].reduce(function(score, keyword) {
+      return score + (text.indexOf(keyword) !== -1 ? 4 : 0);
+    }, 0);
+    const score = nonEmpty + keywordScore;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function makeUniqueHeaders_(row) {
+  const counts = {};
+  return row.map(function(value, index) {
+    const base = String(value || '').trim() || 'Kolom ' + (index + 1);
+    counts[base] = (counts[base] || 0) + 1;
+    return counts[base] === 1 ? base : base + ' ' + counts[base];
+  });
+}
+
+function isComputedHeader_(header) {
+  const normalized = normalizeText_(header);
+  return [
+    'pekerjaan aktif',
+    'tugas aktif',
+    'project aktif',
+    'keterlibatan pekerjaan',
+    'status selesai',
+    'akumulasi'
+  ].some(function(keyword) {
+    return normalized.indexOf(keyword) !== -1;
+  });
+}
+
+function normalizeWriteValue_(value) {
+  const text = String(value == null ? '' : value).trim();
+  if (text === '') return '';
+  return text;
+}
+
+function normalizeText_(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function validateBridgeToken_(token) {
+  if (!token || String(token) !== PERSONNEL_BRIDGE_TOKEN) {
+    throw new Error('Token Personnel Bridge tidak valid.');
+  }
+}
+
+function verifyFirebaseUser_(idToken) {
+  if (!idToken) throw new Error('Sesi Firebase tidak tersedia.');
+  const response = UrlFetchApp.fetch(
+    'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(FIREBASE_API_KEY),
+    {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ idToken: idToken }),
+      muteHttpExceptions: true
+    }
+  );
+  const result = JSON.parse(response.getContentText() || '{}');
+  const user = result.users && result.users[0];
+  if (response.getResponseCode() !== 200 || !user || !user.email) {
+    throw new Error('Sesi Firebase tidak valid atau sudah berakhir.');
+  }
+  return {
+    uid: user.localId,
+    email: String(user.email).toLowerCase()
+  };
+}
+
+function getFirebaseRole_(email, idToken) {
+  if (email === BOOTSTRAP_SUPER_ADMIN_EMAIL) return 'super_admin';
+
+  const roleUrl =
+    'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID +
+    '/databases/(default)/documents/roles/' + encodeURIComponent(email);
+  const response = UrlFetchApp.fetch(roleUrl, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + idToken },
+    muteHttpExceptions: true
+  });
+
+  if (response.getResponseCode() === 404) return 'member';
+  const result = JSON.parse(response.getContentText() || '{}');
+  return result.fields && result.fields.role && result.fields.role.stringValue
+    ? result.fields.role.stringValue
+    : 'member';
+}
+
+function javascriptResponse_(callback, data) {
+  const safeCallback = /^[A-Za-z_$][A-Za-z0-9_$.]*$/.test(callback)
+    ? callback
+    : 'personnelBridgeCallback';
+  return ContentService
+    .createTextOutput(safeCallback + '(' + JSON.stringify(data) + ');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function jsonResponse_(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
