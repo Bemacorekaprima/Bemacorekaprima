@@ -9,5 +9,5 @@ window.FIREBASE_CONFIG = {
 };
 
 
-window.PERSONNEL_BRIDGE_URL = "";
+window.PERSONNEL_BRIDGE_URL = "https://script.google.com/macros/s/AKfycbynqxDu76gMNC4DgRNyhaiijxswiAaX3P1AOXcnGNOoAczMY8T839OG5jMSpyFXr2UxfQ/exec";
 window.PERSONNEL_BRIDGE_TOKEN = "Bemaco-20260630-spreadsheet-bridge";
