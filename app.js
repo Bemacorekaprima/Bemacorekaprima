@@ -1,4 +1,4 @@
-﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -100,23 +100,30 @@ let currentJobDetail = null;
 let jobDetailResizeObserver = null;
 let tenderJobSyncInProgress = false;
 let lastTenderJobSignature = "";
-const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v1";
+const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v2";
+const BEMACO_SPREADSHEET_ID = "1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA";
+const LEGACY_EXTERNAL_SHEET_MARKERS = [
+  "2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq"
+];
 
+function buildSpreadsheetCsvUrl(gid) {
+  return "https://docs.google.com/spreadsheets/d/" + BEMACO_SPREADSHEET_ID + "/export?format=csv&gid=" + gid;
+}
 const DEFAULT_EXTERNAL_SHEET_SOURCES = [
   {
     id: "data-utama",
     label: "Sheet DATA UTAMA",
-    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq/pub?gid=2034016714&single=true&output=csv"
+    url: buildSpreadsheetCsvUrl(2034016714)
   },
   {
     id: "personil-bmc",
     label: "Sheet PERSONIL BMC",
-    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq/pub?gid=2048149704&single=true&output=csv"
+    url: buildSpreadsheetCsvUrl(2048149704)
   },
   {
     id: "outsourcing",
     label: "Sheet Outsourcing",
-    url: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq/pub?gid=1030462578&single=true&output=csv"
+    url: buildSpreadsheetCsvUrl(1030462578)
   }
 ];
 
@@ -783,9 +790,19 @@ function watchCurrentAccessRole(user) {
   });
 }
 
+function normalizeConfiguredSheetUrls(sheetUrls, defaultSheetUrls) {
+  return Object.fromEntries(Object.entries(sheetUrls).map(([sourceId, url]) => {
+    const cleanUrl = String(url || "").trim();
+    return [sourceId, isLegacyExternalSheetUrl(cleanUrl) ? defaultSheetUrls[sourceId] : cleanUrl];
+  }));
+}
+
+function isLegacyExternalSheetUrl(url) {
+  return LEGACY_EXTERNAL_SHEET_MARKERS.some(marker => url.includes(marker));
+}
 function normalizeAppConfig(value = {}) {
   const defaults = createDefaultAppConfig();
-  const sheetUrls = { ...defaults.sheetUrls, ...(value.sheetUrls || {}) };
+  const sheetUrls = normalizeConfiguredSheetUrls({ ...defaults.sheetUrls, ...(value.sheetUrls || {}) }, defaults.sheetUrls);
   const menuRoles = {};
 
   MENU_DEFINITIONS.forEach(menu => {
@@ -7182,7 +7199,3 @@ function safeClassToken(value, fallback = "neutral") {
     .replace(/^-+|-+$/g, "");
   return token || fallback;
 }
-
-
-
-
