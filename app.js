@@ -100,6 +100,7 @@ let currentJobDetail = null;
 let jobDetailResizeObserver = null;
 let tenderJobSyncInProgress = false;
 let lastTenderJobSignature = "";
+const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v1";
 
 const DEFAULT_EXTERNAL_SHEET_SOURCES = [
   {
@@ -275,6 +276,7 @@ const statusToList = {
 document.addEventListener("DOMContentLoaded", bindControls);
 
 function bindControls() {
+  applySidebarPreference();
   document.getElementById("authForm").addEventListener("submit", handleAuthSubmit);
   document.getElementById("loginModeButton").addEventListener("click", () => setAuthMode("login"));
   document.getElementById("registerModeButton").addEventListener("click", () => setAuthMode("register"));
@@ -282,6 +284,7 @@ function bindControls() {
   document.getElementById("googleLoginButton").addEventListener("click", handleGoogleLogin);
   document.getElementById("logoutButton").addEventListener("click", handleLogout);
   document.getElementById("profileMenuButton").addEventListener("click", toggleProfileMenu);
+  document.getElementById("sidebarToggleButton")?.addEventListener("click", toggleSidebar);
   document.getElementById("openProfileButton").addEventListener("click", openProfileModal);
   document.getElementById("profileResetPasswordButton").addEventListener("click", handleProfilePasswordReset);
   document.getElementById("profileForm").addEventListener("submit", saveProfile);
@@ -375,6 +378,7 @@ function bindControls() {
   document.getElementById("dashboardOpenPortfolioButton").addEventListener("click", () => setView("jobs"));
   document.getElementById("dashboardPortfolioSummary").addEventListener("click", handlePortfolioSummaryClick);
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
+  document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
@@ -543,6 +547,20 @@ document.addEventListener("visibilitychange", () => {
 });
 
 document.addEventListener("click", event => {
+  const dashboardOpen = event.target.closest("[data-dashboard-open]");
+  if (dashboardOpen) {
+    setView(dashboardOpen.dataset.dashboardOpen);
+    return;
+  }
+
+  const dashboardTender = event.target.closest("[data-dashboard-open-tender]");
+  if (dashboardTender) {
+    state.selectedTenderId = dashboardTender.dataset.dashboardOpenTender;
+    setView("tenders");
+    renderTenders();
+    return;
+  }
+
   const profileWrap = event.target.closest(".sidebar-profile-wrap");
   if (!profileWrap) closeProfileMenu();
   const actionDropdown = event.target.closest(".action-dropdown");
@@ -554,6 +572,26 @@ document.addEventListener("click", event => {
   const recipientCombobox = event.target.closest(".recipient-combobox");
   if (!recipientCombobox) closeRecipientCombobox();
 });
+
+function applySidebarPreference() {
+  const collapsed = localStorage.getItem("portfolio-workspace.sidebarCollapsed") === "true";
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  updateSidebarToggleButton(collapsed);
+}
+
+function toggleSidebar() {
+  const collapsed = !document.body.classList.contains("sidebar-collapsed");
+  document.body.classList.toggle("sidebar-collapsed", collapsed);
+  localStorage.setItem("portfolio-workspace.sidebarCollapsed", String(collapsed));
+  updateSidebarToggleButton(collapsed);
+}
+
+function updateSidebarToggleButton(collapsed) {
+  const button = document.getElementById("sidebarToggleButton");
+  if (!button) return;
+  button.setAttribute("aria-expanded", String(!collapsed));
+  button.setAttribute("aria-label", collapsed ? "Tampilkan menu" : "Sembunyikan menu");
+}
 
 function setAuthMode(mode) {
   state.authMode = mode;
@@ -1865,13 +1903,16 @@ async function loadExternalSheetData() {
     }
   }
 
+  const cachedSheets = loadExternalSheetCache();
   const results = await Promise.all(loadingSheets.map(async sheet => {
     if (Array.isArray(bridgeRecords[sheet.id])) {
+      saveExternalSheetCache(sheet.id, bridgeRecords[sheet.id]);
       return {
         ...sheet,
         records: bridgeRecords[sheet.id],
         status: "ready",
-        error: ""
+        error: "",
+        source: "bridge"
       };
     }
     try {
@@ -1882,19 +1923,33 @@ async function loadExternalSheetData() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const csvText = await response.text();
       if (!csvText.trim()) throw new Error("Data kosong");
+      const records = csvToRecords(csvText);
+      saveExternalSheetCache(sheet.id, records);
       return {
         ...sheet,
-        records: csvToRecords(csvText),
+        records,
         status: "ready",
-        error: ""
+        error: "",
+        source: "csv"
       };
     } catch (error) {
       if (Array.isArray(bridgeRecords[sheet.id])) {
+        saveExternalSheetCache(sheet.id, bridgeRecords[sheet.id]);
         return {
           ...sheet,
           records: bridgeRecords[sheet.id],
           status: "ready",
-          error: ""
+          error: "",
+          source: "bridge"
+        };
+      }
+      if (Array.isArray(cachedSheets[sheet.id]?.records) && cachedSheets[sheet.id].records.length) {
+        return {
+          ...sheet,
+          records: cachedSheets[sheet.id].records,
+          status: "ready",
+          error: `Memakai cadangan lokal karena sumber utama gagal: ${error?.message || "Gagal memuat data"}`,
+          source: "cache"
         };
       }
       return {
@@ -1920,6 +1975,28 @@ async function loadExternalSheetData() {
   renderTenders();
   renderDashboardPortfolioHome();
   renderDashboardWorkSummary();
+}
+
+function loadExternalSheetCache() {
+  try {
+    return JSON.parse(localStorage.getItem(EXTERNAL_SHEET_CACHE_KEY) || "{}");
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveExternalSheetCache(sheetId, records) {
+  if (!sheetId || !Array.isArray(records)) return;
+  try {
+    const cache = loadExternalSheetCache();
+    cache[sheetId] = {
+      records,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(EXTERNAL_SHEET_CACHE_KEY, JSON.stringify(cache));
+  } catch (error) {
+    console.warn("Cache sheet eksternal gagal disimpan:", error);
+  }
 }
 
 function loadPersonnelBridgeData() {
@@ -2048,7 +2125,7 @@ function renderExternalSheetStatus() {
 
   container.innerHTML = state.externalSheets.map(sheet => {
     const statusLabel = sheet.status === "ready"
-      ? `${sheet.records.length} data`
+      ? `${sheet.records.length} data${sheet.source ? ` · ${sheet.source}` : ""}`
       : sheet.status === "loading"
         ? "Memuat..."
         : sheet.status === "error"
@@ -2514,8 +2591,22 @@ function renderPortfolioAgenda() {
 }
 
 function renderDashboardPortfolioHome() {
-  const allJobs = buildJobsFromAllSources();
+  const selectedScope = document.getElementById("dashboardProjectScope")?.value || "all";
+  let allJobs = buildJobsFromAllSources();
+  if (selectedScope === "active") {
+    allJobs = allJobs.filter(job => getPortfolioStatusKey(job) === "active");
+  } else if (selectedScope === "tender") {
+    allJobs = allJobs.filter(job => getPortfolioStatusKey(job) === "tender");
+  }
   const counts = getPortfolioCounts(allJobs);
+  const taskStats = buildStats(state.tasks);
+  const activeTenders = getDashboardActiveTenders();
+  const personnel = getAllIntegratedPersonnelRecords(getCurrentSummaryYear());
+  const inactivePersonnel = personnel.filter(record => getPersonnelActiveWork(record) <= 0);
+  const documentSummary = getDashboardDocumentSummary();
+  const priorityItems = getDashboardPriorityItems(allJobs);
+  const statusPercent = getDashboardStatusPercent(taskStats, counts, documentSummary);
+
   document.getElementById("dashboardPortfolioYearLabel").textContent = "Seluruh portofolio";
   document.getElementById("dashboardPortfolioTotal").textContent = counts.total;
   document.getElementById("dashboardPortfolioActive").textContent = counts.active;
@@ -2523,41 +2614,272 @@ function renderDashboardPortfolioHome() {
   document.getElementById("dashboardPortfolioTender").textContent = counts.tender;
   document.getElementById("dashboardPortfolioUpcoming").textContent = counts.upcoming;
 
-  const featured = [...allJobs]
-    .sort((left, right) =>
-      getPortfolioCardPriority(left) - getPortfolioCardPriority(right) ||
-      left.pekerjaan.localeCompare(right.pekerjaan, "id")
-    )
-    .slice(0, 3);
-  state.dashboardFeaturedJobs = featured;
-  document.getElementById("dashboardFeaturedJobs").innerHTML = featured.length
-    ? featured.map((job, index) => renderPortfolioJobCard(job, index, "dashboard-portfolio-job-index")).join("")
-    : '<div class="portfolio-empty">Belum ada proyek yang dapat ditampilkan.</div>';
+  setTextContent("dashKpiTasks", taskStats.total);
+  setTextContent("dashKpiTasksMeta", `${taskStats.selesai} selesai`);
+  setTextContent("dashKpiTenders", activeTenders.length);
+  setTextContent("dashKpiTendersMeta", `${activeTenders.filter(isTenderDeadlineUrgent).length} akan closing`);
+  setTextContent("dashKpiPersonnel", personnel.length);
+  setTextContent("dashKpiPersonnelMeta", `${inactivePersonnel.length} tidak aktif`);
+  setTextContent("dashKpiDocuments", documentSummary.total);
+  setTextContent("dashKpiDocumentsMeta", `${documentSummary.final} final`);
+  setTextContent("dashKpiPriority", priorityItems.length);
+  setTextContent("dashKpiPriorityMeta", `${priorityItems.filter(item => item.priority === "Tinggi").length} tinggi`);
+  setTextContent("dashKpiStatus", `${statusPercent}%`);
+
+  renderDashboardDailyTasks();
+  renderDashboardTenderRows(activeTenders);
+  renderDashboardPersonnelSummary(personnel);
+  renderDashboardDocuments(documentSummary);
+  renderDashboardReminders(activeTenders);
+  renderDashboardPriorityRows(priorityItems);
 
   document.getElementById("dashboardActivityList").innerHTML =
     renderPortfolioActivityItems(buildPortfolioActivities(allJobs));
+  document.getElementById("dashboardAgendaCount").textContent = `${getFocusTasks().length} agenda`;
+  document.getElementById("dashboardAgendaBento").innerHTML = "";
+  document.getElementById("dashboardPortfolioBrief").textContent =
+    `${counts.active} proyek aktif, ${activeTenders.length} tender aktif, dan ${personnel.length} personil terbaca.`;
 
-  const agenda = getFocusTasks().slice(0, 2);
-  document.getElementById("dashboardAgendaCount").textContent = `${agenda.length} agenda`;
-  document.getElementById("dashboardAgendaBento").innerHTML = agenda.length
-    ? agenda.map(task => `
-        <div class="portfolio-agenda-item">
-          <span>${escapeHtml(task.deadline ? task.deadline.slice(0, 10) : task.tanggal || "-")}</span>
-          <strong>${escapeHtml(task.namaTugas)}</strong>
-          <small>${escapeHtml(task.penanggungJawab || "Penanggung jawab belum diisi")}</small>
-        </div>
-      `).join("")
-    : '<p class="portfolio-empty-note">Belum ada agenda prioritas.</p>';
+  window.lucide?.createIcons?.();
+}
 
-  const availablePersonnel = getAllIntegratedPersonnelRecords(getCurrentSummaryYear())
-    .filter(record => getPersonnelActiveWork(record) <= 0).length;
-  const brief = [];
-  if (counts.tender) brief.push(`${counts.tender} Tender perlu dipantau`);
-  if (counts.upcoming) brief.push(`${counts.upcoming} proyek Upcoming perlu persiapan`);
-  if (availablePersonnel) brief.push(`${availablePersonnel} personil tersedia untuk dialokasikan`);
-  document.getElementById("dashboardPortfolioBrief").textContent = brief.length
-    ? `${brief.join(". ")}.`
-    : "Seluruh proyek dan kapasitas tim berada dalam kondisi stabil.";
+function setTextContent(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
+
+function getDashboardActiveTenders() {
+  return state.tenders
+    .filter(tender => !["Kontrak", "Arsip", "Selesai"].includes(tender.status))
+    .sort((left, right) => String(left.deadline || "9999").localeCompare(String(right.deadline || "9999")));
+}
+
+function getDashboardDocumentSummary() {
+  const groups = new Map();
+  let total = 0;
+  let final = 0;
+
+  state.tenders.forEach(tender => {
+    getTenderProgress(tender).documents.forEach(documentItem => {
+      total += 1;
+      if (documentItem.status === "Final") final += 1;
+      const group = documentItem.group || "Dokumen";
+      groups.set(group, (groups.get(group) || 0) + 1);
+    });
+  });
+
+  if (!total) {
+    TENDER_DOCUMENT_BLUEPRINT.forEach(([group]) => {
+      total += 1;
+      groups.set(group, (groups.get(group) || 0) + 1);
+    });
+  }
+
+  return { total, final, groups };
+}
+
+function getDashboardStatusPercent(taskStats, counts, documentSummary) {
+  const taskPart = taskStats.total ? taskStats.selesai / taskStats.total : 0;
+  const portfolioPart = counts.total ? (counts.finish + counts.active * 0.65 + counts.tender * 0.45 + counts.upcoming * 0.15) / counts.total : 0;
+  const documentPart = documentSummary.total ? documentSummary.final / documentSummary.total : 0;
+  const available = [taskPart, portfolioPart, documentPart].filter(value => Number.isFinite(value));
+  if (!available.length) return 0;
+  return Math.round((available.reduce((sum, value) => sum + value, 0) / available.length) * 100);
+}
+
+function renderDashboardDailyTasks() {
+  const tasks = getFocusTasks().slice(0, 5);
+  const container = document.getElementById("dashDailyTasks");
+  if (!container) return;
+  container.innerHTML = tasks.length
+    ? tasks.map(task => {
+      const urgency = getUrgency(task);
+      return `
+        <button class="dashboard-task-row" type="button" data-action="preview" data-id="${escapeHtml(task.id)}">
+          <span class="dashboard-task-check ${task.status === "Selesai" ? "done" : ""}"></span>
+          <span>
+            <strong>${escapeHtml(task.namaTugas || "Tanpa nama tugas")}</strong>
+            <small>${escapeHtml(task.penanggungJawab || task.catatan || "Penanggung jawab belum diisi")}</small>
+          </span>
+          <em class="${escapeHtml(urgency.className)}">${escapeHtml(urgency.label)}</em>
+        </button>
+      `;
+    }).join("")
+    : '<p class="dashboard-empty">Belum ada tugas aktif.</p>';
+}
+
+function renderDashboardTenderRows(tenders) {
+  const body = document.getElementById("dashTenderRows");
+  if (!body) return;
+  body.innerHTML = tenders.slice(0, 5).map(tender => `
+    <tr data-dashboard-open-tender="${escapeHtml(tender.id)}">
+      <td><strong>${escapeHtml(tender.name || "Paket Tender")}</strong></td>
+      <td>${escapeHtml(tender.location || tender.budgetYear || "-")}</td>
+      <td>${escapeHtml(tender.agency || "-")}</td>
+      <td>${escapeHtml(formatRupiah(tender.hps || tender.budgetCeiling))}</td>
+      <td>
+        ${escapeHtml(formatTenderDateTime(tender.deadline))}
+        <small>${escapeHtml(getRelativeDateLabel(tender.deadline))}</small>
+      </td>
+      <td><span class="dashboard-status-pill">${escapeHtml(tender.status || "Persiapan")}</span></td>
+    </tr>
+  `).join("") || '<tr><td colspan="6" class="dashboard-empty">Belum ada tender aktif.</td></tr>';
+}
+
+function renderDashboardPersonnelSummary(personnel) {
+  const total = personnel.length;
+  const counts = new Map();
+  personnel.forEach(record => {
+    const rawStatus = normalizeSearchText(getPersonnelStatus(record));
+    const label = rawStatus.includes("cuti") ? "Cuti" :
+      rawStatus.includes("training") || rawStatus.includes("pelatihan") ? "Training" :
+      getPersonnelActiveWork(record) > 0 ? "Aktif" : "Tidak Aktif";
+    counts.set(label, (counts.get(label) || 0) + 1);
+  });
+
+  const palette = ["#22c55e", "#ef4444", "#f59e0b", "#2563eb"];
+  const entries = ["Aktif", "Tidak Aktif", "Cuti", "Training"].map((label, index) => ({
+    label,
+    count: counts.get(label) || 0,
+    color: palette[index]
+  }));
+  let current = 0;
+  const stops = entries.map(item => {
+    const start = current;
+    const size = total ? (item.count / total) * 100 : 0;
+    current += size;
+    return `${item.color} ${start}% ${current}%`;
+  }).join(", ");
+
+  setTextContent("dashPersonnelTotal", total);
+  const ring = document.getElementById("dashPersonnelRing");
+  if (ring) ring.style.background = total ? `conic-gradient(${stops})` : "#e5e7eb";
+  const legend = document.getElementById("dashPersonnelLegend");
+  if (legend) {
+    legend.innerHTML = entries.map(item => `
+      <div>
+        <dt><span style="background:${item.color}"></span>${escapeHtml(item.label)}</dt>
+        <dd>${item.count} ${total ? `(${Math.round((item.count / total) * 100)}%)` : "(0%)"}</dd>
+      </div>
+    `).join("");
+  }
+}
+
+function renderDashboardDocuments(summary) {
+  setTextContent("dashDocumentTotal", summary.total);
+  setTextContent("dashDocumentFinal", `${summary.final} final`);
+  const container = document.getElementById("dashDocumentBreakdown");
+  if (!container) return;
+  container.innerHTML = Array.from(summary.groups.entries()).slice(0, 4).map(([group, count]) => `
+    <div>
+      <span>${escapeHtml(group)}</span>
+      <strong>${count}</strong>
+    </div>
+  `).join("");
+}
+
+function renderDashboardReminders(activeTenders) {
+  const taskReminders = getFocusTasks().slice(0, 3).map(task => ({
+    title: task.namaTugas || "Tugas",
+    meta: task.penanggungJawab || task.deadline || "Tugas aktif",
+    badge: getRelativeDateLabel(task.deadline || task.tanggal)
+  }));
+  const tenderReminders = activeTenders.filter(isTenderDeadlineUrgent).slice(0, 2).map(tender => ({
+    title: `Batas akhir tender ${tender.name || "paket"}`,
+    meta: formatTenderDateTime(tender.deadline),
+    badge: getRelativeDateLabel(tender.deadline)
+  }));
+  const reminders = [...tenderReminders, ...taskReminders].slice(0, 4);
+  const container = document.getElementById("dashReminderList");
+  if (!container) return;
+  container.innerHTML = reminders.length
+    ? reminders.map(item => `
+      <div class="dashboard-reminder-row">
+        <i data-lucide="bell" aria-hidden="true"></i>
+        <span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <small>${escapeHtml(item.meta || "-")}</small>
+        </span>
+        <em>${escapeHtml(item.badge)}</em>
+      </div>
+    `).join("")
+    : '<p class="dashboard-empty">Belum ada pengingat prioritas.</p>';
+}
+
+function getDashboardPriorityItems(allJobs) {
+  const tenderItems = getDashboardActiveTenders().map(tender => ({
+    job: {
+      id: `tender:${tender.id}`,
+      pekerjaan: tender.name || "Paket Tender",
+      tenderId: tender.id,
+      statusOverride: "Tender",
+      records: []
+    },
+    packageName: tender.name || "Paket Tender",
+    project: tender.location || tender.budgetYear || "Tender",
+    priority: isTenderDeadlineUrgent(tender) ? "Tinggi" : "Sedang",
+    progress: getTenderProgress(tender).percent,
+    pic: tender.owner || getTenderPersonnel(tender)[0]?.name || "-"
+  }));
+
+  const jobItems = allJobs
+    .filter(job => getPortfolioStatusKey(job) !== "finish")
+    .map(job => ({
+      job,
+      packageName: job.pekerjaan,
+      project: getPortfolioStatusLabel(job),
+      priority: getPortfolioStatusKey(job) === "active" || getPortfolioStatusKey(job) === "tender" ? "Tinggi" : "Sedang",
+      progress: getPortfolioProgress(job),
+      pic: getPortfolioPeople(job)[0] || "-"
+    }));
+
+  const seen = new Set();
+  return [...tenderItems, ...jobItems]
+    .filter(item => {
+      const key = normalizeSearchText(item.packageName);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => {
+      const priorityScore = { Tinggi: 0, Sedang: 1, Rendah: 2 };
+      return priorityScore[left.priority] - priorityScore[right.priority] ||
+        left.progress - right.progress ||
+        left.packageName.localeCompare(right.packageName, "id");
+    })
+    .slice(0, 4);
+}
+
+function renderDashboardPriorityRows(items) {
+  state.dashboardFeaturedJobs = items.map(item => item.job);
+  const body = document.getElementById("dashboardFeaturedJobs");
+  if (!body) return;
+  body.innerHTML = items.length
+    ? items.map((item, index) => `
+      <tr data-dashboard-portfolio-job-index="${index}">
+        <td><strong>${escapeHtml(item.packageName)}</strong></td>
+        <td>${escapeHtml(item.project || "-")}</td>
+        <td><span class="dashboard-priority-badge priority-${String(item.priority).toLowerCase()}">${escapeHtml(item.priority)}</span></td>
+        <td>
+          <div class="dashboard-progress-line"><span style="width:${item.progress}%"></span></div>
+          <small>${item.progress}%</small>
+        </td>
+        <td>${escapeHtml(item.pic || "-")}</td>
+      </tr>
+    `).join("")
+    : '<tr><td colspan="5" class="dashboard-empty">Belum ada paket prioritas.</td></tr>';
+}
+
+function getRelativeDateLabel(value) {
+  if (!value) return "-";
+  const date = new Date(String(value).includes("T") ? value : `${value}T00:00:00`);
+  const today = new Date(`${state.today}T00:00:00`);
+  if (!Number.isFinite(date.getTime())) return "-";
+  const diff = Math.ceil((date.getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return `${Math.abs(diff)} hari lewat`;
+  if (diff === 0) return "Hari ini";
+  if (diff === 1) return "Besok";
+  return `${diff} hari lagi`;
 }
 
 function renderPortfolioJobCard(job, index, dataAttribute) {
@@ -4720,7 +5042,7 @@ function getAuthErrorMessage(error) {
   if (code.includes("invalid-email")) return "Format email belum benar.";
   if (code.includes("popup-closed-by-user")) return "Login Google dibatalkan.";
   if (code.includes("operation-not-allowed")) return "Provider login ini belum diaktifkan di Firebase Authentication.";
-  if (code.includes("unauthorized-domain")) return "Domain web ini belum diizinkan di Firebase Authentication. Tambahkan localhost dan 127.0.0.1 di Authorized domains.";
+  if (code.includes("unauthorized-domain")) return "Domain web ini belum diizinkan di Firebase Authentication. Tambahkan bemacorekaprima.github.io, localhost, dan 127.0.0.1 di Authorized domains.";
   return error.message || "Terjadi masalah login.";
 }
 
@@ -6759,8 +7081,6 @@ function safeClassToken(value, fallback = "neutral") {
     .replace(/^-+|-+$/g, "");
   return token || fallback;
 }
-
-
 
 
 
