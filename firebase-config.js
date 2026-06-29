@@ -1,5 +1,5 @@
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAj4YTKBT4lkRq62dUPwSxZFDsoZoLJec",
+  apiKey: "AIzaSyAj4yTKTBE41kRq62dUPwSxZFDsoZolJec",
   authDomain: "bemacorekaprima-1f94e.firebaseapp.com",
   projectId: "bemacorekaprima-1f94e",
   storageBucket: "bemacorekaprima-1f94e.firebasestorage.app",
