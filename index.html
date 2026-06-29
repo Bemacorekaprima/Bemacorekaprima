@@ -1359,6 +1359,26 @@
     </form>
   </dialog>
 
+  <dialog id="financeRecordFormModal">
+    <form method="dialog" class="modal-card personnel-form-card finance-record-form-card" id="financeRecordForm">
+      <header>
+        <div>
+          <h2 id="financeRecordFormTitle">Tambah Rincian Finance</h2>
+          <p id="financeRecordFormSource">Data akan disimpan ke Sheet Finance.</p>
+        </div>
+        <button type="button" class="icon-button" id="closeFinanceRecordFormButton">x</button>
+      </header>
+      <input id="financeRecordRowNumber" type="hidden">
+      <div id="financeRecordFormFields" class="personnel-form-fields finance-record-form-fields"></div>
+      <p class="personnel-form-note">Perubahan dari web akan dikirim ke Google Spreadsheet melalui Apps Script Bridge.</p>
+      <footer>
+        <span id="financeRecordFormStatus" class="config-status"></span>
+        <button type="button" class="secondary-button" id="cancelFinanceRecordFormButton">Batal</button>
+        <button class="primary-button" id="saveFinanceRecordButton" type="submit">Simpan ke Spreadsheet</button>
+      </footer>
+    </form>
+  </dialog>
+
   <dialog id="personnelDetailModal">
     <section class="modal-card personnel-detail-card personnel-history-card">
       <header>

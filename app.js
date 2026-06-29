@@ -463,6 +463,10 @@ function bindControls() {
   document.getElementById("financeDetailAddButton")?.addEventListener("click", () => handleFinanceAction("add"));
   document.getElementById("financeDetailEditButton")?.addEventListener("click", () => handleFinanceAction("edit"));
   document.getElementById("financeDetailDeleteButton")?.addEventListener("click", () => handleFinanceAction("delete"));
+  document.getElementById("financeDetailBody")?.addEventListener("click", handleFinanceDetailAction);
+  document.getElementById("financeRecordForm")?.addEventListener("submit", saveFinanceRecord);
+  document.getElementById("closeFinanceRecordFormButton")?.addEventListener("click", closeFinanceRecordForm);
+  document.getElementById("cancelFinanceRecordFormButton")?.addEventListener("click", closeFinanceRecordForm);
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
   document.getElementById("closeJobDetailFooter").addEventListener("click", closeJobDetail);
   document.getElementById("addJobDetailRowButton").addEventListener("click", () => openJobRecordForm(null, currentJobDetail));
@@ -6341,8 +6345,8 @@ function renderFinanceDetail(entry) {
       <h3>Personil dan Nilai</h3>
       <div class="table-wrap finance-detail-table-wrap">
         <table class="finance-detail-table">
-          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Pajak</th><th>Netto</th><th>Keterangan</th></tr></thead>
-          <tbody>${relatedPersonnel.length ? relatedPersonnel.map(row => `
+          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Pajak</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => `
             <tr>
               <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
               <td data-label="Uraian/Jabatan">${escapeHtml(row.uraian)}</td>
@@ -6352,8 +6356,9 @@ function renderFinanceDetail(entry) {
               <td data-label="Pajak">${formatFinanceMoney(row.pajak)}</td>
               <td data-label="Netto">${formatFinanceMoney(row.netto)}</td>
               <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
+              <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : "-"}</td>
             </tr>
-          `).join("") : '<tr><td class="personnel-empty" colspan="8">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
+          `).join("") : '<tr><td class="personnel-empty" colspan="9">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
         </table>
       </div>
     </section>
@@ -6370,7 +6375,8 @@ function buildFinanceDetailPersonnel(entry) {
       total: parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"])),
       pajak: parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"])),
       netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
-      keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-"
+      keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-",
+      record
     }));
   }
   return (entry.personil || []).map(name => ({
@@ -6407,16 +6413,118 @@ function toggleFinanceToolsMenu() {
   button.setAttribute("aria-expanded", String(willOpen));
 }
 function handleFinanceAction(action) {
-  const labels = { add: "Tambah rincian", edit: "Edit pilihan", delete: "Hapus pilihan" };
-  closeActionMenu();
-  const sheet = getFinanceSheet();
-  if (!sheet?.url && sheet?.status !== "ready") {
-    notify("Isi link CSV Finance di Pengaturan terlebih dahulu agar data Finance terbaca.");
+  document.getElementById("financeToolsMenu")?.classList.add("hidden");
+  document.getElementById("financeToolsButton")?.setAttribute("aria-expanded", "false");
+  const entry = buildFinanceEntries().find(item => item.key === state.selectedFinanceJobKey) || getFilteredFinanceEntries()[0] || null;
+  if (action === "add") {
+    openFinanceRecordForm(null, entry);
     return;
   }
-  notify(`${labels[action] || "Aksi"} Finance disiapkan. Penyimpanan langsung ke spreadsheet perlu Apps Script write-back pada tahap berikutnya.`);
+  const record = entry?.financeRecords?.[0];
+  if (!record) {
+    notify("Pilih pekerjaan yang sudah memiliki rincian Finance, atau gunakan Tambah untuk membuat baris baru.");
+    return;
+  }
+  if (action === "edit") openFinanceRecordForm(record, entry);
+  if (action === "delete") deleteFinanceRecord(record, entry);
 }
 
+function getFinanceEditableColumns(records = []) {
+  const ignored = new Set(["_Sumber Baris"]);
+  const columns = [];
+  records.forEach(record => {
+    Object.keys(record || {}).forEach(column => {
+      if (!ignored.has(column) && !columns.includes(column)) columns.push(column);
+    });
+  });
+  if (columns.length) return columns;
+  return ["Pekerjaan", "Nama", "Uraian", "Pemberi Kerja", "Jumlah Bulan", "Harga Satuan", "Total Harga", "Tarif Pajak", "Pajak PPH 21", "Netto", "Tanggal Mulai", "Tanggal Selesai", "Durasi Kontrak", "Keterangan"];
+}
+
+function renderFinanceInput(column, value, required) {
+  return '<input name="' + escapeHtml(column) + '" value="' + escapeHtml(value) + '" autocomplete="off" ' + (required ? 'required' : '') + '>';
+}
+
+function openFinanceRecordForm(record = null, entry = null) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
+  const sheet = getFinanceSheet();
+  const columns = getFinanceEditableColumns(sheet?.records || []);
+  const jobColumn = columns.find(column => includesAny(normalizeSearchText(column), ["pekerjaan", "nama pekerjaan", "project", "proyek"])) || columns[0];
+  const initialRecord = { ...(record || {}) };
+  if (!record && entry?.pekerjaan && jobColumn) initialRecord[jobColumn] = entry.pekerjaan;
+  document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Rincian Finance" : "Tambah Rincian Finance";
+  document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || record?.[jobColumn] || "Sheet Finance";
+  document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("financeRecordFormStatus").textContent = "";
+  document.getElementById("financeRecordFormFields").innerHTML = columns.map((column, index) => {
+    const full = column === jobColumn || includesAny(normalizeSearchText(column), ["keterangan", "catatan"]);
+    return '<label class="' + (full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, initialRecord[column] || "", column === jobColumn || index === 0) + '</label>';
+  }).join("");
+  document.getElementById("financeRecordFormModal").showModal();
+}
+
+function closeFinanceRecordForm() {
+  const modal = document.getElementById("financeRecordFormModal");
+  if (modal?.open) modal.close();
+}
+
+async function saveFinanceRecord(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const rowNumber = Number(document.getElementById("financeRecordRowNumber").value) || 0;
+  const data = Object.fromEntries(Array.from(new FormData(form).entries()).filter(([key]) => key !== "").map(([key, value]) => [key, String(value).trim()]));
+  document.getElementById("financeRecordFormStatus").textContent = "Mengirim perubahan...";
+  document.getElementById("saveFinanceRecordButton").disabled = true;
+  await sendFinanceMutation(rowNumber ? "update" : "add", { rowNumber, data });
+}
+
+async function sendFinanceMutation(action, payload) {
+  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) return notify("Spreadsheet Bridge belum dikonfigurasi.");
+  if (!currentUser) return notify("Silakan login kembali.");
+  try {
+    const firebaseIdToken = await currentUser.getIdToken(true);
+    await fetch(window.PERSONNEL_BRIDGE_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: window.PERSONNEL_BRIDGE_TOKEN, firebaseIdToken, action, sourceId: "finance", targetSourceId: "finance", rowNumber: payload.rowNumber || 0, data: payload.data || {} })
+    });
+    if (action !== "delete") closeFinanceRecordForm();
+    notify(action === "delete" ? "Permintaan hapus Finance dikirim ke Google Spreadsheet." : "Data Finance dikirim ke Google Spreadsheet.");
+    await new Promise(resolve => window.setTimeout(resolve, 1400));
+    await loadExternalSheetData();
+  } catch (error) {
+    notify("Data Finance gagal dikirim: " + error.message);
+    const status = document.getElementById("financeRecordFormStatus");
+    if (status) status.textContent = error.message || "Perubahan gagal dikirim.";
+  } finally {
+    const saveButton = document.getElementById("saveFinanceRecordButton");
+    if (saveButton) saveButton.disabled = false;
+  }
+}
+
+function getCurrentFinanceEntry() {
+  return buildFinanceEntries().find(item => item.key === state.selectedFinanceJobKey) || null;
+}
+
+function handleFinanceDetailAction(event) {
+  const button = event.target.closest("[data-finance-record-action]");
+  if (!button) return;
+  const entry = getCurrentFinanceEntry();
+  const record = entry?.financeRecords?.[Number(button.dataset.financeRecordIndex)];
+  if (!entry || !record) return notify("Rincian Finance tidak ditemukan.");
+  if (button.dataset.financeRecordAction === "edit") openFinanceRecordForm(record, entry);
+  if (button.dataset.financeRecordAction === "delete") deleteFinanceRecord(record, entry);
+}
+
+async function deleteFinanceRecord(record, entry = null) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat menghapus data Finance.")) return;
+  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
+  if (!rowNumber) return notify("Nomor baris Finance tidak ditemukan.");
+  const name = getFinanceRecordPersonName(record) || getFinanceRecordJobName(record) || "baris ini";
+  if (!confirm('Hapus rincian Finance "' + name + '" dari Google Spreadsheet?')) return;
+  await sendFinanceMutation("delete", { rowNumber, data: {} });
+}
 
 function renderStats() {
   const stats = buildStats(getFilteredTasks(false));

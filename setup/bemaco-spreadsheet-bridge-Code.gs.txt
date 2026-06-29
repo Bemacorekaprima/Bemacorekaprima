@@ -8,7 +8,9 @@ const SPREADSHEET_ID = '1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA';
 const PERSONNEL_SHEETS = {
   'data-utama': { gid: 2034016714, names: ['DATA UTAMA', 'Data Utama'] },
   'personil-bmc': { gid: 2048149704, names: ['PERSONIL BMC', 'Personil BMC', 'PERSONIL'] },
-  outsourcing: { gid: 1030462578, names: ['Outsourcing', 'OUTSOURCING'] }
+  outsourcing: { gid: 1030462578, names: ['Outsourcing', 'OUTSOURCING'] },
+  'bar-tender': { gid: 0, names: ['BAR Tender', 'BAR TENDER', 'Tender BAR', 'TENDER BAR'] },
+  finance: { gid: 0, names: ['Finance', 'FINANCE', 'Keuangan', 'KEUANGAN'] }
 };
 
 const PERSONNEL_WRITE_ROLES = ['super_admin', 'editor', 'author'];
@@ -63,7 +65,7 @@ function doPost(e) {
     const firebaseUser = verifyFirebaseUser_(payload.firebaseIdToken);
     const role = getFirebaseRole_(firebaseUser.email, payload.firebaseIdToken);
     if (PERSONNEL_WRITE_ROLES.indexOf(role) === -1) {
-      throw new Error('Role ' + role + ' tidak diizinkan mengubah data personil.');
+      throw new Error('Role ' + role + ' tidak diizinkan mengubah data spreadsheet.');
     }
 
     const sourceId = String(payload.sourceId || '');
@@ -95,7 +97,7 @@ function doPost(e) {
       } else if (action === 'delete') {
         deletePersonnelRow_(sheet, Number(payload.rowNumber));
       } else {
-        throw new Error('Aksi personil tidak dikenali.');
+        throw new Error('Aksi spreadsheet tidak dikenali.');
       }
       clearPersonnelCache_();
     } finally {
@@ -466,4 +468,3 @@ function jsonResponse_(data) {
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
-

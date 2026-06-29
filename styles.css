@@ -5893,3 +5893,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   .finance-detail-table td { display: grid; grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr); gap: 8px; }
   .finance-detail-table td::before { content: attr(data-label); color: var(--muted); font-weight: 800; }
 }
+
+.finance-detail-table .danger-text { color: #b91c1c; }
+#financeRecordFormModal { width: min(1040px, calc(100vw - 28px)); }
+.finance-record-form-card { max-height: calc(100dvh - 28px); }

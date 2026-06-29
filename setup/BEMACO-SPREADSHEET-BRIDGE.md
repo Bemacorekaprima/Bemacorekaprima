@@ -43,3 +43,7 @@ ames pada PERSONNEL_SHEETS di Code.gs.
 ## Catatan
 
 Email Bridge lama sudah dinonaktifkan dari konfigurasi web. Tombol email akan kembali memakai mailto sampai dibuat bridge email baru khusus pengiriman reminder.
+
+## Update sinkronisasi dua arah
+
+Versi bridge ini membaca dan menulis tab DATA UTAMA, PERSONIL BMC, Outsourcing, BAR Tender, dan Finance. Setelah file emaco-spreadsheet-bridge-Code.gs.txt diperbarui, salin seluruh isi file tersebut ke Apps Script yang sudah ter-deploy, lalu Deploy > Manage deployments > Edit > New version agar web dapat menulis data Finance/BAR Tender ke spreadsheet.
