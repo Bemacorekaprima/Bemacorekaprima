@@ -1,6 +1,6 @@
 const PERSONNEL_BRIDGE_TOKEN = 'Ospr630-personnel-bridge';
-const FIREBASE_API_KEY = 'AIzaSyCKmFdf3aiNaUKkRGcnWOKMO2YPFl-WRbw';
-const FIREBASE_PROJECT_ID = 'daily-report-ospr';
+const FIREBASE_API_KEY = 'AIzaSyAj4YTKBT4lkRq62dUPwSxZFDsoZoLJec';
+const FIREBASE_PROJECT_ID = 'bemacorekaprima-1f94e';
 const BOOTSTRAP_SUPER_ADMIN_EMAIL = 'bemacorekaprima.kaltim@gmail.com';
 
 const PERSONNEL_SHEETS = {

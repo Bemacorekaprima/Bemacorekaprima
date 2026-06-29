@@ -1,11 +1,11 @@
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCKmFdf3aiNaUKkRGcnWOKMO2YPFl-WRbw",
-  authDomain: "daily-report-ospr.firebaseapp.com",
-  projectId: "daily-report-ospr",
-  storageBucket: "daily-report-ospr.firebasestorage.app",
-  messagingSenderId: "266373761882",
-  appId: "1:266373761882:web:754d45e4ef7c6ec734163",
-  measurementId: "G-0MLRNNS8GX"
+  apiKey: "AIzaSyAj4YTKBT4lkRq62dUPwSxZFDsoZoLJec",
+  authDomain: "bemacorekaprima-1f94e.firebaseapp.com",
+  projectId: "bemacorekaprima-1f94e",
+  storageBucket: "bemacorekaprima-1f94e.firebasestorage.app",
+  messagingSenderId: "298043931731",
+  appId: "1:298043931731:web:4a3f87ad516a3caabd9aa6",
+  measurementId: "G-PM0ZB3RC5F"
 };
 
 window.EMAIL_BRIDGE_URL = "https://script.google.com/macros/s/AKfycbzkF2LcBiTjFI-eQGYMl6woKrBPlD9yl60SoT1DPFB4cq8_-Hqcy6UGv4vHPtg8aWv49g/exec";
