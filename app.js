@@ -124,9 +124,18 @@ const DEFAULT_EXTERNAL_SHEET_SOURCES = [
     id: "outsourcing",
     label: "Sheet Outsourcing",
     url: buildSpreadsheetCsvUrl(1030462578)
+  },
+  {
+    id: "bar-tender",
+    label: "Sheet BAR Tender",
+    url: ""
+  },
+  {
+    id: "finance",
+    label: "Sheet Finance",
+    url: ""
   }
 ];
-
 const DEFAULT_DRIVE_URL = "https://drive.google.com/drive/folders/1d5-UJScndg70lIXMvM4DrqxAMEOCqkXR?usp=sharing";
 const CONFIGURABLE_ROLES = ["admin", "editor", "author", "contributor", "moderator", "member"];
 const MENU_DEFINITIONS = [
@@ -1001,7 +1010,9 @@ function renderSystemConfiguration() {
     configDriveUrl: config.driveUrl,
     configDataUtamaUrl: config.sheetUrls["data-utama"],
     configPersonilBmcUrl: config.sheetUrls["personil-bmc"],
-    configOutsourcingUrl: config.sheetUrls.outsourcing
+    configOutsourcingUrl: config.sheetUrls.outsourcing,
+    configBarTenderUrl: config.sheetUrls["bar-tender"],
+    configFinanceUrl: config.sheetUrls.finance
   };
   Object.entries(fields).forEach(([id, value]) => {
     const input = document.getElementById(id);
@@ -1049,6 +1060,11 @@ function validateHttpsUrl(value, label) {
   }
 }
 
+function validateOptionalHttpsUrl(value, label) {
+  const cleanValue = String(value || "").trim();
+  return cleanValue ? validateHttpsUrl(cleanValue, label) : "";
+}
+
 async function saveDataSourceConfig(event) {
   event.preventDefault();
   if (!requirePermission(canManageSystemConfig(), "Hanya Super Admin yang dapat mengubah sumber data.")) return;
@@ -1059,7 +1075,9 @@ async function saveDataSourceConfig(event) {
     const sheetUrls = {
       "data-utama": validateHttpsUrl(document.getElementById("configDataUtamaUrl").value, "CSV DATA UTAMA"),
       "personil-bmc": validateHttpsUrl(document.getElementById("configPersonilBmcUrl").value, "CSV PERSONIL BMC"),
-      outsourcing: validateHttpsUrl(document.getElementById("configOutsourcingUrl").value, "CSV Outsourcing")
+      outsourcing: validateHttpsUrl(document.getElementById("configOutsourcingUrl").value, "CSV Outsourcing"),
+      "bar-tender": validateOptionalHttpsUrl(document.getElementById("configBarTenderUrl").value, "CSV BAR Tender"),
+      finance: validateOptionalHttpsUrl(document.getElementById("configFinanceUrl").value, "CSV Finance")
     };
     status.textContent = "Menyimpan...";
     await setDoc(doc(db, "appSettings", "general"), {
@@ -1932,9 +1950,18 @@ async function loadExternalSheetData() {
         source: "bridge"
       };
     }
+    const sheetUrl = String(sheet.url || "").trim();
+    if (!sheetUrl) {
+      return {
+        ...sheet,
+        records: [],
+        status: "idle",
+        error: "URL CSV belum diisi."
+      };
+    }
     try {
-      const separator = sheet.url.includes("?") ? "&" : "?";
-      const response = await fetch(`${sheet.url}${separator}_=${Date.now()}`, {
+      const separator = sheetUrl.includes("?") ? "&" : "?";
+      const response = await fetch(`${sheetUrl}${separator}_=${Date.now()}`, {
         cache: "no-store"
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -2147,6 +2174,8 @@ function renderExternalSheetStatus() {
         ? "Memuat..."
         : sheet.status === "error"
           ? "Tidak dapat dibaca"
+          : sheet.status === "idle" && sheet.error
+          ? sheet.error
           : "Menunggu";
     return `
       <div class="sheet-status-row">

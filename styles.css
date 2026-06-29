@@ -4345,6 +4345,7 @@ pre { overflow: auto; margin: 0; padding: 12px; border-radius: 8px; background: 
 .sheet-status-dot.ready { background: #16a34a; }
 .sheet-status-dot.loading { background: #2563eb; }
 .sheet-status-dot.error { background: #dc2626; }
+.sheet-status-dot.idle { background: #94a3b8; }
 
 .drive-link {
   width: fit-content;
@@ -5745,4 +5746,3 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
     width: 100%;
   }
 }
-

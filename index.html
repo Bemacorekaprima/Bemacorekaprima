@@ -33,7 +33,7 @@
       showAppBootError("Koneksi memerlukan waktu terlalu lama. Silakan refresh halaman.");
     }, 15000);
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260630003000">
+  <link rel="stylesheet" href="styles.css?v=20260630004000">
 </head>
 <body class="auth-pending">
   <div id="loadingView" class="loading-screen">
@@ -1078,6 +1078,14 @@
                 <span>CSV Sheet Outsourcing</span>
                 <input id="configOutsourcingUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
               </label>
+              <label class="full">
+                <span>CSV Sheet BAR Tender</span>
+                <input id="configBarTenderUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
+              </label>
+              <label class="full">
+                <span>CSV Sheet Finance</span>
+                <input id="configFinanceUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
+              </label>
               <footer class="full">
                 <span id="dataSourceConfigStatus" class="config-status"></span>
                 <button class="primary-button" type="submit">Simpan Sumber Data</button>
@@ -1476,13 +1484,13 @@
     </section>
   </dialog>
 
-  <script src="firebase-config.js?v=20260630003000"></script>
+  <script src="firebase-config.js?v=20260630004000"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     window.addEventListener("DOMContentLoaded", () => {
       if (window.lucide) window.lucide.createIcons();
     });
   </script>
-  <script type="module" src="app.js?v=20260630003000"></script>
+  <script type="module" src="app.js?v=20260630004000"></script>
 </body>
 </html>
