@@ -2922,6 +2922,7 @@ function renderDashboardAssignmentSummary() {
     return `${item.color} ${start}% ${cursor}%`;
   }).join(", ");
 
+  setTextContent("dashAssignmentTotal", totalPersonnel);
   const ring = document.getElementById("dashAssignmentRing");
   if (ring) ring.style.background = assignmentTotal ? `conic-gradient(${stops})` : "#e5e7eb";
 

@@ -1289,20 +1289,22 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dashboard-assignment-header {
-  align-items: flex-start;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 10px;
 }
 
 .dashboard-assignment-header h3 {
-  flex: 0 1 96px;
+  width: 100%;
   min-width: 0;
-  line-height: 1.18;
+  line-height: 1.2;
 }
 
 .dashboard-assignment-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  flex: 1 1 172px;
+  grid-template-columns: 1.05fr 0.72fr 0.95fr 1.28fr;
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   border: 1px solid #cfe0f2;
@@ -1312,17 +1314,17 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-assignment-tabs button {
   min-width: 0;
-  min-height: 32px;
-  padding: 0 4px;
+  min-height: 30px;
+  padding: 0 3px;
   border: 0;
   border-left: 1px solid #dbe7f4;
   background: transparent;
   color: #1d4ed8;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   line-height: 1.05;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .dashboard-assignment-tabs button:first-child { border-left: 0; }
@@ -1330,12 +1332,32 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-assignment-summary {
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: 58px 72px minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
-.assignment-donut { width: 78px; height: 78px; }
+.dashboard-assignment-total {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-assignment-total span {
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.dashboard-assignment-total strong {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.assignment-donut { width: 72px; height: 72px; }
 
 .dashboard-assignment-summary dl { display: grid; gap: 8px; margin: 0; min-width: 0; }
 .dashboard-assignment-summary dl div { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
@@ -1345,8 +1367,12 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-assignment-table-wrap { overflow: hidden; border: 1px solid #dbe5f1; border-radius: 8px; }
 .dashboard-assignment-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
-.dashboard-assignment-table th, .dashboard-assignment-table td { padding: 8px 10px; border-bottom: 1px solid #e8eef6; text-align: left; font-size: 10.5px; overflow-wrap: anywhere; }
-.dashboard-assignment-table th { background: #f3f7fb; color: #334155; font-weight: 900; }
+.dashboard-assignment-table th, .dashboard-assignment-table td { padding: 8px 9px; border-bottom: 1px solid #e8eef6; text-align: left; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-assignment-table th { background: #f3f7fb; color: #334155; font-weight: 900; white-space: nowrap; }
+.dashboard-assignment-table th:first-child,
+.dashboard-assignment-table td:first-child { width: 48%; }
+.dashboard-assignment-table th:last-child,
+.dashboard-assignment-table td:last-child { width: 52%; }
 .dashboard-assignment-table tr:last-child td { border-bottom: 0; }
 
 .assignment-badge {
@@ -6057,13 +6083,50 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 .finance-record-form-card { max-height: calc(100dvh - 28px); }
 
 
+
+@media (max-width: 1200px) and (min-width: 701px) {
+  .dashboard-assignment-card .dashboard-card-header {
+    align-items: start;
+  }
+
+  .dashboard-assignment-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-assignment-tabs button {
+    min-height: 28px;
+    font-size: 9.5px;
+    border-top: 1px solid #dbe7f4;
+  }
+
+  .dashboard-assignment-tabs button:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .dashboard-assignment-tabs button:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .dashboard-assignment-summary {
+    grid-template-columns: 54px 68px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .dashboard-assignment-total strong { font-size: 24px; }
+
+  .assignment-donut {
+    width: 68px;
+    height: 68px;
+  }
+}
+
 @media (max-width: 420px) {
   .dashboard-assignment-card { padding: 14px; }
-  .dashboard-assignment-header { display: grid; grid-template-columns: 1fr; }
-  .dashboard-assignment-header h3 { flex-basis: auto; }
-  .dashboard-assignment-tabs { width: 100%; flex-basis: auto; }
-  .dashboard-assignment-summary { grid-template-columns: 70px minmax(0, 1fr); gap: 12px; }
-  .assignment-donut { width: 70px; height: 70px; }
+  .dashboard-assignment-tabs button { min-height: 28px; font-size: 8.5px; }
+  .dashboard-assignment-summary { grid-template-columns: 48px 62px minmax(0, 1fr); gap: 9px; }
+  .dashboard-assignment-total span { font-size: 9px; }
+  .dashboard-assignment-total strong { font-size: 22px; }
+  .assignment-donut { width: 62px; height: 62px; }
   .dashboard-assignment-table th,
-  .dashboard-assignment-table td { padding: 7px 9px; font-size: 10px; }
+  .dashboard-assignment-table td { padding: 7px 8px; font-size: 9.5px; }
 }
