@@ -99,7 +99,9 @@ let externalSheetLastLoadedAt = 0;
 let currentJobDetail = null;
 let jobDetailResizeObserver = null;
 let tenderJobSyncInProgress = false;
+let tenderSheetSyncInProgress = false;
 let lastTenderJobSignature = "";
+let lastTenderSheetSignature = "";
 const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v2";
 const BEMACO_SPREADSHEET_ID = "1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA";
 const LEGACY_EXTERNAL_SHEET_MARKERS = [
@@ -193,6 +195,7 @@ const TENDER_DOCUMENT_STATUSES = [
   "Final"
 ];
 const TENDER_STORAGE_COLLECTION = "tasks";
+const TENDER_SHEET_SOURCE_ID = "bar-tender";
 
 function createDefaultAppConfig() {
   return {
@@ -5271,6 +5274,7 @@ function watchTenders() {
       state.selectedTenderId = state.tenders[0].id;
     }
     setTenderSyncStatus("ready", `Tersinkron realtime - ${state.tenders.length} paket`);
+    syncTenderSheetFromState();
     renderTenders();
     renderJobs();
     renderDashboardPortfolioHome();
@@ -5381,6 +5385,7 @@ async function syncTenderJobsFromDataUtama() {
       await setDoc(reference, payload, { merge: true });
     }
     lastTenderJobSignature = signature;
+    syncTenderSheetFromState();
   } catch (error) {
     console.error("Pekerjaan berstatus Tender gagal disinkronkan:", error);
   } finally {
@@ -5593,6 +5598,7 @@ async function saveTender(event) {
       createdAt: existing?.createdAt || serverTimestamp()
     }, { merge: true });
     state.selectedTenderId = reference.id;
+    await sendTenderSpreadsheetMutation("upsert", { ...existing, ...payload, id: reference.id }, { silent: true });
     setTenderFormStatus("Paket berhasil disimpan.", "success");
     setTenderSyncStatus("ready", "Paket berhasil disimpan dan sedang disinkronkan...");
     await new Promise(resolve => window.setTimeout(resolve, 450));
@@ -5624,6 +5630,7 @@ async function deleteSelectedTender() {
   if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat menghapus paket tender.")) return;
   if (!confirm(`Hapus paket tender "${tender.name}" beserta checklist monitoringnya?`)) return;
   try {
+    await sendTenderSpreadsheetMutation("deleteByKey", tender, { silent: true });
     await deleteDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id));
     state.selectedTenderId = "";
   } catch (error) {
@@ -5701,9 +5708,90 @@ async function saveTenderChecklist() {
       updatedBy: normalizeEmail(currentUser?.email),
       updatedAt: serverTimestamp()
     }, { merge: true });
+    await sendTenderSpreadsheetMutation("upsert", { ...tender, documents }, { silent: true });
     notify("Monitoring dokumen berhasil disimpan.");
   } catch (error) {
     notify(getTenderFirestoreErrorMessage(error, "Monitoring dokumen gagal disimpan."));
+  }
+}
+
+function buildTenderSpreadsheetData(tender) {
+  const progress = getTenderProgress(tender);
+  const personnel = getTenderPersonnel(tender);
+  return {
+    "ID Tender": tender?.id || "",
+    "Paket": tender?.name || "",
+    "Status": tender?.status || "Persiapan",
+    "Instansi/Satker": tender?.agency || "",
+    "Lokasi": tender?.location || "",
+    "Tahun Anggaran": tender?.budgetYear || "",
+    "Sumber Dana": tender?.funding || "",
+    "Pagu": tender?.budgetCeiling || 0,
+    "HPS": tender?.hps || 0,
+    "Metode Seleksi": tender?.method || "",
+    "Jenis Kontrak": tender?.contractType || "",
+    "Deadline": tender?.deadline || "",
+    "Penanggung Jawab": tender?.owner || "",
+    "Email PIC": tender?.ownerEmail || "",
+    "Nama Personil": personnel.map(member => member.name).filter(Boolean).join(", "),
+    "Jumlah Personil": personnel.length || tender?.sourcePersonnelCount || 0,
+    "Progress": progress.percent,
+    "Dokumen Final": progress.finalCount,
+    "Total Dokumen": progress.total,
+    "Folder Dokumen": tender?.driveUrl || "",
+    "Catatan": tender?.notes || "",
+    "Updated By": normalizeEmail(currentUser?.email || tender?.updatedBy || ""),
+    "Updated At": new Date().toISOString()
+  };
+}
+
+async function sendTenderSpreadsheetMutation(action, tender, options = {}) {
+  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN || !currentUser || !tender?.id) return;
+  try {
+    const firebaseIdToken = await currentUser.getIdToken(true);
+    await fetch(window.PERSONNEL_BRIDGE_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        token: window.PERSONNEL_BRIDGE_TOKEN,
+        firebaseIdToken,
+        action,
+        sourceId: TENDER_SHEET_SOURCE_ID,
+        targetSourceId: TENDER_SHEET_SOURCE_ID,
+        matchColumn: "ID Tender",
+        matchValue: tender.id,
+        data: buildTenderSpreadsheetData(tender)
+      })
+    });
+    if (!options.silent) notify("Data Tender dikirim ke Google Spreadsheet.");
+  } catch (error) {
+    if (!options.silent) notify("Data Tender gagal dikirim ke Google Spreadsheet: " + error.message);
+    console.error("Tender gagal dikirim ke Google Spreadsheet:", error);
+  }
+}
+
+async function syncTenderSheetFromState() {
+  if (!currentUser || !canManageTenders() || tenderSheetSyncInProgress || !state.tenders.length) return;
+  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) return;
+  const signature = JSON.stringify(state.tenders.map(tender => [
+    tender.id,
+    tender.name,
+    tender.status,
+    tender.deadline,
+    tender.updatedAt?.seconds || "",
+    createTenderChecklist(tender.documents).map(item => [item.id, item.status, item.deadline, item.url]).join("|")
+  ]));
+  if (signature === lastTenderSheetSignature) return;
+
+  tenderSheetSyncInProgress = true;
+  try {
+    for (const tender of state.tenders) {
+      await sendTenderSpreadsheetMutation("upsert", tender, { silent: true });
+    }
+    lastTenderSheetSignature = signature;
+  } finally {
+    tenderSheetSyncInProgress = false;
   }
 }
 

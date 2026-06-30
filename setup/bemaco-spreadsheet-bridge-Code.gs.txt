@@ -9,11 +9,19 @@ const PERSONNEL_SHEETS = {
   'data-utama': { gid: 2034016714, names: ['DATA UTAMA', 'Data Utama'] },
   'personil-bmc': { gid: 2048149704, names: ['PERSONIL BMC', 'Personil BMC', 'PERSONIL'] },
   outsourcing: { gid: 1030462578, names: ['Outsourcing', 'OUTSOURCING'] },
-  'bar-tender': { gid: 0, names: ['BAR Tender', 'BAR TENDER', 'Tender BAR', 'TENDER BAR'] },
+  'bar-tender': { gid: 1549258591, names: ['BAR Tender', 'BAR TENDER', 'Tender BAR', 'TENDER BAR'] },
   finance: { gid: 0, names: ['Finance', 'FINANCE', 'Keuangan', 'KEUANGAN'] }
 };
 
 const PERSONNEL_WRITE_ROLES = ['super_admin', 'editor', 'author'];
+const DEFAULT_SOURCE_HEADERS = {
+  'bar-tender': [
+    'ID Tender', 'Paket', 'Status', 'Instansi/Satker', 'Lokasi', 'Tahun Anggaran',
+    'Sumber Dana', 'Pagu', 'HPS', 'Metode Seleksi', 'Jenis Kontrak', 'Deadline',
+    'Penanggung Jawab', 'Email PIC', 'Nama Personil', 'Jumlah Personil', 'Progress',
+    'Dokumen Final', 'Total Dokumen', 'Folder Dokumen', 'Catatan', 'Updated By', 'Updated At'
+  ]
+};
 const PERSONNEL_CACHE_TTL_SECONDS = 180;
 const PERSONNEL_CACHE_PREFIX = 'personnelBridge:v2:';
 const PERSONNEL_CACHE_CHUNK_SIZE = 85000;
@@ -81,6 +89,7 @@ function doPost(e) {
     }
     const targetSheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[targetSourceId]);
     const action = String(payload.action || '');
+    ensureSourceHeaders_(targetSheet, targetSourceId, payload.data || {});
     const lock = LockService.getDocumentLock();
     lock.waitLock(30000);
 
@@ -94,6 +103,10 @@ function doPost(e) {
         } else {
           updatePersonnelRow_(sheet, Number(payload.rowNumber), payload.data || {});
         }
+      } else if (action === 'upsert') {
+        upsertPersonnelRow_(targetSheet, payload.data || {}, payload.matchColumn || '', payload.matchValue || '');
+      } else if (action === 'deleteByKey') {
+        deletePersonnelRowByKey_(sheet, payload.matchColumn || '', payload.matchValue || '');
       } else if (action === 'delete') {
         deletePersonnelRow_(sheet, Number(payload.rowNumber));
       } else {
@@ -268,6 +281,45 @@ function getSheetById_(spreadsheet, sheetConfig) {
   return sheet;
 }
 
+function ensureSourceHeaders_(sheet, sourceId, data) {
+  const defaultHeaders = DEFAULT_SOURCE_HEADERS[sourceId];
+  if (!Array.isArray(defaultHeaders) || !defaultHeaders.length) return;
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = values.length ? findHeaderRow_(values) : 0;
+  const headers = values.length ? makeUniqueHeaders_(values[headerIndex]) : [];
+  const nonEmptyRows = values.filter(function(row) {
+    return row.some(function(value) { return String(value || '').trim() !== ''; });
+  }).length;
+  const genericHeaders = headers.length && headers.every(function(header) {
+    return /^column\s+\d+$/i.test(String(header || '').trim());
+  });
+  const missingDataHeaders = Object.keys(data || {}).some(function(key) {
+    return headers.indexOf(key) === -1;
+  });
+
+  if (!headers.length || genericHeaders || (nonEmptyRows <= 1 && missingDataHeaders)) {
+    if (sheet.getMaxColumns() < defaultHeaders.length) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), defaultHeaders.length - sheet.getMaxColumns());
+    }
+    sheet.getRange(1, 1, 1, defaultHeaders.length).setValues([defaultHeaders]);
+    return;
+  }
+
+  if (missingDataHeaders) {
+    const additions = Object.keys(data || {}).filter(function(key) {
+      return headers.indexOf(key) === -1 && !isComputedHeader_(key);
+    });
+    if (additions.length) {
+      const startColumn = headers.length + 1;
+      if (sheet.getMaxColumns() < headers.length + additions.length) {
+        sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length + additions.length - sheet.getMaxColumns());
+      }
+      sheet.getRange(headerIndex + 1, startColumn, 1, additions.length).setValues([additions]);
+    }
+  }
+}
+
 function readSheet_(sheet) {
   const values = sheet.getDataRange().getDisplayValues();
   if (!values.length) return [];
@@ -309,6 +361,41 @@ function addPersonnelRow_(sheet, data) {
       targetCell.setFormulaR1C1(formula);
     }
   });
+}
+
+function upsertPersonnelRow_(sheet, data, matchColumn, matchValue) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const matchIndex = headers.indexOf(String(matchColumn || '').trim());
+  const expected = String(matchValue || data[matchColumn] || '').trim();
+
+  if (matchIndex !== -1 && expected) {
+    for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+      if (String(values[rowIndex][matchIndex] || '').trim() === expected) {
+        updatePersonnelRow_(sheet, rowIndex + 1, data);
+        return;
+      }
+    }
+  }
+
+  addPersonnelRow_(sheet, data);
+}
+
+function deletePersonnelRowByKey_(sheet, matchColumn, matchValue) {
+  const values = sheet.getDataRange().getDisplayValues();
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const matchIndex = headers.indexOf(String(matchColumn || '').trim());
+  const expected = String(matchValue || '').trim();
+  if (matchIndex === -1 || !expected) return;
+
+  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+    if (String(values[rowIndex][matchIndex] || '').trim() === expected) {
+      sheet.deleteRow(rowIndex + 1);
+      return;
+    }
+  }
 }
 
 function updatePersonnelRow_(sheet, rowNumber, data) {
