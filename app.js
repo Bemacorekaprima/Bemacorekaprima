@@ -6464,7 +6464,7 @@ function renderFinanceDetail(entry) {
       <h3>Personil dan Nilai</h3>
       <div class="table-wrap finance-detail-table-wrap">
         <table class="finance-detail-table">
-          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Tarif PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Pajak PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
           <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => `
             <tr>
               <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
@@ -6472,7 +6472,7 @@ function renderFinanceDetail(entry) {
               <td data-label="Bulan">${escapeHtml(row.bulan)}</td>
               <td data-label="Harga Satuan">${row.hasFinance ? formatFinanceMoney(row.hargaSatuan) : "-"}</td>
               <td data-label="Total">${row.hasFinance ? formatFinanceMoney(row.total) : "-"}</td>
-              <td data-label="Tarif PPH 21">${escapeHtml(row.tarifPajak || "-")}</td>
+              <td data-label="Pajak PPH 21">${row.hasFinance ? formatFinanceMoney(row.pajak) : "-"}</td>
               <td data-label="Netto">${row.hasFinance ? formatFinanceMoney(row.netto) : "-"}</td>
               <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
               <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : `<button class="text-button" type="button" data-finance-record-action="complete" data-finance-record-index="${rowIndex}">Edit</button>`}</td>
