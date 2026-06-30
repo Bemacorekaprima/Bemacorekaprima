@@ -408,8 +408,6 @@ function bindControls() {
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
   document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
   document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
-  document.getElementById("dashInventoryMenuButton")?.addEventListener("click", toggleInventoryMenu);
-  document.getElementById("dashInventoryMenu")?.addEventListener("click", handleInventoryMenuAction);
   document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
   document.getElementById("dashInventoryUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage" }));
   document.getElementById("inventoryUsageForm")?.addEventListener("submit", saveInventoryUsage);
@@ -630,7 +628,7 @@ document.addEventListener("click", event => {
   }
 
   const inventoryAction = event.target.closest("[data-inventory-action]");
-  if (inventoryAction && !inventoryAction.closest("#dashInventoryMenu")) {
+  if (inventoryAction) {
     handleInventoryAction(inventoryAction.dataset.inventoryAction);
     return;
   }
@@ -643,8 +641,6 @@ document.addEventListener("click", event => {
   if (!personnelDropdown) closePersonnelMenus();
   const jobsDropdown = event.target.closest(".jobs-action-dropdown");
   if (!jobsDropdown) closeJobsMenus();
-  const inventoryDropdown = event.target.closest(".dashboard-inventory-dropdown");
-  if (!inventoryDropdown) closeInventoryMenu();
   const recipientCombobox = event.target.closest(".recipient-combobox");
   if (!recipientCombobox) closeRecipientCombobox();
 });
@@ -2981,18 +2977,24 @@ function renderDashboardAssignmentSummary(personnelTotal = 0) {
 }
 
 function createDefaultInventoryRecords() {
+  const base = {
+    user: "",
+    purpose: "",
+    destination: "Kantor",
+    departTime: "",
+    returnTime: "",
+    condition: "Baik",
+    notes: "",
+    history: []
+  };
+  const item = (id, name, type, status = "Tersedia", extra = {}) => ({ ...base, id, name, type, status, ...extra });
   return [
-    {
-      id: "inventory-car-a",
-      name: "Kendaraan Mobil - Merek A",
-      type: "Kendaraan",
-      status: "Dipakai",
+    item("inventory-car-a", "Kendaraan Mobil - Merek A", "Kendaraan", "Dipakai", {
       user: "Bpk A",
       purpose: "Mobilisasi personil proyek",
       destination: "Kantor -> Proyek Topografi",
       departTime: `${state.today}T08:30`,
       returnTime: `${state.today}T16:30`,
-      condition: "Baik",
       notes: "Unit prioritas untuk mobilisasi lapangan.",
       history: [
         {
@@ -3002,49 +3004,38 @@ function createDefaultInventoryRecords() {
           note: "Berangkat untuk mobilisasi personil proyek."
         }
       ]
-    },
-    {
-      id: "inventory-laptop-survey",
-      name: "Laptop Survey - Unit 01",
-      type: "Elektronik",
-      status: "Tersedia",
-      user: "",
-      purpose: "",
-      destination: "Kantor",
-      departTime: "",
-      returnTime: "",
-      condition: "Baik",
-      notes: "",
-      history: []
-    },
-    {
-      id: "inventory-printer-office",
-      name: "Printer Administrasi",
-      type: "Peralatan Kantor",
-      status: "Tersedia",
-      user: "",
-      purpose: "",
-      destination: "Ruang Administrasi",
-      departTime: "",
-      returnTime: "",
-      condition: "Baik",
-      notes: "",
-      history: []
-    },
-    {
-      id: "inventory-gps-01",
-      name: "GPS Geodetik - Unit 01",
-      type: "Peralatan Lapangan",
-      status: "Perawatan",
+    }),
+    item("inventory-car-b", "Kendaraan Mobil - Merek B", "Kendaraan", "Dipakai", {
+      user: "Bpk B",
+      purpose: "Survey lapangan",
+      destination: "Kantor -> Proyek Supervisi",
+      departTime: `${state.today}T09:00`,
+      returnTime: `${state.today}T17:00`
+    }),
+    item("inventory-camera-01", "Kamera Dokumentasi - Unit 01", "Peralatan Lapangan", "Dipakai", {
+      user: "Tim Dokumentasi",
+      purpose: "Dokumentasi pekerjaan",
+      destination: "Area proyek",
+      departTime: `${state.today}T10:00`,
+      returnTime: `${state.today}T15:00`
+    }),
+    item("inventory-laptop-survey", "Laptop Survey - Unit 01", "Elektronik"),
+    item("inventory-laptop-admin", "Laptop Administrasi - Unit 02", "Elektronik"),
+    item("inventory-printer-office", "Printer Administrasi", "Peralatan Kantor", "Tersedia", {
+      destination: "Ruang Administrasi"
+    }),
+    item("inventory-projector-01", "Proyektor Meeting - Unit 01", "Peralatan Kantor"),
+    item("inventory-gps-02", "GPS Geodetik - Unit 02", "Peralatan Lapangan"),
+    item("inventory-total-station", "Total Station - Unit 01", "Peralatan Lapangan"),
+    item("inventory-drone-01", "Drone Survey - Unit 01", "Peralatan Lapangan"),
+    item("inventory-radio-01", "Radio Komunikasi - Set 01", "Peralatan Lapangan"),
+    item("inventory-gps-01", "GPS Geodetik - Unit 01", "Peralatan Lapangan", "Perawatan", {
       user: "Tim Teknis",
       purpose: "Kalibrasi alat",
       destination: "Workshop",
-      departTime: "",
-      returnTime: "",
       condition: "Perlu dicek",
-      notes: "Menunggu pemeriksaan baterai.",
-      history: []
-    }
+      notes: "Menunggu pemeriksaan baterai."
+    })
   ];
 }
 
@@ -3080,14 +3071,18 @@ function renderDashboardInventory() {
   const summary = document.getElementById("dashInventorySummary");
   if (summary) {
     summary.innerHTML = [
-      ["Total", counts.total],
-      ["Dipakai", counts.used],
-      ["Tersedia", counts.available],
-      ["Perawatan", counts.maintenance]
-    ].map(([label, count]) => `
+      { label: "Total", count: counts.total, note: "Semua inventaris", icon: "briefcase" },
+      { label: "Dipakai", count: counts.used, note: "Sedang digunakan", icon: "car-front" },
+      { label: "Tersedia", count: counts.available, note: "Siap digunakan", icon: "check" },
+      { label: "Perawatan", count: counts.maintenance, note: "Dalam perawatan", icon: "wrench" }
+    ].map(item => `
       <span>
-        <small>${escapeHtml(label)}</small>
-        <strong>${count}</strong>
+        <i data-lucide="${escapeHtml(item.icon)}" aria-hidden="true"></i>
+        <span>
+          <small>${escapeHtml(item.label)}</small>
+          <strong>${item.count}</strong>
+          <em>${escapeHtml(item.note)}</em>
+        </span>
       </span>
     `).join("");
   }
@@ -3101,48 +3096,54 @@ function renderDashboardInventory() {
 
   const statusClass = safeClassToken(selected.status || "Tersedia");
   const progress = getInventoryUsageProgress(selected);
+  const usageHours = getInventoryUsageHours(selected);
   container.innerHTML = `
     <button class="dashboard-inventory-main" type="button" data-inventory-action="detail">
-      <span class="inventory-item-topline">
-        <strong>${escapeHtml(selected.name || "Inventaris")}</strong>
-        <em class="inventory-status ${statusClass}">${escapeHtml(getInventoryStatusLabel(selected.status))}</em>
+      <span class="inventory-photo-frame">
+        <img src="assets/inventory-car.svg" alt="${escapeHtml(selected.name || "Inventaris kantor")}">
       </span>
-      <span class="inventory-purpose">${escapeHtml(selected.purpose || selected.destination || "Belum ada keterangan penggunaan.")}</span>
-      <dl class="inventory-detail-grid">
-        <div><dt>Pengguna/Driver</dt><dd>${escapeHtml(selected.user || "-")}</dd></div>
-        <div><dt>Tujuan</dt><dd>${escapeHtml(selected.destination || "-")}</dd></div>
-        <div><dt>Berangkat</dt><dd>${escapeHtml(formatInventoryDateTime(selected.departTime))}</dd></div>
-        <div><dt>Estimasi Kembali</dt><dd>${escapeHtml(formatInventoryDateTime(selected.returnTime))}</dd></div>
-      </dl>
-      <span class="inventory-time-track"><i style="width:${progress}%"></i></span>
+      <span class="inventory-content">
+        <span class="inventory-item-topline">
+          <strong>${escapeHtml(selected.name || "Inventaris")}</strong>
+          <em class="inventory-status ${statusClass}">${escapeHtml(getInventoryStatusLabel(selected.status))}</em>
+        </span>
+        <span class="inventory-info-grid">
+          <span class="inventory-info-cell">
+            <i data-lucide="target" aria-hidden="true"></i>
+            <span><small>Tujuan</small><b>${escapeHtml(selected.purpose || "-")}</b></span>
+          </span>
+          <span class="inventory-info-cell">
+            <i data-lucide="clock" aria-hidden="true"></i>
+            <span><small>Berangkat</small><b>${escapeHtml(formatInventoryTime(selected.departTime))}</b></span>
+          </span>
+          <span class="inventory-info-cell">
+            <i data-lucide="map-pin" aria-hidden="true"></i>
+            <span><small>Lokasi / Tujuan</small><b>${escapeHtml(selected.destination || "-")}</b></span>
+          </span>
+          <span class="inventory-info-cell">
+            <i data-lucide="user-round" aria-hidden="true"></i>
+            <span><small>Pengguna / Driver</small><b>${escapeHtml(selected.user || "-")}</b></span>
+          </span>
+          <span class="inventory-info-cell">
+            <i data-lucide="clock-3" aria-hidden="true"></i>
+            <span><small>Estimasi Kembali</small><b>${escapeHtml(formatInventoryTime(selected.returnTime))}</b></span>
+          </span>
+          <span class="inventory-info-cell inventory-progress-cell">
+            <i data-lucide="car-front" aria-hidden="true"></i>
+            <span>
+              <small>Progress Penggunaan</small>
+              <span class="inventory-time-track"><i style="width:${progress}%"></i></span>
+              <em>${progress}%${usageHours ? ` (${escapeHtml(usageHours)})` : ""}</em>
+            </span>
+          </span>
+        </span>
+      </span>
     </button>
   `;
-}
-
-function toggleInventoryMenu(event) {
-  event?.stopPropagation();
-  const menu = document.getElementById("dashInventoryMenu");
-  const button = document.getElementById("dashInventoryMenuButton");
-  if (!menu || !button) return;
-  const willOpen = menu.classList.contains("hidden");
-  closeInventoryMenu();
-  menu.classList.toggle("hidden", !willOpen);
-  button.setAttribute("aria-expanded", String(willOpen));
-}
-
-function closeInventoryMenu() {
-  document.getElementById("dashInventoryMenu")?.classList.add("hidden");
-  document.getElementById("dashInventoryMenuButton")?.setAttribute("aria-expanded", "false");
-}
-
-function handleInventoryMenuAction(event) {
-  const button = event.target.closest("[data-inventory-action]");
-  if (!button) return;
-  handleInventoryAction(button.dataset.inventoryAction);
+  window.lucide?.createIcons?.();
 }
 
 function handleInventoryAction(action) {
-  closeInventoryMenu();
   const selected = getSelectedInventoryRecord();
   if (!selected && action !== "usage") return openInventoryUsageModal({ mode: "add" });
   if (action === "usage") return openInventoryUsageModal({ mode: "usage", record: selected });
@@ -3280,6 +3281,15 @@ function getInventoryUsageProgress(record) {
   return Math.max(0, Math.min(100, Math.round(((Date.now() - start) / (end - start)) * 100)));
 }
 
+function getInventoryUsageHours(record) {
+  const start = new Date(record.departTime || "").getTime();
+  const end = new Date(record.returnTime || "").getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return "";
+  const totalHours = Math.max(1, Math.round((end - start) / 3600000));
+  const usedHours = Math.max(0, Math.min(totalHours, Math.round((Date.now() - start) / 3600000)));
+  return `${usedHours} / ${totalHours} jam`;
+}
+
 function getInventoryStatusLabel(status) {
   if (status === "Dipakai") return "Sedang Digunakan";
   return status || "Tersedia";
@@ -3295,6 +3305,13 @@ function formatInventoryDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+
+function formatInventoryTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 function toDatetimeLocalValue(value) {
@@ -3321,10 +3338,21 @@ function createInventoryId() {
 function loadInventoryCache() {
   try {
     const records = JSON.parse(localStorage.getItem(INVENTORY_CACHE_KEY) || "[]");
-    return Array.isArray(records) && records.length ? records : createDefaultInventoryRecords();
+    if (!Array.isArray(records) || !records.length) return createDefaultInventoryRecords();
+    if (isLegacyDefaultInventoryRecords(records)) {
+      const defaults = createDefaultInventoryRecords();
+      saveInventoryCache(defaults);
+      return defaults;
+    }
+    return records;
   } catch (error) {
     return createDefaultInventoryRecords();
   }
+}
+
+function isLegacyDefaultInventoryRecords(records) {
+  const legacyIds = ["inventory-car-a", "inventory-laptop-survey", "inventory-printer-office", "inventory-gps-01"];
+  return records.length === legacyIds.length && legacyIds.every(id => records.some(item => item?.id === id));
 }
 
 function saveInventoryCache(records) {

@@ -404,36 +404,6 @@
                 <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tenders">Kelola Dokumen</button>
               </article>
 
-              <article class="dashboard-card dashboard-inventory-card">
-                <header class="dashboard-card-header">
-                  <h3><i data-lucide="car-front" aria-hidden="true"></i> Inventaris Kantor</h3>
-                  <div class="action-dropdown dashboard-inventory-dropdown">
-                    <button class="text-button action-dropdown-button" id="dashInventoryMenuButton" type="button" aria-expanded="false">
-                      Pilihan <span class="dropdown-chevron" aria-hidden="true"></span>
-                    </button>
-                    <div class="action-dropdown-menu dashboard-inventory-menu hidden" id="dashInventoryMenu" role="menu">
-                      <button type="button" data-inventory-action="detail" role="menuitem">Lihat Rincian</button>
-                      <button type="button" data-inventory-action="usage" role="menuitem">Catat Penggunaan</button>
-                      <button type="button" data-inventory-action="status" role="menuitem">Ubah Status</button>
-                      <button type="button" data-inventory-action="maintenance" role="menuitem">Jadwalkan Perawatan</button>
-                      <button type="button" data-inventory-action="history" role="menuitem">Riwayat Pemakaian</button>
-                    </div>
-                  </div>
-                </header>
-                <div id="dashInventorySummary" class="dashboard-inventory-summary"></div>
-                <div id="dashInventoryItem" class="dashboard-inventory-item"></div>
-                <div class="dashboard-inventory-actions">
-                  <button class="dashboard-card-footer-button" id="dashInventoryAddButton" type="button">
-                    <i data-lucide="plus" aria-hidden="true"></i>
-                    Tambah Item
-                  </button>
-                  <button class="dashboard-card-footer-button primary-soft" id="dashInventoryUsageButton" type="button">
-                    <i data-lucide="clipboard-pen" aria-hidden="true"></i>
-                    Catat Penggunaan
-                  </button>
-                </div>
-              </article>
-
               <article class="dashboard-card">
                 <header class="dashboard-card-header">
                   <h3><i data-lucide="bell" aria-hidden="true"></i> Pengingat Email</h3>
@@ -444,6 +414,25 @@
               </article>
             </aside>
           </section>
+
+          <article class="dashboard-card dashboard-inventory-card dashboard-inventory-wide-card">
+            <header class="dashboard-card-header">
+              <h3><i data-lucide="truck" aria-hidden="true"></i> Inventaris Kantor</h3>
+              <button class="text-button" id="dashInventoryHistoryButton" type="button" data-inventory-action="history">Lihat Semua</button>
+            </header>
+            <div id="dashInventoryItem" class="dashboard-inventory-item"></div>
+            <div id="dashInventorySummary" class="dashboard-inventory-summary"></div>
+            <div class="dashboard-inventory-actions">
+              <button class="dashboard-card-footer-button" id="dashInventoryAddButton" type="button">
+                <i data-lucide="plus" aria-hidden="true"></i>
+                Tambah Item
+              </button>
+              <button class="dashboard-card-footer-button primary-soft" id="dashInventoryUsageButton" type="button">
+                <i data-lucide="calendar" aria-hidden="true"></i>
+                Catat Penggunaan
+              </button>
+            </div>
+          </article>
 
           <div class="dashboard-hidden-sinks" aria-hidden="true">
             <span id="dashboardPortfolioYearLabel"></span>
