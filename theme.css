@@ -914,3 +914,144 @@ dialog::backdrop {
     to { transform: translateX(120%); }
   }
 }
+
+/* Wide canvas mode: fixes 2K screens viewed at low browser zoom */
+@media (min-width: 2200px) and (min-height: 900px) {
+  .app-shell {
+    grid-template-columns: clamp(258px, 5.8vw, 340px) minmax(0, 1fr);
+  }
+
+  .sidebar-brand-logo {
+    width: clamp(180px, 5vw, 260px);
+    height: clamp(58px, 2.2vw, 78px);
+  }
+
+  .nav-item {
+    min-height: clamp(48px, 1.25vw, 64px);
+    font-size: clamp(13px, 0.32vw, 17px);
+  }
+
+  .main > .view.active,
+  #dashboardView {
+    max-width: none;
+    width: 100%;
+  }
+
+  .topbar {
+    gap: clamp(18px, 1vw, 32px);
+  }
+
+  .topbar-brand {
+    width: clamp(178px, 8vw, 280px);
+    height: clamp(46px, 2.1vw, 72px);
+  }
+
+  .dashboard-executive-header h2 {
+    font-size: clamp(34px, 1.2vw, 52px);
+  }
+
+  .dashboard-executive-header p,
+  .topbar-title p {
+    font-size: clamp(13px, 0.35vw, 18px);
+  }
+
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(6, minmax(220px, 1fr));
+    gap: clamp(16px, 0.8vw, 28px);
+  }
+
+  .dashboard-kpi-card {
+    min-height: clamp(126px, 4.6vw, 190px);
+    padding: clamp(18px, 0.9vw, 30px);
+  }
+
+  .dashboard-kpi-icon {
+    width: clamp(50px, 2.25vw, 82px);
+    height: clamp(50px, 2.25vw, 82px);
+  }
+
+  .dashboard-kpi-icon svg {
+    width: clamp(24px, 1vw, 38px);
+    height: clamp(24px, 1vw, 38px);
+  }
+
+  .dashboard-kpi-copy small {
+    font-size: clamp(13px, 0.34vw, 18px);
+  }
+
+  .dashboard-kpi-copy strong {
+    font-size: clamp(30px, 1.12vw, 46px);
+  }
+
+  .dashboard-kpi-copy em,
+  .dashboard-status-pill,
+  .dashboard-priority-badge {
+    font-size: clamp(11px, 0.28vw, 15px);
+  }
+
+  .dashboard-main-grid {
+    grid-template-columns: minmax(900px, 1.42fr) minmax(560px, 0.72fr);
+    gap: clamp(18px, 0.9vw, 32px);
+  }
+
+  .dashboard-primary-stack,
+  .dashboard-side-stack {
+    gap: clamp(18px, 0.9vw, 32px);
+  }
+
+  .dashboard-card {
+    padding: clamp(18px, 0.9vw, 30px);
+  }
+
+  .dashboard-tender-card > header,
+  .dashboard-priority-card > header {
+    margin: calc(clamp(18px, 0.9vw, 30px) * -1) calc(clamp(18px, 0.9vw, 30px) * -1) clamp(14px, 0.7vw, 24px);
+    padding: clamp(16px, 0.75vw, 26px) clamp(18px, 0.9vw, 30px);
+  }
+
+  .dashboard-card-header h3 {
+    font-size: clamp(18px, 0.48vw, 25px);
+  }
+
+  .dashboard-card-header svg {
+    width: clamp(18px, 0.55vw, 28px);
+    height: clamp(18px, 0.55vw, 28px);
+  }
+
+  .dashboard-mini-table th,
+  .dashboard-mini-table td,
+  .dashboard-assignment-table th,
+  .dashboard-assignment-table td {
+    padding: clamp(12px, 0.45vw, 18px);
+    font-size: clamp(13px, 0.31vw, 17px);
+  }
+
+  .dashboard-mini-table small,
+  .dashboard-assignment-summary dt,
+  .dashboard-assignment-summary dd small,
+  .dashboard-document-breakdown span,
+  .dashboard-document-breakdown strong {
+    font-size: clamp(12px, 0.29vw, 16px);
+  }
+
+  .dashboard-card-footer-button,
+  .dashboard-card-header .text-button {
+    min-height: clamp(42px, 1vw, 60px);
+    font-size: clamp(13px, 0.34vw, 18px);
+  }
+}
+
+@media (min-width: 3000px) and (min-height: 1200px) {
+  .dashboard-main-grid {
+    grid-template-columns: minmax(1100px, 1.38fr) minmax(900px, 0.82fr);
+  }
+
+  .dashboard-side-stack {
+    grid-template-columns: repeat(2, minmax(360px, 1fr));
+    align-items: start;
+  }
+
+  .dashboard-side-stack .dashboard-card {
+    min-width: 0;
+  }
+}
