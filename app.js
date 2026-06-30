@@ -6162,11 +6162,17 @@ function getFinanceSheet() {
 }
 
 function parseFinanceNumber(value) {
-  const raw = String(value || "").replace(/[^\d,.-]/g, "").trim();
-  if (!raw) return 0;
-  const normalized = raw.includes(",") && raw.lastIndexOf(",") > raw.lastIndexOf(".")
-    ? raw.replace(/\./g, "").replace(",", ".")
-    : raw.replace(/,/g, "");
+  const parsed = parseIndonesianNumber(value);
+  if (parsed != null) return parsed;
+
+  const numeric = String(value || "").replace(/[^\d,.-]/g, "").trim();
+  if (!numeric) return 0;
+  const lastComma = numeric.lastIndexOf(",");
+  const lastDot = numeric.lastIndexOf(".");
+  const decimalSeparator = lastComma > lastDot ? "," : ".";
+  const normalized = decimalSeparator === ","
+    ? numeric.replace(/\./g, "").replace(",", ".")
+    : numeric.replace(/,/g, "");
   const number = Number(normalized);
   return Number.isFinite(number) ? number : 0;
 }
