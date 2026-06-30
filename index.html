@@ -404,6 +404,36 @@
                 <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tenders">Kelola Dokumen</button>
               </article>
 
+              <article class="dashboard-card dashboard-inventory-card">
+                <header class="dashboard-card-header">
+                  <h3><i data-lucide="car-front" aria-hidden="true"></i> Inventaris Kantor</h3>
+                  <div class="action-dropdown dashboard-inventory-dropdown">
+                    <button class="text-button action-dropdown-button" id="dashInventoryMenuButton" type="button" aria-expanded="false">
+                      Pilihan <span class="dropdown-chevron" aria-hidden="true"></span>
+                    </button>
+                    <div class="action-dropdown-menu dashboard-inventory-menu hidden" id="dashInventoryMenu" role="menu">
+                      <button type="button" data-inventory-action="detail" role="menuitem">Lihat Rincian</button>
+                      <button type="button" data-inventory-action="usage" role="menuitem">Catat Penggunaan</button>
+                      <button type="button" data-inventory-action="status" role="menuitem">Ubah Status</button>
+                      <button type="button" data-inventory-action="maintenance" role="menuitem">Jadwalkan Perawatan</button>
+                      <button type="button" data-inventory-action="history" role="menuitem">Riwayat Pemakaian</button>
+                    </div>
+                  </div>
+                </header>
+                <div id="dashInventorySummary" class="dashboard-inventory-summary"></div>
+                <div id="dashInventoryItem" class="dashboard-inventory-item"></div>
+                <div class="dashboard-inventory-actions">
+                  <button class="dashboard-card-footer-button" id="dashInventoryAddButton" type="button">
+                    <i data-lucide="plus" aria-hidden="true"></i>
+                    Tambah Item
+                  </button>
+                  <button class="dashboard-card-footer-button primary-soft" id="dashInventoryUsageButton" type="button">
+                    <i data-lucide="clipboard-pen" aria-hidden="true"></i>
+                    Catat Penggunaan
+                  </button>
+                </div>
+              </article>
+
               <article class="dashboard-card">
                 <header class="dashboard-card-header">
                   <h3><i data-lucide="bell" aria-hidden="true"></i> Pengingat Email</h3>
@@ -1404,6 +1434,83 @@
         <span id="financeRecordFormStatus" class="config-status"></span>
         <button type="button" class="secondary-button" id="cancelFinanceRecordFormButton">Batal</button>
         <button class="primary-button" id="saveFinanceRecordButton" type="submit">Simpan ke Spreadsheet</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="inventoryUsageModal">
+    <form method="dialog" class="modal-card inventory-form-card" id="inventoryUsageForm">
+      <header>
+        <div>
+          <h2 id="inventoryUsageTitle">Catat Penggunaan Inventaris</h2>
+          <p id="inventoryUsageSubtitle">Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.</p>
+        </div>
+        <button type="button" class="icon-button" id="closeInventoryUsageButton">x</button>
+      </header>
+      <input id="inventoryRecordId" type="hidden">
+      <div class="inventory-form-grid">
+        <label>
+          <span>Nama Inventaris</span>
+          <input id="inventoryItemName" list="inventoryNameSuggestions" required placeholder="Contoh: Kendaraan Mobil - Merek A">
+        </label>
+        <label>
+          <span>Jenis</span>
+          <select id="inventoryItemType">
+            <option>Kendaraan</option>
+            <option>Peralatan Kantor</option>
+            <option>Peralatan Lapangan</option>
+            <option>Elektronik</option>
+            <option>Lainnya</option>
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select id="inventoryStatus">
+            <option value="Dipakai">Sedang Digunakan</option>
+            <option value="Tersedia">Tersedia</option>
+            <option value="Perawatan">Perawatan</option>
+          </select>
+        </label>
+        <label>
+          <span>Pengguna / Driver</span>
+          <input id="inventoryUser" list="inventoryPersonSuggestions" placeholder="Contoh: Bpk A">
+        </label>
+        <label class="full">
+          <span>Keperluan</span>
+          <input id="inventoryPurpose" placeholder="Contoh: Mobilisasi personil proyek">
+        </label>
+        <label class="full">
+          <span>Tujuan / Lokasi</span>
+          <input id="inventoryDestination" placeholder="Contoh: Kantor -> Proyek Topografi">
+        </label>
+        <label>
+          <span>Waktu Berangkat</span>
+          <input id="inventoryDepartTime" type="datetime-local">
+        </label>
+        <label>
+          <span>Estimasi Kembali</span>
+          <input id="inventoryReturnTime" type="datetime-local">
+        </label>
+        <label>
+          <span>Kondisi Awal</span>
+          <select id="inventoryCondition">
+            <option>Baik</option>
+            <option>Perlu dicek</option>
+            <option>Rusak ringan</option>
+            <option>Rusak berat</option>
+          </select>
+        </label>
+        <label>
+          <span>Catatan</span>
+          <input id="inventoryNotes" placeholder="Catatan tambahan">
+        </label>
+      </div>
+      <datalist id="inventoryNameSuggestions"></datalist>
+      <datalist id="inventoryPersonSuggestions"></datalist>
+      <div id="inventoryHistoryPreview" class="inventory-history-preview"></div>
+      <footer>
+        <button type="button" class="secondary-button" id="cancelInventoryUsageButton">Batal</button>
+        <button class="primary-button" type="submit">Simpan</button>
       </footer>
     </form>
   </dialog>

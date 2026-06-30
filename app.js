@@ -103,6 +103,7 @@ let tenderSheetSyncInProgress = false;
 let lastTenderJobSignature = "";
 let lastTenderSheetSignature = "";
 const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v2";
+const INVENTORY_CACHE_KEY = "bemaco.dashboard.inventory.v1";
 const BEMACO_SPREADSHEET_ID = "1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA";
 const LEGACY_EXTERNAL_SHEET_MARKERS = [
   "2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq"
@@ -290,7 +291,9 @@ let state = {
   selectedTenderId: "",
   tenderSearch: "",
   tenderStatusFilter: "all",
-  dashboardAssignmentFilter: "all"
+  dashboardAssignmentFilter: "all",
+  inventoryRecords: [],
+  selectedInventoryId: ""
 };
 
 const statusToList = {
@@ -405,6 +408,13 @@ function bindControls() {
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
   document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
   document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
+  document.getElementById("dashInventoryMenuButton")?.addEventListener("click", toggleInventoryMenu);
+  document.getElementById("dashInventoryMenu")?.addEventListener("click", handleInventoryMenuAction);
+  document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
+  document.getElementById("dashInventoryUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage" }));
+  document.getElementById("inventoryUsageForm")?.addEventListener("submit", saveInventoryUsage);
+  document.getElementById("closeInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
+  document.getElementById("cancelInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
@@ -564,6 +574,8 @@ onAuthStateChanged(auth, async user => {
     watchAppSettings();
     renderUserProfile();
     state.tasks = loadCachedTasks();
+    state.inventoryRecords = loadInventoryCache();
+    state.selectedInventoryId = state.inventoryRecords.find(item => item.status === "Dipakai")?.id || state.inventoryRecords[0]?.id || "";
     state.syncMessage = state.tasks.length
       ? "Menampilkan cadangan lokal. Sinkronisasi Firebase berjalan..."
       : "Memuat data dari Firebase...";
@@ -585,6 +597,8 @@ onAuthStateChanged(auth, async user => {
     state.tasks = [];
     state.tenders = [];
     state.people = [];
+    state.inventoryRecords = [];
+    state.selectedInventoryId = "";
     state.externalSheets = createInitialExternalSheets(state.appConfig);
     externalSheetLastLoadedAt = 0;
     state.syncMessage = "Menunggu login...";
@@ -615,6 +629,12 @@ document.addEventListener("click", event => {
     return;
   }
 
+  const inventoryAction = event.target.closest("[data-inventory-action]");
+  if (inventoryAction && !inventoryAction.closest("#dashInventoryMenu")) {
+    handleInventoryAction(inventoryAction.dataset.inventoryAction);
+    return;
+  }
+
   const profileWrap = event.target.closest(".sidebar-profile-wrap");
   if (!profileWrap) closeProfileMenu();
   const actionDropdown = event.target.closest(".action-dropdown");
@@ -623,6 +643,8 @@ document.addEventListener("click", event => {
   if (!personnelDropdown) closePersonnelMenus();
   const jobsDropdown = event.target.closest(".jobs-action-dropdown");
   if (!jobsDropdown) closeJobsMenus();
+  const inventoryDropdown = event.target.closest(".dashboard-inventory-dropdown");
+  if (!inventoryDropdown) closeInventoryMenu();
   const recipientCombobox = event.target.closest(".recipient-combobox");
   if (!recipientCombobox) closeRecipientCombobox();
 });
@@ -2716,6 +2738,7 @@ function renderDashboardPortfolioHome() {
   renderDashboardPersonnelSummary(personnel);
   renderDashboardAssignmentSummary(personnel.length);
   renderDashboardDocuments(documentSummary);
+  renderDashboardInventory();
   renderDashboardReminders(activeTenders);
   renderDashboardPriorityRows(priorityItems);
 
@@ -2956,6 +2979,358 @@ function renderDashboardAssignmentSummary(personnelTotal = 0) {
     </tr>
   `).join("") : '<tr><td colspan="2" class="dashboard-empty">Belum ada data posisi penugasan.</td></tr>';
 }
+
+function createDefaultInventoryRecords() {
+  return [
+    {
+      id: "inventory-car-a",
+      name: "Kendaraan Mobil - Merek A",
+      type: "Kendaraan",
+      status: "Dipakai",
+      user: "Bpk A",
+      purpose: "Mobilisasi personil proyek",
+      destination: "Kantor -> Proyek Topografi",
+      departTime: `${state.today}T08:30`,
+      returnTime: `${state.today}T16:30`,
+      condition: "Baik",
+      notes: "Unit prioritas untuk mobilisasi lapangan.",
+      history: [
+        {
+          at: `${state.today}T08:30`,
+          action: "Catat Penggunaan",
+          user: "Bpk A",
+          note: "Berangkat untuk mobilisasi personil proyek."
+        }
+      ]
+    },
+    {
+      id: "inventory-laptop-survey",
+      name: "Laptop Survey - Unit 01",
+      type: "Elektronik",
+      status: "Tersedia",
+      user: "",
+      purpose: "",
+      destination: "Kantor",
+      departTime: "",
+      returnTime: "",
+      condition: "Baik",
+      notes: "",
+      history: []
+    },
+    {
+      id: "inventory-printer-office",
+      name: "Printer Administrasi",
+      type: "Peralatan Kantor",
+      status: "Tersedia",
+      user: "",
+      purpose: "",
+      destination: "Ruang Administrasi",
+      departTime: "",
+      returnTime: "",
+      condition: "Baik",
+      notes: "",
+      history: []
+    },
+    {
+      id: "inventory-gps-01",
+      name: "GPS Geodetik - Unit 01",
+      type: "Peralatan Lapangan",
+      status: "Perawatan",
+      user: "Tim Teknis",
+      purpose: "Kalibrasi alat",
+      destination: "Workshop",
+      departTime: "",
+      returnTime: "",
+      condition: "Perlu dicek",
+      notes: "Menunggu pemeriksaan baterai.",
+      history: []
+    }
+  ];
+}
+
+function getInventoryRecords() {
+  if (!Array.isArray(state.inventoryRecords) || !state.inventoryRecords.length) {
+    state.inventoryRecords = createDefaultInventoryRecords();
+    saveInventoryCache(state.inventoryRecords);
+  }
+  return state.inventoryRecords;
+}
+
+function getSelectedInventoryRecord() {
+  const records = getInventoryRecords();
+  return records.find(item => item.id === state.selectedInventoryId) ||
+    records.find(item => item.status === "Dipakai") ||
+    records[0] ||
+    null;
+}
+
+function renderDashboardInventory() {
+  const records = getInventoryRecords();
+  const selected = getSelectedInventoryRecord();
+  if (selected) state.selectedInventoryId = selected.id;
+
+  const counts = records.reduce((summary, item) => {
+    summary.total += 1;
+    if (item.status === "Dipakai") summary.used += 1;
+    else if (item.status === "Perawatan") summary.maintenance += 1;
+    else summary.available += 1;
+    return summary;
+  }, { total: 0, used: 0, available: 0, maintenance: 0 });
+
+  const summary = document.getElementById("dashInventorySummary");
+  if (summary) {
+    summary.innerHTML = [
+      ["Total", counts.total],
+      ["Dipakai", counts.used],
+      ["Tersedia", counts.available],
+      ["Perawatan", counts.maintenance]
+    ].map(([label, count]) => `
+      <span>
+        <small>${escapeHtml(label)}</small>
+        <strong>${count}</strong>
+      </span>
+    `).join("");
+  }
+
+  const container = document.getElementById("dashInventoryItem");
+  if (!container) return;
+  if (!selected) {
+    container.innerHTML = '<p class="dashboard-empty">Belum ada inventaris kantor.</p>';
+    return;
+  }
+
+  const statusClass = safeClassToken(selected.status || "Tersedia");
+  const progress = getInventoryUsageProgress(selected);
+  container.innerHTML = `
+    <button class="dashboard-inventory-main" type="button" data-inventory-action="detail">
+      <span class="inventory-item-topline">
+        <strong>${escapeHtml(selected.name || "Inventaris")}</strong>
+        <em class="inventory-status ${statusClass}">${escapeHtml(getInventoryStatusLabel(selected.status))}</em>
+      </span>
+      <span class="inventory-purpose">${escapeHtml(selected.purpose || selected.destination || "Belum ada keterangan penggunaan.")}</span>
+      <dl class="inventory-detail-grid">
+        <div><dt>Pengguna/Driver</dt><dd>${escapeHtml(selected.user || "-")}</dd></div>
+        <div><dt>Tujuan</dt><dd>${escapeHtml(selected.destination || "-")}</dd></div>
+        <div><dt>Berangkat</dt><dd>${escapeHtml(formatInventoryDateTime(selected.departTime))}</dd></div>
+        <div><dt>Estimasi Kembali</dt><dd>${escapeHtml(formatInventoryDateTime(selected.returnTime))}</dd></div>
+      </dl>
+      <span class="inventory-time-track"><i style="width:${progress}%"></i></span>
+    </button>
+  `;
+}
+
+function toggleInventoryMenu(event) {
+  event?.stopPropagation();
+  const menu = document.getElementById("dashInventoryMenu");
+  const button = document.getElementById("dashInventoryMenuButton");
+  if (!menu || !button) return;
+  const willOpen = menu.classList.contains("hidden");
+  closeInventoryMenu();
+  menu.classList.toggle("hidden", !willOpen);
+  button.setAttribute("aria-expanded", String(willOpen));
+}
+
+function closeInventoryMenu() {
+  document.getElementById("dashInventoryMenu")?.classList.add("hidden");
+  document.getElementById("dashInventoryMenuButton")?.setAttribute("aria-expanded", "false");
+}
+
+function handleInventoryMenuAction(event) {
+  const button = event.target.closest("[data-inventory-action]");
+  if (!button) return;
+  handleInventoryAction(button.dataset.inventoryAction);
+}
+
+function handleInventoryAction(action) {
+  closeInventoryMenu();
+  const selected = getSelectedInventoryRecord();
+  if (!selected && action !== "usage") return openInventoryUsageModal({ mode: "add" });
+  if (action === "usage") return openInventoryUsageModal({ mode: "usage", record: selected });
+  if (action === "status") return cycleInventoryStatus(selected);
+  if (action === "maintenance") return openInventoryUsageModal({ mode: "maintenance", record: selected });
+  if (action === "history") return openInventoryUsageModal({ mode: "history", record: selected });
+  return openInventoryUsageModal({ mode: "detail", record: selected });
+}
+
+function openInventoryUsageModal(options = {}) {
+  const mode = options.mode || "usage";
+  const record = options.record || getSelectedInventoryRecord() || {};
+  const modal = document.getElementById("inventoryUsageModal");
+  if (!modal) return;
+
+  setTextContent("inventoryUsageTitle", mode === "add" ? "Tambah Inventaris Kantor" :
+    mode === "maintenance" ? "Jadwalkan Perawatan Inventaris" :
+    mode === "history" ? "Riwayat Pemakaian Inventaris" :
+    mode === "detail" ? "Rincian Inventaris Kantor" :
+    "Catat Penggunaan Inventaris");
+  setTextContent("inventoryUsageSubtitle", "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
+  setInputValue("inventoryRecordId", record.id || "");
+  setInputValue("inventoryItemName", record.name || "");
+  setInputValue("inventoryItemType", record.type || "Kendaraan");
+  setInputValue("inventoryStatus", mode === "maintenance" ? "Perawatan" : (record.status || "Dipakai"));
+  setInputValue("inventoryUser", record.user || "");
+  setInputValue("inventoryPurpose", mode === "maintenance" ? "Perawatan berkala" : (record.purpose || ""));
+  setInputValue("inventoryDestination", record.destination || "");
+  setInputValue("inventoryDepartTime", toDatetimeLocalValue(record.departTime) || (mode === "usage" ? toDatetimeLocalValue(new Date()) : ""));
+  setInputValue("inventoryReturnTime", toDatetimeLocalValue(record.returnTime));
+  setInputValue("inventoryCondition", record.condition || "Baik");
+  setInputValue("inventoryNotes", record.notes || "");
+  populateInventoryDatalists();
+  renderInventoryHistoryPreview(record);
+  if (!modal.open) modal.showModal();
+}
+
+function closeInventoryUsageModal() {
+  const modal = document.getElementById("inventoryUsageModal");
+  if (modal?.open) modal.close();
+}
+
+function saveInventoryUsage(event) {
+  event.preventDefault();
+  const records = getInventoryRecords();
+  const id = document.getElementById("inventoryRecordId")?.value || createInventoryId();
+  const existingIndex = records.findIndex(item => item.id === id);
+  const existing = existingIndex >= 0 ? records[existingIndex] : { id, history: [] };
+  const status = getInputValue("inventoryStatus") || "Dipakai";
+  const nextRecord = {
+    ...existing,
+    id,
+    name: getInputValue("inventoryItemName") || "Inventaris Kantor",
+    type: getInputValue("inventoryItemType") || "Lainnya",
+    status,
+    user: getInputValue("inventoryUser"),
+    purpose: getInputValue("inventoryPurpose"),
+    destination: getInputValue("inventoryDestination"),
+    departTime: getInputValue("inventoryDepartTime"),
+    returnTime: getInputValue("inventoryReturnTime"),
+    condition: getInputValue("inventoryCondition") || "Baik",
+    notes: getInputValue("inventoryNotes"),
+    updatedAt: new Date().toISOString()
+  };
+  nextRecord.history = [
+    {
+      at: new Date().toISOString(),
+      action: status === "Perawatan" ? "Jadwalkan Perawatan" : "Catat Penggunaan",
+      user: nextRecord.user,
+      note: [nextRecord.purpose, nextRecord.destination].filter(Boolean).join(" - ") || nextRecord.notes
+    },
+    ...(Array.isArray(existing.history) ? existing.history : [])
+  ].slice(0, 12);
+
+  if (existingIndex >= 0) records[existingIndex] = nextRecord;
+  else records.unshift(nextRecord);
+  state.inventoryRecords = records;
+  state.selectedInventoryId = nextRecord.id;
+  saveInventoryCache(records);
+  renderDashboardInventory();
+  closeInventoryUsageModal();
+  notify("Data inventaris kantor tersimpan.");
+}
+
+function cycleInventoryStatus(record) {
+  if (!record) return;
+  const sequence = ["Tersedia", "Dipakai", "Perawatan"];
+  const nextStatus = sequence[(sequence.indexOf(record.status) + 1) % sequence.length] || "Tersedia";
+  record.status = nextStatus;
+  record.updatedAt = new Date().toISOString();
+  record.history = [
+    { at: record.updatedAt, action: "Ubah Status", user: currentProfile?.displayName || "", note: getInventoryStatusLabel(nextStatus) },
+    ...(Array.isArray(record.history) ? record.history : [])
+  ].slice(0, 12);
+  saveInventoryCache(state.inventoryRecords);
+  renderDashboardInventory();
+  notify(`Status inventaris menjadi ${getInventoryStatusLabel(nextStatus)}.`);
+}
+
+function renderInventoryHistoryPreview(record = {}) {
+  const container = document.getElementById("inventoryHistoryPreview");
+  if (!container) return;
+  const history = Array.isArray(record.history) ? record.history.slice(0, 4) : [];
+  container.innerHTML = `
+    <strong>Riwayat Pemakaian</strong>
+    ${history.length ? history.map(item => `
+      <div>
+        <span>${escapeHtml(formatInventoryDateTime(item.at))}</span>
+        <b>${escapeHtml(item.action || "-")}</b>
+        <small>${escapeHtml([item.user, item.note].filter(Boolean).join(" - ") || "-")}</small>
+      </div>
+    `).join("") : '<p>Belum ada riwayat pemakaian.</p>'}
+  `;
+}
+
+function populateInventoryDatalists() {
+  const names = document.getElementById("inventoryNameSuggestions");
+  if (names) {
+    names.innerHTML = getInventoryRecords().map(item => `<option value="${escapeHtml(item.name)}"></option>`).join("");
+  }
+  const people = document.getElementById("inventoryPersonSuggestions");
+  if (people) {
+    const suggestions = new Set([
+      ...getAllIntegratedPersonnelRecords(getCurrentSummaryYear()).map(getPersonnelName).filter(Boolean),
+      ...getInventoryRecords().map(item => item.user).filter(Boolean)
+    ]);
+    people.innerHTML = Array.from(suggestions).slice(0, 80).map(name => `<option value="${escapeHtml(name)}"></option>`).join("");
+  }
+}
+
+function getInventoryUsageProgress(record) {
+  const start = new Date(record.departTime || "").getTime();
+  const end = new Date(record.returnTime || "").getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return record.status === "Dipakai" ? 50 : 0;
+  return Math.max(0, Math.min(100, Math.round(((Date.now() - start) / (end - start)) * 100)));
+}
+
+function getInventoryStatusLabel(status) {
+  if (status === "Dipakai") return "Sedang Digunakan";
+  return status || "Tersedia";
+}
+
+function formatInventoryDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function toDatetimeLocalValue(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function setInputValue(id, value) {
+  const input = document.getElementById(id);
+  if (input) input.value = value || "";
+}
+
+function getInputValue(id) {
+  return document.getElementById(id)?.value?.trim() || "";
+}
+
+function createInventoryId() {
+  return `inventory-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function loadInventoryCache() {
+  try {
+    const records = JSON.parse(localStorage.getItem(INVENTORY_CACHE_KEY) || "[]");
+    return Array.isArray(records) && records.length ? records : createDefaultInventoryRecords();
+  } catch (error) {
+    return createDefaultInventoryRecords();
+  }
+}
+
+function saveInventoryCache(records) {
+  localStorage.setItem(INVENTORY_CACHE_KEY, JSON.stringify(Array.isArray(records) ? records : []));
+}
+
 function renderDashboardDocuments(summary) {
   setTextContent("dashDocumentTotal", summary.total);
   setTextContent("dashDocumentFinal", `${summary.final} final`);
