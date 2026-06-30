@@ -6217,6 +6217,21 @@ function getFinanceRecordPersonName(record) {
   return getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
 }
 
+function getFinancePphTaxValue(record) {
+  const keys = Object.keys(record || {});
+  const exactKey = keys.find(key => {
+    const normalized = normalizeSearchText(key);
+    return normalized.includes("pajak") && normalized.includes("pph") && normalized.includes("21") && !normalized.includes("tarif");
+  });
+  if (exactKey) return String(record?.[exactKey] || "").trim();
+
+  const fallbackKey = keys.find(key => {
+    const normalized = normalizeSearchText(key);
+    return normalized.includes("pph") && normalized.includes("21") && !normalized.includes("tarif");
+  });
+  return fallbackKey ? String(record?.[fallbackKey] || "").trim() : "";
+}
+
 function getFinanceStatusKey(entry) {
   if (!entry.financeRecords.length) return "waiting";
   if (entry.progress >= 100) return "complete";
@@ -6253,7 +6268,7 @@ function buildFinanceEntries() {
     group.financeRecords.push(record);
     group.totalHarga += parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"]));
     group.netto += parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"]));
-    group.pajak += parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"]));
+    group.pajak += parseFinanceNumber(getFinancePphTaxValue(record));
     group.pemberiKerja ||= getRecordValue(record, ["pemberi kerja", "instansi", "klien", "owner"]);
     group.tanggalMulai ||= getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]);
     group.tanggalSelesai ||= getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"]);
@@ -6523,7 +6538,7 @@ function buildFinanceDetailRowFromRecord(record, fallback = {}) {
     hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
     total: parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"])),
     tarifPajak: getRecordValue(record, ["tarif pajak", "tarif pph 21", "tarif pph", "pph"]),
-    pajak: parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"])),
+    pajak: parseFinanceNumber(getFinancePphTaxValue(record)),
     netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
     keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-",
     hasFinance: true,
