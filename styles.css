@@ -1210,28 +1210,46 @@ input:focus, select:focus, textarea:focus {
   background: #0796a8;
 }
 
-.dashboard-personnel-summary {
-  display: grid;
-  grid-template-columns: 78px 88px minmax(0, 1fr);
+.dashboard-personnel-total,
+.dashboard-assignment-total {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fbff;
 }
 
-.dashboard-personnel-summary span,
+.dashboard-personnel-total span,
+.dashboard-assignment-total span,
 .dashboard-document-total span {
   display: block;
   color: #475569;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
+  line-height: 1.15;
 }
 
-.dashboard-personnel-summary strong,
+.dashboard-personnel-total strong,
+.dashboard-assignment-total strong,
 .dashboard-document-total strong {
   display: block;
-  margin-top: 4px;
   color: #0f172a;
-  font-size: 28px;
+  font-size: 20px;
+  font-weight: 900;
   line-height: 1;
+}
+
+.dashboard-document-total strong { margin-top: 4px; font-size: 28px; }
+
+.dashboard-personnel-summary {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
 }
 
 .dashboard-donut {
@@ -1329,32 +1347,6 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-assignment-tabs button:first-child { border-left: 0; }
 .dashboard-assignment-tabs button.active { background: #2563eb; color: #ffffff; }
-
-.dashboard-assignment-total {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 32px;
-  padding: 6px 10px;
-  border: 1px solid #dbe5f1;
-  border-radius: 8px;
-  background: #f8fbff;
-}
-
-.dashboard-assignment-total span {
-  color: #475569;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.dashboard-assignment-total strong {
-  color: #0f172a;
-  font-size: 20px;
-  font-weight: 900;
-  line-height: 1;
-}
 
 .dashboard-assignment-summary {
   display: grid;
@@ -5361,6 +5353,16 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
     grid-template-columns: 1fr;
   }
 
+  .dashboard-personnel-total,
+  .dashboard-assignment-total {
+    padding: 6px 8px;
+  }
+
+  .dashboard-personnel-total strong,
+  .dashboard-assignment-total strong {
+    font-size: 18px;
+  }
+
   .dashboard-mini-table {
     min-width: 640px;
   }
@@ -6118,6 +6120,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
     gap: 10px;
   }
 
+  .dashboard-personnel-total strong,
   .dashboard-assignment-total strong { font-size: 19px; }
 
   .assignment-donut {
@@ -6130,8 +6133,11 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   .dashboard-assignment-card { padding: 14px; }
   .dashboard-assignment-tabs button { min-height: 28px; font-size: 8.5px; }
   .dashboard-assignment-summary { grid-template-columns: 62px minmax(0, 1fr); gap: 9px; }
+  .dashboard-personnel-total,
   .dashboard-assignment-total { padding: 6px 8px; }
+  .dashboard-personnel-total span,
   .dashboard-assignment-total span { font-size: 10px; }
+  .dashboard-personnel-total strong,
   .dashboard-assignment-total strong { font-size: 18px; }
   .assignment-donut { width: 62px; height: 62px; }
   .dashboard-assignment-table th,

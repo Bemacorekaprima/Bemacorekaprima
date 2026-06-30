@@ -2714,7 +2714,7 @@ function renderDashboardPortfolioHome() {
   renderDashboardDailyTasks();
   renderDashboardTenderRows(activeTenders);
   renderDashboardPersonnelSummary(personnel);
-  renderDashboardAssignmentSummary();
+  renderDashboardAssignmentSummary(personnel.length);
   renderDashboardDocuments(documentSummary);
   renderDashboardReminders(activeTenders);
   renderDashboardPriorityRows(priorityItems);
@@ -2897,9 +2897,9 @@ function handleDashboardAssignmentFilter(event) {
   renderDashboardPortfolioHome();
 }
 
-function renderDashboardAssignmentSummary() {
+function renderDashboardAssignmentSummary(personnelTotal = 0) {
   const records = getDashboardAssignmentRecords();
-  const totalPersonnel = records.length;
+  const totalPersonnel = personnelTotal || getAllIntegratedPersonnelRecords(getCurrentSummaryYear()).length;
   const counts = new Map(DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => [category.key, 0]));
   const rows = [];
 
