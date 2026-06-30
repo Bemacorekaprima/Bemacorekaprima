@@ -1288,10 +1288,22 @@ input:focus, select:focus, textarea:focus {
   gap: 14px;
 }
 
-.dashboard-assignment-header { align-items: center; gap: 10px; }
+.dashboard-assignment-header {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dashboard-assignment-header h3 {
+  flex: 0 1 96px;
+  min-width: 0;
+  line-height: 1.18;
+}
 
 .dashboard-assignment-tabs {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1 1 172px;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid #cfe0f2;
   border-radius: 8px;
@@ -1299,14 +1311,18 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dashboard-assignment-tabs button {
-  min-height: 34px;
-  padding: 0 12px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 4px;
   border: 0;
   border-left: 1px solid #dbe7f4;
   background: transparent;
   color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.05;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .dashboard-assignment-tabs button:first-child { border-left: 0; }
@@ -1314,22 +1330,22 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-assignment-summary {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr);
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
-.assignment-donut { width: 88px; height: 88px; }
+.assignment-donut { width: 78px; height: 78px; }
 
-.dashboard-assignment-summary dl { display: grid; gap: 10px; margin: 0; }
-.dashboard-assignment-summary dl div { display: flex; justify-content: space-between; gap: 12px; }
-.dashboard-assignment-summary dt { display: inline-flex; align-items: center; gap: 7px; color: #334155; font-size: 12px; font-weight: 800; }
-.dashboard-assignment-summary dt span { width: 8px; height: 8px; border-radius: 50%; }
-.dashboard-assignment-summary dd { margin: 0; color: #0f172a; font-size: 12px; font-weight: 900; }
+.dashboard-assignment-summary dl { display: grid; gap: 8px; margin: 0; min-width: 0; }
+.dashboard-assignment-summary dl div { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.dashboard-assignment-summary dt { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: #334155; font-size: 11px; font-weight: 800; }
+.dashboard-assignment-summary dt span { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.dashboard-assignment-summary dd { margin: 0; color: #0f172a; font-size: 11px; font-weight: 900; white-space: nowrap; }
 
-.dashboard-assignment-table-wrap { overflow: auto; border: 1px solid #dbe5f1; border-radius: 8px; }
-.dashboard-assignment-table { width: 100%; min-width: 420px; border-collapse: collapse; }
-.dashboard-assignment-table th, .dashboard-assignment-table td { padding: 10px 12px; border-bottom: 1px solid #e8eef6; text-align: left; font-size: 12px; }
+.dashboard-assignment-table-wrap { overflow: hidden; border: 1px solid #dbe5f1; border-radius: 8px; }
+.dashboard-assignment-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
+.dashboard-assignment-table th, .dashboard-assignment-table td { padding: 8px 10px; border-bottom: 1px solid #e8eef6; text-align: left; font-size: 10.5px; overflow-wrap: anywhere; }
 .dashboard-assignment-table th { background: #f3f7fb; color: #334155; font-weight: 900; }
 .dashboard-assignment-table tr:last-child td { border-bottom: 0; }
 
@@ -6039,3 +6055,15 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 .finance-detail-table .danger-text { color: #b91c1c; }
 #financeRecordFormModal { width: min(1040px, calc(100vw - 28px)); }
 .finance-record-form-card { max-height: calc(100dvh - 28px); }
+
+
+@media (max-width: 420px) {
+  .dashboard-assignment-card { padding: 14px; }
+  .dashboard-assignment-header { display: grid; grid-template-columns: 1fr; }
+  .dashboard-assignment-header h3 { flex-basis: auto; }
+  .dashboard-assignment-tabs { width: 100%; flex-basis: auto; }
+  .dashboard-assignment-summary { grid-template-columns: 70px minmax(0, 1fr); gap: 12px; }
+  .assignment-donut { width: 70px; height: 70px; }
+  .dashboard-assignment-table th,
+  .dashboard-assignment-table td { padding: 7px 9px; font-size: 10px; }
+}
