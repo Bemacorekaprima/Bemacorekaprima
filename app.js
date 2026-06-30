@@ -4872,7 +4872,11 @@ function isComputedPersonnelColumn(column) {
 }
 
 function getEditablePersonnelColumns(records) {
-  return getPersonnelColumns(records).filter(column => !isComputedPersonnelColumn(column));
+  const columns = getPersonnelColumns(records).filter(column => !isComputedPersonnelColumn(column));
+  if (!columns.some(column => normalizeSearchText(column).includes("posisi penugasan"))) {
+    columns.push("POSISI PENUGASAN");
+  }
+  return columns;
 }
 
 function getPersonnelStatusColumn(columns) {
@@ -4891,7 +4895,11 @@ function normalizePersonnelStatusLabel(sourceId) {
 }
 
 function renderPersonnelInput(column, value, required) {
-  const statusColumn = includesAny(normalizeSearchText(column), ["status"]);
+  const normalized = normalizeSearchText(column);
+  if (normalized.includes("posisi penugasan")) {
+    return renderAssignmentMultiSelect(column, value);
+  }
+  const statusColumn = includesAny(normalized, ["status"]);
   if (statusColumn) {
     const selectedSource = normalizePersonnelSourceFromStatus(value, state.personnelSource);
     return `
@@ -4933,12 +4941,14 @@ function openPersonnelForm(record = null) {
     record ? "Edit Personil" : "Tambah Personil";
   document.getElementById("personnelFormSource").textContent = sheet.label;
   document.getElementById("personnelFormRow").value = record?.["_Sumber Baris"] || "";
-  document.getElementById("personnelFormFields").innerHTML = columns.map((column, index) => `
+  const personnelFormFields = document.getElementById("personnelFormFields");
+  personnelFormFields.innerHTML = columns.map((column, index) => `
     <label class="${columns.length % 2 && index === columns.length - 1 ? "full" : ""}">
       <span>${escapeHtml(humanizeFieldName(column))}</span>
       ${renderPersonnelInput(column, record?.[column] || "", index === 0)}
     </label>
   `).join("");
+  bindAssignmentMultiSelects(personnelFormFields);
   document.getElementById("personnelFormModal").showModal();
 }
 
