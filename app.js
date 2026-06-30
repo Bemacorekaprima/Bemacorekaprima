@@ -6096,6 +6096,29 @@ function getFinanceRecordJobName(record) {
   return getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"]);
 }
 
+function getFinanceJobMatchKey(value) {
+  return normalizeSearchText(value)
+    .replace(/^(pekerjaan|project|proyek|paket)\s+/g, "")
+    .replace(/\s+(pekerjaan|project|proyek|paket)$/g, "")
+    .trim();
+}
+
+function getFinanceGroupForJob(grouped, jobName) {
+  const key = getFinanceJobMatchKey(jobName);
+  if (!key) return null;
+  if (grouped.has(key)) return grouped.get(key);
+
+  let best = null;
+  grouped.forEach(group => {
+    if (best) return;
+    const financeKey = group.matchKey || getFinanceJobMatchKey(group.pekerjaan);
+    if (!financeKey) return;
+    const longEnough = key.length >= 18 && financeKey.length >= 18;
+    if (longEnough && (key.includes(financeKey) || financeKey.includes(key))) best = group;
+  });
+  return best;
+}
+
 function getFinanceRecordPersonName(record) {
   return getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
 }
@@ -6120,9 +6143,10 @@ function buildFinanceEntries() {
   const grouped = new Map();
   financeRecords.forEach(record => {
     const jobName = getFinanceRecordJobName(record) || "Pekerjaan tanpa nama";
-    const key = normalizeSearchText(jobName);
+    const key = getFinanceJobMatchKey(jobName);
     const group = grouped.get(key) || {
       key,
+      matchKey: key,
       pekerjaan: jobName,
       financeRecords: [],
       totalHarga: 0,
@@ -6145,8 +6169,8 @@ function buildFinanceEntries() {
   const entries = [];
   const seen = new Set();
   buildJobsFromAllSources().forEach(job => {
-    const key = normalizeSearchText(job.pekerjaan);
-    const finance = grouped.get(key);
+    const key = getFinanceJobMatchKey(job.pekerjaan);
+    const finance = getFinanceGroupForJob(grouped, job.pekerjaan);
     const progress = getPortfolioProgress(job);
     const people = getPortfolioPeople(job);
     entries.push({
@@ -6157,15 +6181,16 @@ function buildFinanceEntries() {
       totalHarga: finance?.totalHarga || 0,
       netto: finance?.netto || 0,
       pajak: finance?.pajak || 0,
-      pemberiKerja: finance?.pemberiKerja || getRecordValue(job.records?.[0] || {}, ["pemberi kerja", "instansi", "klien", "owner"]),
-      tanggalMulai: finance?.tanggalMulai || job.tanggalMulai || "",
-      tanggalSelesai: finance?.tanggalSelesai || job.tanggalSelesai || "",
+      pemberiKerja: getRecordValue(job.records?.[0] || {}, ["pemberi kerja", "instansi", "klien", "owner"]) || finance?.pemberiKerja || "",
+      tanggalMulai: job.tanggalMulai || "",
+      tanggalSelesai: job.tanggalSelesai || "",
       progress,
       status: getPortfolioStatusLabel(job),
       yearLabel: getJobYearLabel(job),
       personil: people,
       source: finance ? "Finance + Portofolio" : "Portofolio"
     });
+    if (finance?.matchKey) seen.add(finance.matchKey);
     seen.add(key);
   });
 
