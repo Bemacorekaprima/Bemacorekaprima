@@ -4896,6 +4896,11 @@ function normalizePersonnelStatusLabel(sourceId) {
 
 function renderPersonnelInput(column, value, required) {
   const normalized = normalizeSearchText(column);
+  const escapedColumn = escapeHtml(column);
+  const escapedValue = escapeHtml(value);
+  if (includesAny(normalized, ["nama personil", "nama lengkap"])) {
+    return `<input name="${escapedColumn}" value="${escapedValue}" list="personnelNameSuggestions" autocomplete="off" placeholder="Pilih atau ketik nama personil" ${required ? "required" : ""}>`;
+  }
   if (normalized.includes("posisi penugasan")) {
     return renderAssignmentMultiSelect(column, value);
   }
@@ -4903,7 +4908,7 @@ function renderPersonnelInput(column, value, required) {
   if (statusColumn) {
     const selectedSource = normalizePersonnelSourceFromStatus(value, state.personnelSource);
     return `
-      <select name="${escapeHtml(column)}" ${required ? "required" : ""}>
+      <select name="${escapedColumn}" ${required ? "required" : ""}>
         <option value="Bemaco" ${selectedSource === "personil-bmc" ? "selected" : ""}>Bemaco</option>
         <option value="Outsourcing" ${selectedSource === "outsourcing" ? "selected" : ""}>Outsourcing</option>
       </select>
@@ -4911,8 +4916,8 @@ function renderPersonnelInput(column, value, required) {
   }
   return `
     <input
-      name="${escapeHtml(column)}"
-      value="${escapeHtml(value)}"
+      name="${escapedColumn}"
+      value="${escapedValue}"
       autocomplete="off"
       ${required ? "required" : ""}
     >
@@ -4942,12 +4947,16 @@ function openPersonnelForm(record = null) {
   document.getElementById("personnelFormSource").textContent = sheet.label;
   document.getElementById("personnelFormRow").value = record?.["_Sumber Baris"] || "";
   const personnelFormFields = document.getElementById("personnelFormFields");
-  personnelFormFields.innerHTML = columns.map((column, index) => `
-    <label class="${columns.length % 2 && index === columns.length - 1 ? "full" : ""}">
-      <span>${escapeHtml(humanizeFieldName(column))}</span>
-      ${renderPersonnelInput(column, record?.[column] || "", index === 0)}
-    </label>
-  `).join("");
+  personnelFormFields.innerHTML = `
+    <datalist id="personnelNameSuggestions"></datalist>
+    ${columns.map((column, index) => `
+      <label class="${columns.length % 2 && index === columns.length - 1 ? "full" : ""}">
+        <span>${escapeHtml(humanizeFieldName(column))}</span>
+        ${renderPersonnelInput(column, record?.[column] || "", index === 0)}
+      </label>
+    `).join("")}
+  `;
+  renderPersonnelNameSuggestions();
   bindAssignmentMultiSelects(personnelFormFields);
   document.getElementById("personnelFormModal").showModal();
 }
