@@ -2928,12 +2928,15 @@ function renderDashboardAssignmentSummary(personnelTotal = 0) {
 
   const legend = document.getElementById("dashAssignmentLegend");
   if (legend) {
-    legend.innerHTML = entries.map(item => `
-      <div>
-        <dt><span style="background:${item.color}"></span>${escapeHtml(item.label)}</dt>
-        <dd>${item.count} ${totalPersonnel ? `(${Math.round((item.count / totalPersonnel) * 100)}%)` : "(0%)"}</dd>
-      </div>
-    `).join("");
+    legend.innerHTML = entries.map(item => {
+      const percent = totalPersonnel ? Math.round((item.count / totalPersonnel) * 100) : 0;
+      return `
+        <div class="assignment-legend-row">
+          <dt><span style="background:${item.color}"></span>${escapeHtml(item.label)}</dt>
+          <dd><strong>${item.count}</strong><small>${percent}% dari total</small></dd>
+        </div>
+      `;
+    }).join("");
   }
 
   const filter = state.dashboardAssignmentFilter || "all";

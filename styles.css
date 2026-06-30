@@ -1361,7 +1361,27 @@ input:focus, select:focus, textarea:focus {
 .dashboard-assignment-summary dl div { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
 .dashboard-assignment-summary dt { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: #334155; font-size: 11px; font-weight: 800; }
 .dashboard-assignment-summary dt span { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
-.dashboard-assignment-summary dd { margin: 0; color: #0f172a; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.dashboard-assignment-summary dd {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+  margin: 0;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.dashboard-assignment-summary dd strong {
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.dashboard-assignment-summary dd small {
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 800;
+}
 
 .dashboard-assignment-table-wrap { overflow: hidden; border: 1px solid #dbe5f1; border-radius: 8px; }
 .dashboard-assignment-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
