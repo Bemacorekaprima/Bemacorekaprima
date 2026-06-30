@@ -6484,3 +6484,299 @@ input:focus, select:focus, textarea:focus {
   .dashboard-main-grid { grid-template-columns: minmax(0, 1fr); }
   .dashboard-side-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* BEMACO royal theme for all menu workspaces */
+.view.active {
+  min-width: 0;
+}
+
+@media (min-width: 761px) {
+  .main > .view.active {
+    width: 100%;
+    max-width: 1720px;
+    margin-inline: auto;
+  }
+}
+
+.section-header,
+.finance-header,
+.finance-detail-header,
+.portfolio-section-heading,
+.tender-detail-header,
+.personnel-heading,
+.reports-hero-header,
+.settings-header {
+  color: #071a44;
+}
+
+.section-header p,
+.finance-header p,
+.finance-detail-header p,
+.portfolio-section-heading p,
+.tender-detail-header p,
+.personnel-heading p,
+.reports-hero p {
+  color: #52657f;
+}
+
+.panel,
+.column,
+.personnel-source-card,
+.portfolio-overview,
+.portfolio-job-card,
+.portfolio-metrics article,
+.portfolio-metrics .portfolio-metric-card,
+.tender-list-panel,
+.tender-detail-panel,
+.finance-panel,
+.finance-detail-panel,
+.finance-kpi-card,
+.finance-detail-kpis article,
+.finance-detail-grid article,
+.finance-mobile-card,
+.settings-card,
+.reports-hero,
+.reports-stat-card,
+.report-preview-block,
+.document-card,
+.google-drive-card,
+.task-card,
+.reminder-card,
+.modal-card,
+.personnel-form-card,
+.finance-record-form-card,
+.tender-form-card,
+.job-detail-card,
+.personnel-history-card {
+  border: 1px solid rgba(196, 211, 232, 0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 255, 0.94));
+  box-shadow: 0 18px 42px rgba(17, 54, 120, 0.1);
+}
+
+.panel:hover,
+.personnel-source-card:hover,
+.portfolio-job-card:hover,
+.finance-kpi-card:hover,
+.reports-stat-card:hover {
+  border-color: rgba(79, 132, 255, 0.45);
+  box-shadow: 0 22px 48px rgba(26, 86, 219, 0.14);
+}
+
+.toolbar,
+.right-toolbar,
+.personnel-heading-actions,
+.portfolio-controls,
+.tender-filter-row,
+.finance-tools,
+.reports-actions,
+.reports-export-actions,
+.settings-toolbar {
+  border-radius: 12px;
+}
+
+.table-wrap,
+.dashboard-table-wrap,
+.personnel-table-wrap,
+.finance-table-wrap,
+.finance-detail-table-wrap,
+.tender-table-wrap,
+.tender-checklist-wrap,
+.dashboard-summary-table-wrap,
+.job-detail-table-surface {
+  border: 1px solid #d8e4f4;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+table,
+.personnel-table,
+.jobs-table,
+.finance-table,
+.finance-detail-table,
+.tender-table,
+.tender-checklist-table,
+.dashboard-summary-table,
+.job-detail-wide-table {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+th,
+.personnel-table th,
+.jobs-table th,
+.finance-table th,
+.finance-detail-table th,
+.tender-table th,
+.tender-checklist-table th,
+.dashboard-summary-table th,
+.job-detail-wide-table th {
+  background: linear-gradient(180deg, #eef5ff, #e7f0ff);
+  color: #12366d;
+  font-weight: 900;
+}
+
+td,
+.personnel-table td,
+.jobs-table td,
+.finance-table td,
+.finance-detail-table td,
+.tender-table td,
+.tender-checklist-table td,
+.dashboard-summary-table td,
+.job-detail-wide-table td {
+  border-bottom-color: #e1ebf8;
+}
+
+tbody tr:hover td,
+.tender-table tr.selected td {
+  background: #f7fbff;
+}
+
+.tender-table tr.selected {
+  box-shadow: inset 4px 0 #1557e6;
+}
+
+.portfolio-overview {
+  border-color: rgba(37, 99, 235, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.94)),
+    radial-gradient(circle at 96% 0%, rgba(99, 102, 241, 0.12), transparent 32%);
+}
+
+.portfolio-metrics article,
+.portfolio-metrics .portfolio-metric-card,
+.finance-kpi-card,
+.reports-stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-metrics article::before,
+.portfolio-metrics .portfolio-metric-card::before,
+.finance-kpi-card::before,
+.reports-stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #0f5bff, #7c3aed);
+}
+
+.finance-kpi-card.green::before,
+.reports-stat-card.green::before {
+  background: linear-gradient(180deg, #16a34a, #22c55e);
+}
+
+.finance-kpi-card.amber::before {
+  background: linear-gradient(180deg, #f59e0b, #fb7185);
+}
+
+.finance-kpi-card.blue::before,
+.reports-stat-card.blue::before {
+  background: linear-gradient(180deg, #0f5bff, #38bdf8);
+}
+
+.reports-stat-card.purple::before {
+  background: linear-gradient(180deg, #7c3aed, #ec4899);
+}
+
+.tender-status-badge,
+.finance-status,
+.priority-badge,
+.status-badge,
+.work-status-badge,
+.access-role-badge,
+.tender-personnel-member-source {
+  border: 1px solid rgba(178, 197, 224, 0.75);
+  box-shadow: 0 6px 14px rgba(21, 87, 230, 0.08);
+  font-weight: 900;
+}
+
+.primary-button,
+button.primary-button,
+.dashboard-create-task-button {
+  background: linear-gradient(135deg, #0f5bff, #073bc6);
+  box-shadow: 0 14px 28px rgba(15, 91, 255, 0.22);
+}
+
+.secondary-button,
+.text-button,
+.dashboard-card-footer-button,
+.reports-template-list button {
+  border-color: #d5e2f5;
+  background: linear-gradient(180deg, #ffffff, #f5f9ff);
+  color: #0d3f9e;
+}
+
+.secondary-button:hover,
+.text-button:hover,
+.dashboard-card-footer-button:hover,
+.reports-template-list button:hover {
+  border-color: #9fbbf5;
+  background: #eef5ff;
+  color: #0637b8;
+}
+
+input,
+select,
+textarea {
+  background-color: rgba(255, 255, 255, 0.96);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.tender-template-preview:focus {
+  border-color: #0f5bff;
+  box-shadow: 0 0 0 3px rgba(15, 91, 255, 0.14);
+}
+
+dialog,
+.modal-card,
+.personnel-form-card,
+.finance-record-form-card,
+.tender-form-card,
+.job-detail-card,
+.personnel-history-card {
+  border-radius: 18px;
+}
+
+dialog::backdrop {
+  background: rgba(7, 26, 68, 0.46);
+  backdrop-filter: blur(4px);
+}
+
+.profile-popover {
+  max-width: min(320px, calc(100vw - 28px));
+}
+
+.profile-popover,
+.tools-menu,
+.personnel-tools-menu,
+.finance-tools-menu {
+  border-color: rgba(196, 211, 232, 0.95);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 42px rgba(7, 26, 68, 0.18);
+}
+
+@media (max-width: 760px) {
+  .main > .view.active {
+    width: 100%;
+  }
+
+  .panel,
+  .portfolio-overview,
+  .portfolio-job-card,
+  .finance-kpi-card,
+  .finance-mobile-card,
+  .reports-stat-card {
+    border-radius: 12px;
+  }
+
+  .profile-popover {
+    left: auto;
+    right: 12px;
+    bottom: auto;
+    top: 76px;
+  }
+}
