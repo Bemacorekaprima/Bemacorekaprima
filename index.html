@@ -360,6 +360,28 @@
                 <button class="dashboard-card-footer-button" type="button" data-dashboard-open="personnel">Kelola Personil</button>
               </article>
 
+              <article class="dashboard-card dashboard-assignment-card">
+                <header class="dashboard-card-header dashboard-assignment-header">
+                  <h3><i data-lucide="users-round" aria-hidden="true"></i> Posisi Penugasan</h3>
+                  <div class="dashboard-assignment-tabs" id="dashAssignmentTabs" aria-label="Filter posisi penugasan">
+                    <button class="active" type="button" data-dashboard-assignment-filter="all">Semua</button>
+                    <button type="button" data-dashboard-assignment-filter="ho">HO</button>
+                    <button type="button" data-dashboard-assignment-filter="on-site">On Site</button>
+                    <button type="button" data-dashboard-assignment-filter="intermitten">Intermitten</button>
+                  </div>
+                </header>
+                <div class="dashboard-assignment-summary">
+                  <div id="dashAssignmentRing" class="dashboard-donut assignment-donut" aria-hidden="true"></div>
+                  <dl id="dashAssignmentLegend"></dl>
+                </div>
+                <div class="dashboard-assignment-table-wrap">
+                  <table class="dashboard-assignment-table">
+                    <thead><tr><th>Personil</th><th>Posisi Penugasan</th></tr></thead>
+                    <tbody id="dashAssignmentRows"></tbody>
+                  </table>
+                </div>
+              </article>
+
               <article class="dashboard-card">
                 <header class="dashboard-card-header">
                   <h3><i data-lucide="file-text" aria-hidden="true"></i> Dokumen</h3>

@@ -289,7 +289,8 @@ let state = {
   dashboardInactivePersonnelRecords: [],
   selectedTenderId: "",
   tenderSearch: "",
-  tenderStatusFilter: "all"
+  tenderStatusFilter: "all",
+  dashboardAssignmentFilter: "all"
 };
 
 const statusToList = {
@@ -403,6 +404,7 @@ function bindControls() {
   document.getElementById("dashboardPortfolioSummary").addEventListener("click", handlePortfolioSummaryClick);
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
   document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
+  document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
@@ -2712,6 +2714,7 @@ function renderDashboardPortfolioHome() {
   renderDashboardDailyTasks();
   renderDashboardTenderRows(activeTenders);
   renderDashboardPersonnelSummary(personnel);
+  renderDashboardAssignmentSummary(personnel);
   renderDashboardDocuments(documentSummary);
   renderDashboardReminders(activeTenders);
   renderDashboardPriorityRows(priorityItems);
@@ -2848,6 +2851,85 @@ function renderDashboardPersonnelSummary(personnel) {
   }
 }
 
+const DASHBOARD_ASSIGNMENT_CATEGORIES = [
+  { key: "ho", label: "HO", color: "#2563eb", tokens: ["ho", "head office"] },
+  { key: "on-site", label: "On Site", color: "#22c55e", tokens: ["on site", "onsite", "site", "lapangan"] },
+  { key: "intermitten", label: "Intermitten", color: "#f59e0b", tokens: ["intermitten", "intermittent", "intermitent"] }
+];
+
+function getPersonnelAssignmentRaw(record) {
+  return getRecordValue(record, ["posisi penugasan", "penugasan", "assignment"]);
+}
+
+function getPersonnelAssignmentCategories(record) {
+  const raw = normalizeSearchText(getPersonnelAssignmentRaw(record));
+  if (!raw) return [];
+  return DASHBOARD_ASSIGNMENT_CATEGORIES.filter(category =>
+    category.tokens.some(token => raw.includes(token))
+  );
+}
+
+function handleDashboardAssignmentFilter(event) {
+  const button = event.target.closest("[data-dashboard-assignment-filter]");
+  if (!button) return;
+  state.dashboardAssignmentFilter = button.dataset.dashboardAssignmentFilter || "all";
+  renderDashboardPortfolioHome();
+}
+
+function renderDashboardAssignmentSummary(personnel) {
+  const totalPersonnel = personnel.length;
+  const counts = new Map(DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => [category.key, 0]));
+  const rows = [];
+
+  personnel.forEach(record => {
+    const categories = getPersonnelAssignmentCategories(record);
+    if (!categories.length) return;
+    categories.forEach(category => counts.set(category.key, (counts.get(category.key) || 0) + 1));
+    rows.push({ record, categories });
+  });
+
+  const entries = DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => ({
+    ...category,
+    count: counts.get(category.key) || 0
+  }));
+  const assignmentTotal = entries.reduce((sum, item) => sum + item.count, 0);
+  let cursor = 0;
+  const stops = entries.map(item => {
+    const start = cursor;
+    cursor += assignmentTotal ? (item.count / assignmentTotal) * 100 : 0;
+    return `${item.color} ${start}% ${cursor}%`;
+  }).join(", ");
+
+  const ring = document.getElementById("dashAssignmentRing");
+  if (ring) ring.style.background = assignmentTotal ? `conic-gradient(${stops})` : "#e5e7eb";
+
+  const legend = document.getElementById("dashAssignmentLegend");
+  if (legend) {
+    legend.innerHTML = entries.map(item => `
+      <div>
+        <dt><span style="background:${item.color}"></span>${escapeHtml(item.label)}</dt>
+        <dd>${item.count} ${totalPersonnel ? `(${Math.round((item.count / totalPersonnel) * 100)}%)` : "(0%)"}</dd>
+      </div>
+    `).join("");
+  }
+
+  const filter = state.dashboardAssignmentFilter || "all";
+  document.querySelectorAll("[data-dashboard-assignment-filter]").forEach(button => {
+    button.classList.toggle("active", button.dataset.dashboardAssignmentFilter === filter);
+  });
+
+  const body = document.getElementById("dashAssignmentRows");
+  if (!body) return;
+  const filteredRows = rows
+    .filter(row => filter === "all" || row.categories.some(category => category.key === filter))
+    .slice(0, 5);
+  body.innerHTML = filteredRows.length ? filteredRows.map(row => `
+    <tr>
+      <td>${escapeHtml(getPersonnelName(row.record) || "-")}</td>
+      <td>${row.categories.map(category => `<span class="assignment-badge ${category.key}">${escapeHtml(category.label)}</span>`).join("")}</td>
+    </tr>
+  `).join("") : '<tr><td colspan="2" class="dashboard-empty">Belum ada data posisi penugasan.</td></tr>';
+}
 function renderDashboardDocuments(summary) {
   setTextContent("dashDocumentTotal", summary.total);
   setTextContent("dashDocumentFinal", `${summary.final} final`);
