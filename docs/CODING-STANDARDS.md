@@ -1,4 +1,4 @@
-﻿# Standar Coding Dashboard
+# Standar Coding Dashboard
 
 Dokumen ini menjadi pegangan teknis untuk update berikutnya pada web Dashboard.
 
@@ -38,3 +38,13 @@ Saat audit, `app.js`, `styles.css`, dan `index.html` masih besar. Ini masih aman
 - Pisahkan renderer per halaman: Dashboard, Portfolio, Tender, Personil, Tugas, Pengaturan.
 - Setelah modul stabil, baru kecilkan `app.js` utama menjadi router dan pengikat event.
 
+
+## Struktur CSS
+
+Gunakan pemisahan bertahap agar file mudah dirawat:
+
+- `styles.css`: base style, layout dasar, komponen lama yang masih menjadi fondasi aplikasi.
+- `theme.css`: tema visual, warna, gradasi, polish dashboard, dan override lintas halaman. File ini diload setelah `styles.css`, sehingga perubahan tema tidak perlu mengubah base style.
+- Jika nanti bertambah besar, pecah lagi berdasarkan domain: `base.css`, `layout.css`, `components.css`, `pages/dashboard.css`, dan `pages/finance.css`.
+
+Prinsipnya: perubahan data dan sinkronisasi tetap di `app.js`; perubahan tampilan cukup di file CSS tema selama tidak membutuhkan markup baru.

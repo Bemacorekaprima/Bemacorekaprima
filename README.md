@@ -1,4 +1,4 @@
-﻿# Asisten Harian Web Gratis
+# Asisten Harian Web Gratis
 
 Paket ini adalah versi web full gratis dengan:
 
@@ -14,7 +14,8 @@ Paket ini adalah versi web full gratis dengan:
 asisten-harian-web-gratis/
   web/
     index.html
-    styles.css
+    styles.css        # base/layout utama
+    theme.css         # tema visual dan polish dashboard
     app.js
     firebase-config.example.js
     firestore.rules
@@ -30,11 +31,11 @@ asisten-harian-web-gratis/
 
 ```text
 Browser user
-  â†“
+  ↓
 GitHub Pages
-  â†“
+  ↓
 Firebase Authentication + Firestore
-  â†“
+  ↓
 Opsional: Apps Script Email Bridge
 ```
 
