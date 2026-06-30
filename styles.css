@@ -6433,3 +6433,54 @@ input:focus, select:focus, textarea:focus {
   .sidebar-brand-logo { width: min(42vw, 150px); height: 42px; }
   .profile-popover { position: fixed; top: 64px; right: 12px; left: auto; bottom: auto; }
 }
+/* BEMACO royal theme layout correction */
+@media (min-width: 761px) {
+  .app-shell {
+    grid-template-columns: 258px minmax(0, 1fr);
+    width: 100vw;
+    overflow: hidden;
+  }
+  .main {
+    width: 100% !important;
+    min-width: 0;
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    padding: 0 34px 34px;
+  }
+  .topbar {
+    margin: 0 -34px 26px;
+    padding: 20px 34px;
+  }
+  #dashboardView {
+    width: 100%;
+    max-width: 1720px;
+    margin: 0 auto;
+  }
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(6, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  .dashboard-main-grid {
+    grid-template-columns: minmax(680px, 1fr) minmax(360px, 0.48fr);
+    gap: 18px;
+  }
+  .dashboard-primary-stack,
+  .dashboard-side-stack { gap: 18px; }
+  .dashboard-card { padding: 18px; }
+  .dashboard-tender-card > header,
+  .dashboard-priority-card > header {
+    margin: -18px -18px 14px;
+    padding: 16px 18px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dashboard-kpi-grid { grid-template-columns: repeat(6, minmax(170px, 1fr)); }
+  .dashboard-main-grid { grid-template-columns: minmax(760px, 1fr) minmax(400px, 0.48fr); }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .dashboard-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dashboard-main-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-side-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
