@@ -2508,7 +2508,7 @@ function getPortfolioProgress(job) {
   return 60;
 }
 
-function getPortfolioPeople(job) {
+function getPortfolioPeople(job, limit = 4) {
   const names = [];
   const seen = new Set();
   (job.records || []).forEach(record => {
@@ -2518,7 +2518,7 @@ function getPortfolioPeople(job) {
     seen.add(key);
     names.push(name);
   });
-  return names.slice(0, 4);
+  return names.slice(0, limit);
 }
 
 function getPortfolioCardPriority(job) {
@@ -6266,7 +6266,7 @@ function buildFinanceEntries() {
     const key = getFinanceJobMatchKey(job.pekerjaan);
     const finance = getFinanceGroupForJob(grouped, job.pekerjaan);
     const progress = getPortfolioProgress(job);
-    const people = getPortfolioPeople(job);
+    const people = getPortfolioPeople(job, Infinity);
     entries.push({
       key,
       pekerjaan: job.pekerjaan,
@@ -6464,18 +6464,18 @@ function renderFinanceDetail(entry) {
       <h3>Personil dan Nilai</h3>
       <div class="table-wrap finance-detail-table-wrap">
         <table class="finance-detail-table">
-          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Pajak</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Tarif PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
           <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => `
             <tr>
               <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
               <td data-label="Uraian/Jabatan">${escapeHtml(row.uraian)}</td>
               <td data-label="Bulan">${escapeHtml(row.bulan)}</td>
-              <td data-label="Harga Satuan">${formatFinanceMoney(row.hargaSatuan)}</td>
-              <td data-label="Total">${formatFinanceMoney(row.total)}</td>
-              <td data-label="Pajak">${formatFinanceMoney(row.pajak)}</td>
-              <td data-label="Netto">${formatFinanceMoney(row.netto)}</td>
+              <td data-label="Harga Satuan">${row.hasFinance ? formatFinanceMoney(row.hargaSatuan) : "-"}</td>
+              <td data-label="Total">${row.hasFinance ? formatFinanceMoney(row.total) : "-"}</td>
+              <td data-label="Tarif PPH 21">${escapeHtml(row.tarifPajak || "-")}</td>
+              <td data-label="Netto">${row.hasFinance ? formatFinanceMoney(row.netto) : "-"}</td>
               <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
-              <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : "-"}</td>
+              <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : `<button class="text-button" type="button" data-finance-record-action="complete" data-finance-record-index="${rowIndex}">Edit</button>`}</td>
             </tr>
           `).join("") : '<tr><td class="personnel-empty" colspan="9">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
         </table>
@@ -6484,30 +6484,109 @@ function renderFinanceDetail(entry) {
   `;
 }
 
-function buildFinanceDetailPersonnel(entry) {
-  if (entry.financeRecords.length) {
-    return entry.financeRecords.map(record => ({
-      nama: getFinanceRecordPersonName(record) || "Tanpa nama",
-      uraian: getRecordValue(record, ["uraian", "jabatan", "posisi"]) || "-",
+function getFinanceRecordKey(record) {
+  const name = getFinanceRecordPersonName(record);
+  return canonicalPersonnelName(name) || normalizeSearchText(name);
+}
+
+function getPortfolioFinancePersonRows(entry) {
+  const records = entry?.job?.records || [];
+  const rows = [];
+  const seen = new Set();
+  records.forEach(record => {
+    const nama = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
+    const key = canonicalPersonnelName(nama) || normalizeSearchText(nama);
+    if (!nama || seen.has(key)) return;
+    seen.add(key);
+    rows.push({
+      key,
+      nama,
+      uraian: getRecordValue(record, [
+        "uraian",
+        "jabatan",
+        "posisi",
+        "posisi/jabatan (kontrak)",
+        "posisi/jabatan"
+      ]) || "Terhubung dari Portofolio/Personil",
       bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || "-",
-      hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
-      total: parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"])),
-      pajak: parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"])),
-      netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
-      keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-",
       record
+    });
+  });
+  return rows;
+}
+
+function buildFinanceDetailRowFromRecord(record, fallback = {}) {
+  return {
+    nama: getFinanceRecordPersonName(record) || fallback.nama || "Tanpa nama",
+    uraian: getRecordValue(record, ["uraian", "jabatan", "posisi"]) || fallback.uraian || "-",
+    bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || fallback.bulan || "-",
+    hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
+    total: parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"])),
+    tarifPajak: getRecordValue(record, ["tarif pajak", "tarif pph 21", "tarif pph", "pph"]),
+    pajak: parseFinanceNumber(getRecordValue(record, ["pajak pph 21", "pph 21", "pajak"])),
+    netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
+    keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-",
+    hasFinance: true,
+    record
+  };
+}
+
+function buildFinanceDetailPersonnel(entry) {
+  const financeByName = new Map();
+  (entry.financeRecords || []).forEach(record => {
+    const key = getFinanceRecordKey(record);
+    if (key && !financeByName.has(key)) financeByName.set(key, record);
+  });
+
+  const rows = [];
+  const usedFinanceKeys = new Set();
+  getPortfolioFinancePersonRows(entry).forEach(person => {
+    const financeRecord = financeByName.get(person.key);
+    if (financeRecord) {
+      rows.push(buildFinanceDetailRowFromRecord(financeRecord, person));
+      usedFinanceKeys.add(person.key);
+      return;
+    }
+    rows.push({
+      nama: person.nama,
+      uraian: person.uraian,
+      bulan: person.bulan,
+      hargaSatuan: 0,
+      total: 0,
+      tarifPajak: "",
+      pajak: 0,
+      netto: 0,
+      keterangan: "Menunggu rincian Sheet Finance",
+      hasFinance: false,
+      record: null,
+      seed: person
+    });
+  });
+
+  (entry.financeRecords || []).forEach(record => {
+    const key = getFinanceRecordKey(record);
+    if (key && usedFinanceKeys.has(key)) return;
+    rows.push(buildFinanceDetailRowFromRecord(record));
+  });
+
+  if (!rows.length) {
+    return (entry.personil || []).map(name => ({
+      nama: name,
+      uraian: "Terhubung dari Portofolio/Personil",
+      bulan: "-",
+      hargaSatuan: 0,
+      total: 0,
+      tarifPajak: "",
+      pajak: 0,
+      netto: 0,
+      keterangan: "Menunggu rincian Sheet Finance",
+      hasFinance: false,
+      record: null,
+      seed: { nama: name, uraian: "Terhubung dari Portofolio/Personil", bulan: "-" }
     }));
   }
-  return (entry.personil || []).map(name => ({
-    nama: name,
-    uraian: "Terhubung dari Portofolio/Personil",
-    bulan: "-",
-    hargaSatuan: 0,
-    total: 0,
-    pajak: 0,
-    netto: 0,
-    keterangan: "Menunggu rincian Sheet Finance"
-  }));
+
+  return rows;
 }
 
 function resetFinanceFilters() {
@@ -6564,13 +6643,26 @@ function renderFinanceInput(column, value, required) {
   return '<input name="' + escapeHtml(column) + '" value="' + escapeHtml(value) + '" autocomplete="off" ' + (required ? 'required' : '') + '>';
 }
 
-function openFinanceRecordForm(record = null, entry = null) {
+function setFinanceSeedValue(target, columns, keywords, value) {
+  if (!value) return;
+  const column = columns.find(item => includesAny(normalizeSearchText(item), keywords));
+  if (column && !target[column]) target[column] = value;
+}
+
+function applyFinanceSeedToRecord(target, columns, seed) {
+  setFinanceSeedValue(target, columns, ["nama"], seed.nama);
+  setFinanceSeedValue(target, columns, ["uraian", "jabatan", "posisi"], seed.uraian);
+  setFinanceSeedValue(target, columns, ["jumlah bulan", "bulan", "durasi kontrak"], seed.bulan);
+}
+
+function openFinanceRecordForm(record = null, entry = null, seed = null) {
   if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
   const sheet = getFinanceSheet();
   const columns = getFinanceEditableColumns(sheet?.records || []);
   const jobColumn = columns.find(column => includesAny(normalizeSearchText(column), ["pekerjaan", "nama pekerjaan", "project", "proyek"])) || columns[0];
   const initialRecord = { ...(record || {}) };
   if (!record && entry?.pekerjaan && jobColumn) initialRecord[jobColumn] = entry.pekerjaan;
+  if (!record && seed) applyFinanceSeedToRecord(initialRecord, columns, seed);
   document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Rincian Finance" : "Tambah Rincian Finance";
   document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || record?.[jobColumn] || "Sheet Finance";
   document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
@@ -6630,8 +6722,14 @@ function handleFinanceDetailAction(event) {
   const button = event.target.closest("[data-finance-record-action]");
   if (!button) return;
   const entry = getCurrentFinanceEntry();
-  const record = entry?.financeRecords?.[Number(button.dataset.financeRecordIndex)];
-  if (!entry || !record) return notify("Rincian Finance tidak ditemukan.");
+  if (!entry) return notify("Rincian Finance tidak ditemukan.");
+  const row = buildFinanceDetailPersonnel(entry)[Number(button.dataset.financeRecordIndex)];
+  const record = row?.record;
+  if (button.dataset.financeRecordAction === "complete") {
+    openFinanceRecordForm(null, entry, row?.seed || row);
+    return;
+  }
+  if (!record) return notify("Rincian Finance tidak ditemukan.");
   if (button.dataset.financeRecordAction === "edit") openFinanceRecordForm(record, entry);
   if (button.dataset.financeRecordAction === "delete") deleteFinanceRecord(record, entry);
 }
