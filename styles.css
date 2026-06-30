@@ -3843,6 +3843,80 @@ td small { display: block; margin-top: 4px; color: var(--muted); }
   width: 100%;
 }
 
+.job-record-form-footer {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.job-record-form-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.assignment-multiselect {
+  display: grid;
+  gap: 8px;
+}
+
+.assignment-selected {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.assignment-placeholder {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.assignment-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.assignment-option {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #334155 !important;
+  font-size: 12px;
+  font-weight: 900 !important;
+}
+
+.assignment-option input {
+  width: auto;
+  min-width: 0;
+}
+
+.assignment-option.ho { border-color: #bfdbfe; background: #eff6ff; }
+.assignment-option.on-site { border-color: #bbf7d0; background: #f0fdf4; }
+.assignment-option.intermitten { border-color: #fed7aa; background: #fff7ed; }
+
+@media (max-width: 640px) {
+  .job-record-form-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .assignment-options { grid-template-columns: 1fr; }
+}
+
 #jobRecordFormModal .job-record-form-card > footer {
   position: sticky;
   bottom: 0;

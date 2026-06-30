@@ -1373,10 +1373,12 @@
       <input id="jobRecordRowNumber" type="hidden">
       <div id="jobRecordFormFields" class="job-record-form-fields"></div>
       <p class="personnel-form-note">Kolom formula spreadsheet tidak ditimpa. Isi minimal nama pekerjaan dan data personil yang diperlukan.</p>
-      <footer>
+      <footer class="job-record-form-footer">
         <span id="jobRecordFormStatus" class="config-status"></span>
-        <button type="button" class="secondary-button" id="cancelJobRecordFormButton">Batal</button>
-        <button class="primary-button" id="saveJobRecordButton" type="submit">Simpan ke Spreadsheet</button>
+        <div class="job-record-form-actions">
+          <button type="button" class="secondary-button" id="cancelJobRecordFormButton">Batal</button>
+          <button class="primary-button" id="saveJobRecordButton" type="submit">Simpan ke Spreadsheet</button>
+        </div>
       </footer>
     </form>
   </dialog>

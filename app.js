@@ -2714,7 +2714,7 @@ function renderDashboardPortfolioHome() {
   renderDashboardDailyTasks();
   renderDashboardTenderRows(activeTenders);
   renderDashboardPersonnelSummary(personnel);
-  renderDashboardAssignmentSummary(personnel);
+  renderDashboardAssignmentSummary();
   renderDashboardDocuments(documentSummary);
   renderDashboardReminders(activeTenders);
   renderDashboardPriorityRows(priorityItems);
@@ -2862,11 +2862,32 @@ function getPersonnelAssignmentRaw(record) {
 }
 
 function getPersonnelAssignmentCategories(record) {
+  const status = normalizeSearchText(getRecordValue(record, ["status pekerjaan", "status"]));
+  const isFinish = status.includes("finish") || status.includes("selesai");
+  const isFinishOvertime = isFinish && status.includes("overtime");
+  if (isFinish && !isFinishOvertime) {
+    return DASHBOARD_ASSIGNMENT_CATEGORIES.filter(category => category.key === "ho");
+  }
+
   const raw = normalizeSearchText(getPersonnelAssignmentRaw(record));
   if (!raw) return [];
   return DASHBOARD_ASSIGNMENT_CATEGORIES.filter(category =>
     category.tokens.some(token => raw.includes(token))
   );
+}
+
+function getDashboardAssignmentRecords() {
+  const sheet = getDataUtamaSheet();
+  if (!sheet || sheet.status !== "ready") return [];
+  const seen = new Set();
+  return sheet.records.filter(record => {
+    const name = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
+    const job = getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"]);
+    const key = [canonicalPersonnelName(name) || normalizeSearchText(name), normalizeSearchText(job)].join("|");
+    if (!name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function handleDashboardAssignmentFilter(event) {
@@ -2876,12 +2897,13 @@ function handleDashboardAssignmentFilter(event) {
   renderDashboardPortfolioHome();
 }
 
-function renderDashboardAssignmentSummary(personnel) {
-  const totalPersonnel = personnel.length;
+function renderDashboardAssignmentSummary() {
+  const records = getDashboardAssignmentRecords();
+  const totalPersonnel = records.length;
   const counts = new Map(DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => [category.key, 0]));
   const rows = [];
 
-  personnel.forEach(record => {
+  records.forEach(record => {
     const categories = getPersonnelAssignmentCategories(record);
     if (!categories.length) return;
     categories.forEach(category => counts.set(category.key, (counts.get(category.key) || 0) + 1));
@@ -3632,11 +3654,62 @@ function getEditableJobColumns(records) {
   );
 }
 
+function parseAssignmentSelectionValue(value) {
+  const raw = normalizeSearchText(value);
+  if (!raw) return [];
+  return DASHBOARD_ASSIGNMENT_CATEGORIES.filter(category =>
+    category.tokens.some(token => raw.includes(token))
+  ).map(category => category.label);
+}
+
+function getAssignmentBadgeKey(value) {
+  return DASHBOARD_ASSIGNMENT_CATEGORIES.find(category => category.label === value)?.key || "";
+}
+
+function renderAssignmentMultiSelect(column, value) {
+  const selected = new Set(parseAssignmentSelectionValue(value));
+  const name = escapeHtml(column);
+  const options = DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => {
+    const checked = selected.has(category.label) ? "checked" : "";
+    return `<label class="assignment-option ${category.key}"><input type="checkbox" value="${escapeHtml(category.label)}" ${checked}> <span>${escapeHtml(category.label)}</span></label>`;
+  }).join("");
+  return `
+    <div class="assignment-multiselect" data-assignment-field>
+      <input type="hidden" name="${name}" value="${escapeHtml(Array.from(selected).join(", "))}">
+      <div class="assignment-selected" data-assignment-selected></div>
+      <div class="assignment-options">${options}</div>
+    </div>
+  `;
+}
+
+function updateAssignmentMultiSelect(field) {
+  const hidden = field.querySelector('input[type="hidden"]');
+  const selected = [...field.querySelectorAll('.assignment-options input:checked')].map(input => input.value);
+  if (hidden) hidden.value = selected.join(", ");
+  const display = field.querySelector("[data-assignment-selected]");
+  if (!display) return;
+  display.innerHTML = selected.length
+    ? selected.map(value => `<span class="assignment-badge ${getAssignmentBadgeKey(value)}">${escapeHtml(value)}</span>`).join("")
+    : '<span class="assignment-placeholder">Pilih posisi penugasan</span>';
+}
+
+function bindAssignmentMultiSelects(root = document) {
+  root.querySelectorAll("[data-assignment-field]").forEach(field => {
+    updateAssignmentMultiSelect(field);
+    field.querySelectorAll('.assignment-options input[type="checkbox"]').forEach(input => {
+      input.addEventListener("change", () => updateAssignmentMultiSelect(field));
+    });
+  });
+}
+
 function renderJobRecordInput(column, value) {
   const normalized = normalizeSearchText(column);
   const escapedValue = escapeHtml(value);
   if (includesAny(normalized, ["nama personil", "nama lengkap"])) {
     return `<input name="${escapeHtml(column)}" value="${escapedValue}" list="personnelNameSuggestions" autocomplete="off" placeholder="Ketik nama personil dari Bemaco atau Outsourcing">`;
+  }
+  if (normalized.includes("posisi penugasan")) {
+    return renderAssignmentMultiSelect(column, value);
   }
   if (normalized === "keterlibatan") {
     return `
@@ -3969,7 +4042,9 @@ function openJobRecordForm(record = null, job = null) {
     `).join("")}
   `;
   renderPersonnelNameSuggestions();
-  document.getElementById("jobRecordFormFields")
+  const jobRecordFields = document.getElementById("jobRecordFormFields");
+  bindAssignmentMultiSelects(jobRecordFields);
+  jobRecordFields
     .querySelector(`[name="${CSS.escape(jobColumn)}"]`)
     ?.setAttribute("required", "");
   document.getElementById("jobRecordFormModal").showModal();
