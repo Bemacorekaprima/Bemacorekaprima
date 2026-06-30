@@ -3668,18 +3668,20 @@ function getAssignmentBadgeKey(value) {
 }
 
 function renderAssignmentMultiSelect(column, value) {
-  const selected = new Set(parseAssignmentSelectionValue(value));
-  const name = escapeHtml(column);
-  const options = DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => {
-    const checked = selected.has(category.label) ? "checked" : "";
-    return `<label class="assignment-option ${category.key}"><input type="checkbox" value="${escapeHtml(category.label)}" ${checked}> <span>${escapeHtml(category.label)}</span></label>`;
-  }).join("");
+  const selected = parseAssignmentSelectionValue(value);
+  const displayValue = selected[0] || value || "";
+  const listId = `assignmentPositionOptions-${normalizeSearchText(column).replace(/[^a-z0-9]+/g, "-") || "default"}`;
   return `
-    <div class="assignment-multiselect" data-assignment-field>
-      <input type="hidden" name="${name}" value="${escapeHtml(Array.from(selected).join(", "))}">
-      <div class="assignment-selected" data-assignment-selected></div>
-      <div class="assignment-options">${options}</div>
-    </div>
+    <input
+      name="${escapeHtml(column)}"
+      value="${escapeHtml(displayValue)}"
+      list="${escapeHtml(listId)}"
+      autocomplete="off"
+      placeholder="Pilih posisi penugasan"
+    >
+    <datalist id="${escapeHtml(listId)}">
+      ${DASHBOARD_ASSIGNMENT_CATEGORIES.map(category => `<option value="${escapeHtml(category.label)}"></option>`).join("")}
+    </datalist>
   `;
 }
 
