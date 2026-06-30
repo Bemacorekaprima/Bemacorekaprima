@@ -3924,28 +3924,61 @@ td small { display: block; margin-top: 4px; color: var(--muted); }
 }
 
 .assignment-option {
+  position: relative;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid #dbe5f1;
   border-radius: 8px;
   background: #f8fbff;
   color: #334155 !important;
   font-size: 12px;
   font-weight: 900 !important;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, color 140ms ease;
 }
 
 .assignment-option input {
-  width: auto;
-  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #64748b;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
-.assignment-option.ho { border-color: #bfdbfe; background: #eff6ff; }
-.assignment-option.on-site { border-color: #bbf7d0; background: #f0fdf4; }
-.assignment-option.intermitten { border-color: #fed7aa; background: #fff7ed; }
+.assignment-option input::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  opacity: 0;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.assignment-option input:checked::after { opacity: 1; }
+.assignment-option:hover { box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08); }
+.assignment-option:has(input:focus-visible) { outline: 2px solid rgba(37, 99, 235, 0.28); outline-offset: 2px; }
+
+.assignment-option.ho { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8 !important; }
+.assignment-option.on-site { border-color: #bbf7d0; background: #f0fdf4; color: #15803d !important; }
+.assignment-option.intermitten { border-color: #fed7aa; background: #fff7ed; color: #c2410c !important; }
+.assignment-option.ho input:checked { border-color: #2563eb; background: #2563eb; color: #2563eb; }
+.assignment-option.on-site input:checked { border-color: #22c55e; background: #22c55e; color: #22c55e; }
+.assignment-option.intermitten input:checked { border-color: #f59e0b; background: #f59e0b; color: #f59e0b; }
 
 @media (max-width: 640px) {
   .job-record-form-actions {
