@@ -6521,9 +6521,20 @@ input:focus, select:focus, textarea:focus {
 
 .panel,
 .column,
+.auth-card,
+.stat-card,
+.ai-panel,
+.ai-chat-card,
+.focus-item,
+.report-item,
+.preview-list div,
 .personnel-source-card,
 .portfolio-overview,
 .portfolio-job-card,
+.portfolio-summary-card,
+.portfolio-activity-card,
+.portfolio-brief-panel,
+.portfolio-agenda-panel,
 .portfolio-metrics article,
 .portfolio-metrics .portfolio-metric-card,
 .tender-list-panel,
@@ -6540,6 +6551,9 @@ input:focus, select:focus, textarea:focus {
 .report-preview-block,
 .document-card,
 .google-drive-card,
+.system-config-panel,
+.system-config-form,
+.menu-visibility-card,
 .task-card,
 .reminder-card,
 .modal-card,
@@ -6554,8 +6568,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .panel:hover,
+.stat-card:hover,
+.focus-item:hover,
+.report-item:hover,
 .personnel-source-card:hover,
 .portfolio-job-card:hover,
+.portfolio-summary-trigger:hover,
+.portfolio-summary-card .portfolio-metrics .portfolio-metric-card:hover,
 .finance-kpi-card:hover,
 .reports-stat-card:hover {
   border-color: rgba(79, 132, 255, 0.45);
@@ -6597,7 +6616,8 @@ table,
 .tender-table,
 .tender-checklist-table,
 .dashboard-summary-table,
-.job-detail-wide-table {
+.job-detail-wide-table,
+.menu-visibility-table {
   background: rgba(255, 255, 255, 0.98);
 }
 
@@ -6609,7 +6629,8 @@ th,
 .tender-table th,
 .tender-checklist-table th,
 .dashboard-summary-table th,
-.job-detail-wide-table th {
+.job-detail-wide-table th,
+.menu-visibility-table th {
   background: linear-gradient(180deg, #eef5ff, #e7f0ff);
   color: #12366d;
   font-weight: 900;
@@ -6623,7 +6644,8 @@ td,
 .tender-table td,
 .tender-checklist-table td,
 .dashboard-summary-table td,
-.job-detail-wide-table td {
+.job-detail-wide-table td,
+.menu-visibility-table td {
   border-bottom-color: #e1ebf8;
 }
 
@@ -6641,6 +6663,38 @@ tbody tr:hover td,
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.94)),
     radial-gradient(circle at 96% 0%, rgba(99, 102, 241, 0.12), transparent 32%);
+}
+
+.ai-panel,
+.ai-chat-card {
+  border-color: rgba(37, 99, 235, 0.3);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.96)),
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.14), transparent 30%);
+}
+
+.auth-card {
+  border-color: rgba(180, 200, 232, 0.95);
+  box-shadow: 0 28px 70px rgba(7, 26, 68, 0.2);
+}
+
+.stat-card strong,
+.portfolio-summary-card .portfolio-metrics strong,
+.reports-stat-card strong,
+.finance-kpi-card strong {
+  color: #071a44;
+}
+
+.portfolio-summary-card,
+.portfolio-activity-card,
+.portfolio-agenda-panel {
+  border-color: rgba(196, 211, 232, 0.88);
+}
+
+.portfolio-activity-item,
+.portfolio-agenda-item {
+  border-color: #dce7f6;
+  background: linear-gradient(180deg, #ffffff, #f7fbff);
 }
 
 .portfolio-metrics article,
