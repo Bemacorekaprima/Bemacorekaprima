@@ -4441,10 +4441,10 @@ function openJobRecordForm(record = null, job = null) {
     <datalist id="personnelNameSuggestions"></datalist>
     <datalist id="jobStatusOptions">
       <option value="Upcoming">
-      <option value="Active">
-      <option value="Progress">
+      <option value="Ongoing">
       <option value="Finish">
-      <option value="Finish, Overtime">
+      <option value="Overtime">
+      <option value="Finish & Overtime">
     </datalist>
     <datalist id="contractStatusOptions">
       <option value="Kontrak">
