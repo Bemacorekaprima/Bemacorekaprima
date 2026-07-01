@@ -1059,7 +1059,7 @@ dialog::backdrop {
 .dashboard-inventory-wide-card {
   display: grid;
   gap: 16px;
-  margin-top: 18px;
+  margin-top: 0;
   padding: 18px;
   overflow: visible;
 }
@@ -1382,12 +1382,6 @@ dialog::backdrop {
 .inventory-history-preview b {
   color: #071a44;
   font-size: 12px;
-}
-
-@media (min-width: 3000px) and (min-height: 1200px) {
-  .dashboard-inventory-wide-card {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 1100px) {

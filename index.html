@@ -287,6 +287,27 @@
 
           <section class="dashboard-main-grid">
             <div class="dashboard-primary-stack">
+              <article class="dashboard-card dashboard-priority-card">
+                <header class="dashboard-card-header">
+                  <h3><i data-lucide="star" aria-hidden="true"></i> Paket Prioritas</h3>
+                </header>
+                <div class="dashboard-table-wrap">
+                  <table class="dashboard-mini-table">
+                    <thead>
+                      <tr>
+                        <th>Paket</th>
+                        <th>Proyek</th>
+                        <th>Prioritas</th>
+                        <th>Progress</th>
+                        <th>PIC</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dashboardFeaturedJobs"></tbody>
+                  </table>
+                </div>
+                <button class="dashboard-card-footer-button" id="dashboardOpenPortfolioButton" type="button">Lihat Semua Paket Prioritas</button>
+              </article>
+
               <article class="dashboard-card dashboard-tender-card">
                 <header class="dashboard-card-header">
                   <h3><i data-lucide="briefcase-business" aria-hidden="true"></i> Tender Aktif</h3>
@@ -310,25 +331,23 @@
                 <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tenders">Lihat Semua Tender</button>
               </article>
 
-              <article class="dashboard-card dashboard-priority-card">
+              <article class="dashboard-card dashboard-inventory-card dashboard-inventory-wide-card">
                 <header class="dashboard-card-header">
-                  <h3><i data-lucide="star" aria-hidden="true"></i> Paket Prioritas</h3>
+                  <h3><i data-lucide="truck" aria-hidden="true"></i> Inventaris Kantor</h3>
+                  <button class="text-button" id="dashInventoryHistoryButton" type="button" data-inventory-action="history">Lihat Semua</button>
                 </header>
-                <div class="dashboard-table-wrap">
-                  <table class="dashboard-mini-table">
-                    <thead>
-                      <tr>
-                        <th>Paket</th>
-                        <th>Proyek</th>
-                        <th>Prioritas</th>
-                        <th>Progress</th>
-                        <th>PIC</th>
-                      </tr>
-                    </thead>
-                    <tbody id="dashboardFeaturedJobs"></tbody>
-                  </table>
+                <div id="dashInventoryItem" class="dashboard-inventory-item"></div>
+                <div id="dashInventorySummary" class="dashboard-inventory-summary"></div>
+                <div class="dashboard-inventory-actions">
+                  <button class="dashboard-card-footer-button" id="dashInventoryAddButton" type="button">
+                    <i data-lucide="plus" aria-hidden="true"></i>
+                    Tambah Item
+                  </button>
+                  <button class="dashboard-card-footer-button primary-soft" id="dashInventoryUsageButton" type="button">
+                    <i data-lucide="calendar" aria-hidden="true"></i>
+                    Catat Penggunaan
+                  </button>
                 </div>
-                <button class="dashboard-card-footer-button" id="dashboardOpenPortfolioButton" type="button">Lihat Semua Paket Prioritas</button>
               </article>
             </div>
 
@@ -414,25 +433,6 @@
               </article>
             </aside>
           </section>
-
-          <article class="dashboard-card dashboard-inventory-card dashboard-inventory-wide-card">
-            <header class="dashboard-card-header">
-              <h3><i data-lucide="truck" aria-hidden="true"></i> Inventaris Kantor</h3>
-              <button class="text-button" id="dashInventoryHistoryButton" type="button" data-inventory-action="history">Lihat Semua</button>
-            </header>
-            <div id="dashInventoryItem" class="dashboard-inventory-item"></div>
-            <div id="dashInventorySummary" class="dashboard-inventory-summary"></div>
-            <div class="dashboard-inventory-actions">
-              <button class="dashboard-card-footer-button" id="dashInventoryAddButton" type="button">
-                <i data-lucide="plus" aria-hidden="true"></i>
-                Tambah Item
-              </button>
-              <button class="dashboard-card-footer-button primary-soft" id="dashInventoryUsageButton" type="button">
-                <i data-lucide="calendar" aria-hidden="true"></i>
-                Catat Penggunaan
-              </button>
-            </div>
-          </article>
 
           <div class="dashboard-hidden-sinks" aria-hidden="true">
             <span id="dashboardPortfolioYearLabel"></span>
