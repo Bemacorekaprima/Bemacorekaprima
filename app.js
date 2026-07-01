@@ -4138,6 +4138,9 @@ function renderJobRecordInput(column, value) {
       </select>
     `;
   }
+  if (normalized.includes("status kontrak")) {
+    return `<input name="${escapeHtml(column)}" value="${escapedValue}" list="contractStatusOptions" autocomplete="off" placeholder="Kontrak, Tidak Terkontrak, atau Proposal">`;
+  }
   if (normalized.includes("status pekerjaan")) {
     return `
       <input name="${escapeHtml(column)}" value="${escapedValue}" list="jobStatusOptions" autocomplete="off">
@@ -4442,6 +4445,11 @@ function openJobRecordForm(record = null, job = null) {
       <option value="Progress">
       <option value="Finish">
       <option value="Finish, Overtime">
+    </datalist>
+    <datalist id="contractStatusOptions">
+      <option value="Kontrak">
+      <option value="Tidak Terkontrak">
+      <option value="Proposal">
     </datalist>
     ${columns.map(column => `
       <label class="${column === jobColumn ? "full" : ""}">
