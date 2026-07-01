@@ -6825,6 +6825,22 @@ function getFinancePphTaxValue(record) {
   return fallbackKey ? String(record?.[fallbackKey] || "").trim() : "";
 }
 
+function getFinanceContractValue(record) {
+  const keys = Object.keys(record || {});
+  const contractKey = keys.find(key => {
+    const normalized = normalizeSearchText(key);
+    return (
+      (normalized.includes("nilai kontrak") ||
+        normalized.includes("kontrak awal") ||
+        normalized.includes("nilai pekerjaan") ||
+        normalized.includes("nilai pagu")) &&
+      !normalized.includes("total harga") &&
+      !normalized.includes("harga satuan")
+    );
+  });
+  return contractKey ? parseFinanceNumber(record?.[contractKey]) : 0;
+}
+
 function getFinanceStatusKey(entry) {
   if (!entry.financeRecords.length) return "waiting";
   if (entry.progress >= 100) return "complete";
@@ -6852,6 +6868,8 @@ function buildFinanceEntries() {
       pekerjaan: jobName,
       financeRecords: [],
       totalHarga: 0,
+      totalBiayaPersonil: 0,
+      nilaiKontrak: 0,
       netto: 0,
       pajak: 0,
       pemberiKerja: "",
@@ -6859,7 +6877,11 @@ function buildFinanceEntries() {
       tanggalSelesai: ""
     };
     group.financeRecords.push(record);
-    group.totalHarga += parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"]));
+    const biayaPersonil = parseFinanceNumber(getRecordValue(record, ["total harga", "harga total", "total biaya", "total biaya personil"]));
+    const nilaiKontrak = getFinanceContractValue(record);
+    group.totalBiayaPersonil += biayaPersonil;
+    group.totalHarga = group.totalBiayaPersonil;
+    if (nilaiKontrak > group.nilaiKontrak) group.nilaiKontrak = nilaiKontrak;
     group.netto += parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"]));
     group.pajak += parseFinanceNumber(getFinancePphTaxValue(record));
     group.pemberiKerja ||= getRecordValue(record, ["pemberi kerja", "instansi", "klien", "owner"]);
@@ -6880,7 +6902,9 @@ function buildFinanceEntries() {
       pekerjaan: job.pekerjaan,
       job,
       financeRecords: finance?.financeRecords || [],
-      totalHarga: finance?.totalHarga || 0,
+      totalHarga: finance?.totalBiayaPersonil || finance?.totalHarga || 0,
+      totalBiayaPersonil: finance?.totalBiayaPersonil || finance?.totalHarga || 0,
+      nilaiKontrak: finance?.nilaiKontrak || 0,
       netto: finance?.netto || 0,
       pajak: finance?.pajak || 0,
       pemberiKerja: getRecordValue(job.records?.[0] || {}, ["pemberi kerja", "instansi", "klien", "owner"]) || finance?.pemberiKerja || "",
@@ -6903,7 +6927,9 @@ function buildFinanceEntries() {
       pekerjaan: finance.pekerjaan,
       job: null,
       financeRecords: finance.financeRecords,
-      totalHarga: finance.totalHarga,
+      totalHarga: finance.totalBiayaPersonil || finance.totalHarga,
+      totalBiayaPersonil: finance.totalBiayaPersonil || finance.totalHarga,
+      nilaiKontrak: finance.nilaiKontrak || 0,
       netto: finance.netto,
       pajak: finance.pajak,
       pemberiKerja: finance.pemberiKerja,
@@ -6984,7 +7010,7 @@ function renderFinance() {
         <td data-label="Pekerjaan"><strong>${escapeHtml(entry.pekerjaan)}</strong><small>${escapeHtml(entry.pemberiKerja || entry.source)}</small></td>
         <td data-label="Progress"><div class="finance-progress"><span style="width:${entry.progress}%"></span></div><small>${entry.progress}%</small></td>
         <td data-label="Status"><span class="finance-status ${getFinanceStatusKey(entry)}">${escapeHtml(getFinanceStatusLabel(entry))}</span></td>
-        <td data-label="Total Harga">${formatFinanceMoney(entry.totalHarga)}</td>
+        <td data-label="Total Biaya Personil">${formatFinanceMoney(entry.totalBiayaPersonil || entry.totalHarga)}</td>
         <td data-label="Pajak">${formatFinanceMoney(entry.pajak)}</td>
         <td data-label="Netto"><strong>${formatFinanceMoney(entry.netto)}</strong></td>
         <td data-label="Personil">${entry.personil.length || entry.financeRecords.length || 0}</td>
@@ -7037,6 +7063,26 @@ function openFinanceDetail(key) {
   document.getElementById("financeDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function getFinanceTerminPlan(entry) {
+  const contractValue = entry?.nilaiKontrak || 0;
+  return [
+    { label: "Termin 1", percent: 25, className: "blue" },
+    { label: "Termin 2", percent: 45, className: "purple" },
+    { label: "Termin 3", percent: 30, className: "green" }
+  ].map(item => ({
+    ...item,
+    value: Math.round(contractValue * item.percent / 100)
+  }));
+}
+
+function getFinanceTerminPercentTotal(terminPlan) {
+  return terminPlan.reduce((total, item) => total + Number(item.percent || 0), 0);
+}
+
+function getFinanceTerminValueTotal(terminPlan) {
+  return terminPlan.reduce((total, item) => total + Number(item.value || 0), 0);
+}
+
 function renderFinanceDetail(entry) {
   const panel = document.getElementById("financeDetailPanel");
   const body = document.getElementById("financeDetailBody");
@@ -7045,16 +7091,54 @@ function renderFinanceDetail(entry) {
   setTextContent("financeDetailTitle", entry.pekerjaan);
   setTextContent("financeDetailMeta", `${entry.source} - ${getFinanceStatusLabel(entry)} - ${entry.progress}% progress`);
   const relatedPersonnel = buildFinanceDetailPersonnel(entry);
+  const totalBiayaPersonil = entry.totalBiayaPersonil || entry.totalHarga || 0;
+  const nilaiKontrak = entry.nilaiKontrak || 0;
+  const terminPlan = getFinanceTerminPlan(entry);
+  const terminPercentTotal = getFinanceTerminPercentTotal(terminPlan);
+  const terminValueTotal = getFinanceTerminValueTotal(terminPlan);
+  const terminRemaining = Math.max(0, nilaiKontrak - terminValueTotal);
   body.innerHTML = `
-    <section class="finance-detail-kpis">
-      <article><span>Total Harga</span><strong>${formatFinanceMoney(entry.totalHarga)}</strong></article>
-      <article><span>Pajak PPH 21</span><strong>${formatFinanceMoney(entry.pajak)}</strong></article>
-      <article><span>Netto</span><strong>${formatFinanceMoney(entry.netto)}</strong></article>
-      <article><span>Personil</span><strong>${relatedPersonnel.length}</strong></article>
+    <section class="finance-summary-groups">
+      <article class="finance-summary-group contract">
+        <header>
+          <div>
+            <span class="section-eyebrow">KONTRAK DAN TERMIN</span>
+            <h3>Nilai Kontrak tersinkron ke termin</h3>
+          </div>
+          <span class="finance-validation-badge ${terminPercentTotal === 100 ? "valid" : "warning"}">${terminPercentTotal}% termin</span>
+        </header>
+        <div class="finance-detail-kpis finance-contract-kpis">
+          <article class="primary"><span>Nilai Kontrak</span><strong>${formatFinanceMoney(nilaiKontrak)}</strong><small>Dasar perhitungan termin</small></article>
+          <article><span>Total Termin</span><strong>${terminPercentTotal}%</strong><small>Alokasi kontrak</small></article>
+          <article><span>Nilai Termin</span><strong>${formatFinanceMoney(terminValueTotal)}</strong><small>Akumulasi rencana termin</small></article>
+          <article><span>Sisa Alokasi</span><strong>${formatFinanceMoney(terminRemaining)}</strong><small>Terhadap nilai kontrak</small></article>
+        </div>
+      </article>
+      <article class="finance-summary-group personnel-cost">
+        <header>
+          <div>
+            <span class="section-eyebrow">BIAYA PERSONIL</span>
+            <h3>Total biaya personil, PPH 21, dan netto</h3>
+          </div>
+          <span class="finance-validation-badge neutral">${relatedPersonnel.length} personil</span>
+        </header>
+        <div class="finance-detail-kpis finance-personnel-kpis">
+          <article><span>Total Biaya Personil</span><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong><small>Dari rincian personil</small></article>
+          <article><span>PPH 21</span><strong>${formatFinanceMoney(entry.pajak)}</strong><small>Akumulasi pajak personil</small></article>
+          <article><span>Netto</span><strong>${formatFinanceMoney(entry.netto)}</strong><small>Total biaya - PPH 21</small></article>
+          <article><span>Personil</span><strong>${relatedPersonnel.length}</strong><small>Baris personil terkait</small></article>
+        </div>
+      </article>
     </section>
     <section class="finance-detail-grid">
-      <article>
-        <h3>Identitas Pekerjaan</h3>
+      <article class="finance-summary-card">
+        <header class="finance-card-title-row">
+          <h3>Ringkasan Pekerjaan</h3>
+          <div class="finance-inline-actions">
+            <button class="primary-button" type="button" data-finance-termin-action="add">+ Tambah Termin</button>
+            <button class="secondary-button" type="button" data-finance-termin-action="addendum">+ Tambah Addendum</button>
+          </div>
+        </header>
         <dl>
           <div><dt>Pemberi Kerja</dt><dd>${escapeHtml(entry.pemberiKerja || "-")}</dd></div>
           <div><dt>Tanggal Mulai</dt><dd>${escapeHtml(entry.tanggalMulai || "-")}</dd></div>
@@ -7062,24 +7146,47 @@ function renderFinanceDetail(entry) {
           <div><dt>Status Portofolio</dt><dd>${escapeHtml(entry.status || "-")}</dd></div>
         </dl>
       </article>
-      <article>
-        <h3>Status Termin/Tagihan</h3>
-        <div class="finance-detail-progress"><span style="width:${entry.progress}%"></span></div>
-        <p>${escapeHtml(getFinanceStatusLabel(entry))}. Data angka diambil dari Sheet Finance, progress dari Portofolio/Tender.</p>
+      <article class="finance-termin-card">
+        <header class="finance-card-title-row">
+          <div>
+            <h3>Skema Termin dari Nilai Kontrak</h3>
+            <p>Persentase termin dihitung dari Nilai Kontrak, bukan dari biaya personil.</p>
+          </div>
+          <span class="finance-validation-badge ${terminPercentTotal === 100 ? "valid" : "warning"}">Total ${terminPercentTotal}%</span>
+        </header>
+        <div class="finance-termin-stack" aria-label="Pembagian termin">
+          ${terminPlan.map(item => `<span class="${item.className}" style="width:${item.percent}%"><b>${item.percent}%</b></span>`).join("")}
+        </div>
+        <div class="finance-termin-list">
+          ${terminPlan.map(item => `
+            <div>
+              <strong>${escapeHtml(item.label)}</strong>
+              <span>${item.percent}% x ${formatFinanceMoney(nilaiKontrak)}</span>
+              <b>${formatFinanceMoney(item.value)}</b>
+              <button class="text-button" type="button" data-finance-termin-action="edit">Edit</button>
+              <button class="text-button danger-text" type="button" data-finance-termin-action="delete">Hapus</button>
+            </div>
+          `).join("")}
+        </div>
       </article>
     </section>
-    <section>
+    <section class="finance-personnel-value-section">
       <h3>Personil dan Nilai</h3>
+      <div class="finance-personnel-cost-strip" aria-label="Ringkasan biaya personil">
+        <span><small>Total Biaya Personil</small><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong></span>
+        <span><small>PPH 21</small><strong>${formatFinanceMoney(entry.pajak)}</strong></span>
+        <span><small>Netto</small><strong>${formatFinanceMoney(entry.netto)}</strong></span>
+      </div>
       <div class="table-wrap finance-detail-table-wrap">
         <table class="finance-detail-table">
-          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total</th><th>Pajak PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total Biaya</th><th>Pajak PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
           <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => `
             <tr>
               <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
               <td data-label="Uraian/Jabatan">${escapeHtml(row.uraian)}</td>
               <td data-label="Bulan">${escapeHtml(row.bulan)}</td>
               <td data-label="Harga Satuan">${row.hasFinance ? formatFinanceMoney(row.hargaSatuan) : "-"}</td>
-              <td data-label="Total">${row.hasFinance ? formatFinanceMoney(row.total) : "-"}</td>
+              <td data-label="Total Biaya">${row.hasFinance ? formatFinanceMoney(row.total) : "-"}</td>
               <td data-label="Pajak PPH 21">${row.hasFinance ? formatFinanceMoney(row.pajak) : "-"}</td>
               <td data-label="Netto">${row.hasFinance ? formatFinanceMoney(row.netto) : "-"}</td>
               <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
@@ -7129,7 +7236,7 @@ function buildFinanceDetailRowFromRecord(record, fallback = {}) {
     uraian: getRecordValue(record, ["uraian", "jabatan", "posisi"]) || fallback.uraian || "-",
     bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || fallback.bulan || "-",
     hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
-    total: parseFinanceNumber(getRecordValue(record, ["total harga", "nilai kontrak", "harga total"])),
+    total: parseFinanceNumber(getRecordValue(record, ["total biaya personil", "total harga", "harga total"])),
     tarifPajak: getRecordValue(record, ["tarif pajak", "tarif pph 21", "tarif pph", "pph"]),
     pajak: parseFinanceNumber(getFinancePphTaxValue(record)),
     netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
@@ -7244,7 +7351,7 @@ function getFinanceEditableColumns(records = []) {
     });
   });
   if (columns.length) return columns;
-  return ["Pekerjaan", "Nama", "Uraian", "Pemberi Kerja", "Jumlah Bulan", "Harga Satuan", "Total Harga", "Tarif Pajak", "Pajak PPH 21", "Netto", "Tanggal Mulai", "Tanggal Selesai", "Durasi Kontrak", "Keterangan"];
+  return ["Pekerjaan", "Nama", "Uraian", "Pemberi Kerja", "Nilai Kontrak", "Jumlah Bulan", "Harga Satuan", "Total Biaya Personil", "Tarif Pajak", "Pajak PPH 21", "Netto", "Tanggal Mulai", "Tanggal Selesai", "Durasi Kontrak", "Keterangan"];
 }
 
 function renderFinanceInput(column, value, required) {
@@ -7327,6 +7434,18 @@ function getCurrentFinanceEntry() {
 }
 
 function handleFinanceDetailAction(event) {
+  const terminButton = event.target.closest("[data-finance-termin-action]");
+  if (terminButton) {
+    const action = terminButton.dataset.financeTerminAction;
+    const messages = {
+      add: "Struktur Termin siap ditampilkan. Untuk simpan permanen, tambahkan sheet FINANCE_TERMIN.",
+      addendum: "Struktur Addendum siap ditampilkan. Untuk simpan permanen, tambahkan sheet FINANCE_ADDENDUM.",
+      edit: "Edit Termin membutuhkan data dari sheet FINANCE_TERMIN.",
+      delete: "Hapus Termin membutuhkan data dari sheet FINANCE_TERMIN."
+    };
+    notify(messages[action] || "Fitur termin siap dikaitkan ke spreadsheet.");
+    return;
+  }
   const button = event.target.closest("[data-finance-record-action]");
   if (!button) return;
   const entry = getCurrentFinanceEntry();
