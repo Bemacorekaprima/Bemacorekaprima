@@ -227,7 +227,6 @@
                 <div class="action-dropdown-menu hidden" id="actionDropdownMenu" role="menu">
                   <button type="button" id="newTaskButton" role="menuitem">+ Tugas Baru</button>
                   <button type="button" id="sendAllButton" role="menuitem">Kirim Reminder</button>
-                  <button type="button" id="exportCsvButton" role="menuitem">Export sebagai CSV...</button>
                 </div>
               </div>
             </div>
@@ -573,7 +572,6 @@
                   <button id="addJobButton" type="button">Tambah Pekerjaan Lengkap</button>
                   <button id="exportJobsPdfButton" type="button">Export PDF</button>
                   <button id="exportJobsExcelButton" type="button">Export Excel</button>
-                  <button id="exportJobsCsvButton" type="button">Export CSV</button>
                 </div>
               </div>
             </div>
@@ -675,7 +673,6 @@
                   <button class="hidden" id="addPersonnelButton" type="button">Tambah Personil</button>
                   <button id="exportPersonnelExcelButton" type="button">Export Excel</button>
                   <button id="exportPersonnelPdfButton" type="button">Export PDF</button>
-                  <button id="exportPersonnelButton" type="button">Export CSV</button>
                 </div>
               </div>
             </div>
@@ -977,7 +974,6 @@
               <div class="reports-export-actions">
                 <button class="secondary-button" id="reportsExportPdf">PDF</button>
                 <button class="secondary-button" id="reportsExportExcel">Excel</button>
-                <button class="secondary-button" id="reportsExportCsv">CSV</button>
                 <button class="secondary-button" id="reportsPrint">Print</button>
               </div>
             </article>
@@ -1188,7 +1184,7 @@
                 <span class="storage-icon sheets-storage-icon">S</span>
                 <div class="sheet-storage-copy">
                   <strong>Google Spreadsheet</strong>
-                  <p>Tiga sheet publik dibaca sebagai sumber data tambahan untuk Chat AI.</p>
+                  <p>Data dibaca dan ditulis melalui Apps Script Bridge agar sinkron dua arah dengan spreadsheet.</p>
                   <div class="sheet-source-status" id="sheetSourceStatus" aria-live="polite">
                     <span>Menunggu sinkronisasi...</span>
                   </div>
@@ -1200,7 +1196,7 @@
             <div class="section-header">
               <div>
                 <h2>Sumber Data</h2>
-                <p>Ubah tautan Google Drive dan CSV publik Google Spreadsheet tanpa mengedit kode.</p>
+                <p>Simpan folder Google Drive. Google Spreadsheet dikelola otomatis oleh Apps Script Bridge.</p>
               </div>
               <span class="access-role-badge">Super Admin</span>
             </div>
@@ -1209,26 +1205,9 @@
                 <span>Folder Google Drive</span>
                 <input id="configDriveUrl" type="url" required placeholder="https://drive.google.com/drive/folders/...">
               </label>
-              <label class="full">
-                <span>CSV Sheet DATA UTAMA</span>
-                <input id="configDataUtamaUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
-              </label>
-              <label class="full">
-                <span>CSV Sheet PERSONIL BMC</span>
-                <input id="configPersonilBmcUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
-              </label>
-              <label class="full">
-                <span>CSV Sheet Outsourcing</span>
-                <input id="configOutsourcingUrl" type="url" required placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
-              </label>
-              <label class="full">
-                <span>CSV Sheet BAR Tender</span>
-                <input id="configBarTenderUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
-              </label>
-              <label class="full">
-                <span>CSV Sheet Finance</span>
-                <input id="configFinanceUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?...&output=csv">
-              </label>
+              <div class="full config-note">
+                Apps Script otomatis menyiapkan sheet dan header yang dibutuhkan web, termasuk FINANCE_TERMIN, FINANCE_ADDENDUM, dan INVENTARIS.
+              </div>
               <footer class="full">
                 <span id="dataSourceConfigStatus" class="config-status"></span>
                 <button class="primary-button" type="submit">Simpan Sumber Data</button>

@@ -1,38 +1,94 @@
-﻿const PERSONNEL_BRIDGE_TOKEN = 'Bemaco-20260630-spreadsheet-bridge';
+const PERSONNEL_BRIDGE_TOKEN = 'Bemaco-20260630-spreadsheet-bridge';
 const FIREBASE_API_KEY = 'AIzaSyAj4yTKTBE41kRq62dUPwSxZFDsoZolJec';
 const FIREBASE_PROJECT_ID = 'bemacorekaprima-1f94e';
 const BOOTSTRAP_SUPER_ADMIN_EMAIL = 'bemacorekaprima.kaltim@gmail.com';
-
 const SPREADSHEET_ID = '1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA';
 
-const PERSONNEL_SHEETS = {
-  'data-utama': { gid: 2034016714, names: ['DATA UTAMA', 'Data Utama'] },
-  'personil-bmc': { gid: 2048149704, names: ['PERSONIL BMC', 'Personil BMC', 'PERSONIL'] },
-  outsourcing: { gid: 1030462578, names: ['Outsourcing', 'OUTSOURCING'] },
-  'bar-tender': { gid: 1549258591, names: ['BAR Tender', 'BAR TENDER', 'Tender BAR', 'TENDER BAR'] },
-  finance: { gid: 0, names: ['Finance', 'FINANCE', 'Keuangan', 'KEUANGAN'] }
-};
-
 const PERSONNEL_WRITE_ROLES = ['super_admin', 'editor', 'author'];
-const DEFAULT_SOURCE_HEADERS = {
-  'bar-tender': [
-    'ID Tender', 'Paket', 'Status', 'Instansi/Satker', 'Lokasi', 'Tahun Anggaran',
-    'Sumber Dana', 'Pagu', 'HPS', 'Metode Seleksi', 'Jenis Kontrak', 'Deadline',
-    'Penanggung Jawab', 'Email PIC', 'Nama Personil', 'Jumlah Personil', 'Progress',
-    'Dokumen Final', 'Total Dokumen', 'Folder Dokumen', 'Catatan', 'Updated By', 'Updated At'
-  ]
-};
 const PERSONNEL_CACHE_TTL_SECONDS = 180;
-const PERSONNEL_CACHE_PREFIX = 'personnelBridge:v2:';
+const PERSONNEL_CACHE_PREFIX = 'bemacoBridge:v3:';
 const PERSONNEL_CACHE_CHUNK_SIZE = 85000;
 const PERSONNEL_CACHE_MAX_CHUNKS = 30;
+
+const PERSONNEL_SHEETS = {
+  'data-utama': {
+    gid: 2034016714,
+    names: ['DATA UTAMA', 'Data Utama'],
+    headers: [
+      'ID', 'NAMA PERSONIL', 'SKA/Bidang Keahlian', 'POSISI/JABATAN (Kontrak)',
+      'POSISI/JABATAN (Real)', 'PEKERJAAN', 'TANGGAL MULAI', 'TANGGAL SELESAI',
+      'MASA OVERTIME', 'BOBOT', 'BEBAN', 'STATUS KONTRAK', 'JENIS PEKERJAAN',
+      'KETERLIBATAN', 'POSISI PENUGASAN', 'STATUS PEKERJAAN', 'JUMLAH BULAN',
+      'Jumlah Bulan Overtime', 'BOBOT INDIVIDUAL', 'REMUNERASI/BILLING RATE (KONTRAK)',
+      'REMUNERASI/BILLING RATE (REALISASI)', 'Updated At', 'Updated By', 'Row Key'
+    ]
+  },
+  'personil-bmc': {
+    gid: 2048149704,
+    names: ['PERSONIL BMC', 'Personil BMC', 'PERSONIL'],
+    headers: ['NAMA PERSONIL', 'STATUS', 'JABATAN ATAU POSISI', 'POSISI PENUGASAN', 'Updated At', 'Updated By', 'Row Key']
+  },
+  outsourcing: {
+    gid: 1030462578,
+    names: ['Outsourcing', 'OUTSOURCING'],
+    headers: ['NAMA PERSONIL', 'STATUS', 'JABATAN ATAU POSISI', 'POSISI PENUGASAN', 'Updated At', 'Updated By', 'Row Key']
+  },
+  'bar-tender': {
+    gid: 1549258591,
+    names: ['BAR Tender', 'BAR TENDER', 'Tender BAR', 'TENDER BAR', 'TENDER'],
+    headers: [
+      'ID Tender', 'Paket', 'Status', 'Instansi/Satker', 'Lokasi', 'Tahun Anggaran',
+      'Sumber Dana', 'Pagu', 'HPS', 'Metode Seleksi', 'Jenis Kontrak', 'Deadline',
+      'Penanggung Jawab', 'Email PIC', 'Nama Personil', 'Jumlah Personil', 'Progress',
+      'Dokumen Final', 'Total Dokumen', 'Folder Dokumen', 'Catatan', 'Updated By', 'Updated At', 'Row Key'
+    ]
+  },
+  finance: {
+    gid: 0,
+    names: ['Finance', 'FINANCE', 'Keuangan', 'KEUANGAN'],
+    headers: [
+      'Pekerjaan', 'Nama', 'Uraian', 'Pemberi Kerja', 'Nilai Kontrak', 'Jumlah Bulan',
+      'Harga Satuan', 'Total Biaya Personil', 'Tarif Pajak', 'Pajak PPH 21', 'Netto',
+      'Tanggal Mulai', 'Tanggal Selesai', 'Durasi Kontrak', 'Keterangan', 'Updated At',
+      'Updated By', 'Row Key'
+    ]
+  },
+  'finance-termin': {
+    gid: 0,
+    names: ['FINANCE_TERMIN', 'Finance Termin', 'TERMIN'],
+    headers: [
+      'ID', 'ID Pekerjaan', 'Nama Pekerjaan', 'Termin Ke', 'Nama Termin', 'Persentase',
+      'Nilai Kontrak', 'Nilai Termin', 'Status', 'Tanggal Tagihan', 'Tanggal Bayar',
+      'Keterangan', 'Updated At', 'Updated By', 'Row Key'
+    ]
+  },
+  'finance-addendum': {
+    gid: 0,
+    names: ['FINANCE_ADDENDUM', 'Finance Addendum', 'ADDENDUM'],
+    headers: [
+      'ID', 'ID Pekerjaan', 'Nama Pekerjaan', 'Addendum Ke', 'Nama Addendum',
+      'Nilai Kontrak Sebelum', 'Nilai Addendum', 'Nilai Kontrak Baru', 'Tanggal Addendum',
+      'Status', 'Keterangan', 'Updated At', 'Updated By', 'Row Key'
+    ]
+  },
+  inventory: {
+    gid: 0,
+    names: ['INVENTARIS', 'Inventory', 'Inventaris Kantor'],
+    headers: [
+      'ID', 'Nama Inventaris', 'Kategori', 'Merek/Model', 'Status', 'Tujuan',
+      'Pengguna/Driver', 'Berangkat', 'Estimasi Kembali', 'Lokasi/Tujuan',
+      'Progress Penggunaan', 'Keterangan', 'Updated At', 'Updated By', 'Row Key'
+    ]
+  }
+};
 
 function doGet(e) {
   const callback = String((e && e.parameter && e.parameter.callback) || 'personnelBridgeCallback');
 
   try {
     validateBridgeToken_((e && e.parameter && e.parameter.token) || '');
-    const cachedSheets = getCachedSheets_();
+    const force = String((e && e.parameter && e.parameter.force) || '') === '1';
+    const cachedSheets = force ? null : getCachedSheets_();
     if (cachedSheets) {
       return javascriptResponse_(callback, {
         ok: true,
@@ -44,9 +100,9 @@ function doGet(e) {
 
     const spreadsheet = getBoundSpreadsheet_();
     const sheets = {};
-
     Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
-      const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
+      const sheet = getOrCreateSheet_(spreadsheet, sourceId);
+      ensureSourceHeaders_(sheet, sourceId, {});
       sheets[sourceId] = readSheet_(sheet);
     });
     setCachedSheets_(sheets);
@@ -77,42 +133,44 @@ function doPost(e) {
     }
 
     const sourceId = String(payload.sourceId || '');
-    if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, sourceId)) {
-      throw new Error('Sumber sheet tidak valid.');
-    }
+    const targetSourceId = String(payload.targetSourceId || sourceId);
+    assertSource_(sourceId);
+    assertSource_(targetSourceId);
 
     const spreadsheet = getBoundSpreadsheet_();
-    const sheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[sourceId]);
-    const targetSourceId = String(payload.targetSourceId || sourceId);
-    if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, targetSourceId)) {
-      throw new Error('Target sheet tidak valid.');
-    }
-    const targetSheet = getSheetById_(spreadsheet, PERSONNEL_SHEETS[targetSourceId]);
+    const sourceSheet = getOrCreateSheet_(spreadsheet, sourceId);
+    const targetSheet = getOrCreateSheet_(spreadsheet, targetSourceId);
     const action = String(payload.action || '');
-    ensureSourceHeaders_(targetSheet, targetSourceId, payload.data || {});
+    const data = addAuditFields_(payload.data || {}, firebaseUser.email);
+
+    ensureSourceHeaders_(sourceSheet, sourceId, data);
+    ensureSourceHeaders_(targetSheet, targetSourceId, data);
+
     const lock = LockService.getDocumentLock();
     lock.waitLock(30000);
 
     try {
-      if (action === 'add') {
-        addPersonnelRow_(targetSheet, payload.data || {});
+      if (action === 'ensureSheet') {
+        ensureSourceHeaders_(targetSheet, targetSourceId, data);
+      } else if (action === 'add') {
+        addRow_(targetSheet, data);
       } else if (action === 'update') {
         if (targetSourceId !== sourceId) {
-          addPersonnelRow_(targetSheet, payload.data || {});
-          deletePersonnelRow_(sheet, Number(payload.rowNumber));
+          addRow_(targetSheet, data);
+          deleteRow_(sourceSheet, Number(payload.rowNumber));
         } else {
-          updatePersonnelRow_(sheet, Number(payload.rowNumber), payload.data || {});
+          updateRow_(sourceSheet, Number(payload.rowNumber), data);
         }
       } else if (action === 'upsert') {
-        upsertPersonnelRow_(targetSheet, payload.data || {}, payload.matchColumn || '', payload.matchValue || '');
+        upsertRow_(targetSheet, data, payload.matchColumn || '', payload.matchValue || '');
       } else if (action === 'deleteByKey') {
-        deletePersonnelRowByKey_(sheet, payload.matchColumn || '', payload.matchValue || '');
+        deleteRowByKey_(sourceSheet, payload.matchColumn || '', payload.matchValue || '');
       } else if (action === 'delete') {
-        deletePersonnelRow_(sheet, Number(payload.rowNumber));
+        deleteRow_(sourceSheet, Number(payload.rowNumber));
       } else {
         throw new Error('Aksi spreadsheet tidak dikenali.');
       }
-      clearPersonnelCache_();
+      clearBridgeCache_();
     } finally {
       lock.releaseLock();
     }
@@ -134,17 +192,286 @@ function doPost(e) {
   }
 }
 
+function getOrCreateSheet_(spreadsheet, sourceId) {
+  const config = PERSONNEL_SHEETS[sourceId];
+  if (!config) throw new Error('Sumber sheet tidak valid: ' + sourceId);
+
+  const gid = Number(config.gid || 0);
+  let sheet = spreadsheet.getSheets().find(function(item) {
+    return gid && item.getSheetId() === gid;
+  });
+
+  if (!sheet && Array.isArray(config.names)) {
+    sheet = spreadsheet.getSheets().find(function(item) {
+      const currentName = normalizeName_(item.getName());
+      return config.names.some(function(candidate) {
+        return currentName === normalizeName_(candidate);
+      });
+    });
+  }
+
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(config.names[0]);
+    ensureSourceHeaders_(sheet, sourceId, {});
+  }
+
+  return sheet;
+}
+
+function ensureSourceHeaders_(sheet, sourceId, data) {
+  const defaultHeaders = PERSONNEL_SHEETS[sourceId].headers || [];
+  const dataHeaders = Object.keys(data || {}).filter(function(key) {
+    return key && key.charAt(0) !== '_' && !isComputedHeader_(key);
+  });
+  const desiredHeaders = mergeHeaders_(defaultHeaders, dataHeaders);
+  if (!desiredHeaders.length) return;
+
+  const values = getSheetValues_(sheet);
+  const hasContent = values.some(function(row) {
+    return row.some(function(value) { return String(value || '').trim() !== ''; });
+  });
+  const headerIndex = hasContent ? findHeaderRow_(values) : 0;
+  let headers = hasContent ? makeUniqueHeaders_(values[headerIndex]) : [];
+  const genericHeaders = headers.length && headers.every(function(header) {
+    return /^column\s+\d+$/i.test(String(header || '').trim());
+  });
+
+  if (!headers.length || genericHeaders || !hasContent) {
+    writeHeaderRow_(sheet, desiredHeaders, 1);
+    return;
+  }
+
+  const additions = desiredHeaders.filter(function(header) {
+    return headers.indexOf(header) === -1;
+  });
+  if (!additions.length) return;
+
+  const startColumn = headers.length + 1;
+  if (sheet.getMaxColumns() < headers.length + additions.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length + additions.length - sheet.getMaxColumns());
+  }
+  sheet.getRange(headerIndex + 1, startColumn, 1, additions.length).setValues([additions]);
+}
+
+function writeHeaderRow_(sheet, headers, rowNumber) {
+  if (sheet.getMaxColumns() < headers.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+  }
+  sheet.getRange(rowNumber, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(rowNumber);
+}
+
+function readSheet_(sheet) {
+  const values = getSheetValues_(sheet);
+  if (!values.length) return [];
+
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const records = [];
+
+  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+    const row = values[rowIndex];
+    if (!row.some(function(value) { return String(value || '').trim() !== ''; })) continue;
+
+    const record = { '_Sumber Baris': rowIndex + 1 };
+    headers.forEach(function(header, columnIndex) {
+      record[header] = row[columnIndex] || '';
+    });
+    records.push(record);
+  }
+  return records;
+}
+
+function addRow_(sheet, data) {
+  const values = getSheetValues_(sheet);
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const targetRow = Math.max(sheet.getLastRow() + 1, headerIndex + 2);
+  const sourceFormulaRow = Math.max(headerIndex + 2, targetRow - 1);
+
+  headers.forEach(function(header, columnIndex) {
+    const column = columnIndex + 1;
+    const cell = sheet.getRange(targetRow, column);
+    const sourceFormula = sourceFormulaRow < targetRow ? sheet.getRange(sourceFormulaRow, column).getFormulaR1C1() : '';
+
+    if (Object.prototype.hasOwnProperty.call(data, header) && !isComputedHeader_(header)) {
+      cell.setValue(normalizeWriteValue_(data[header]));
+    } else if (sourceFormula) {
+      cell.setFormulaR1C1(sourceFormula);
+    }
+  });
+}
+
+function updateRow_(sheet, rowNumber, data) {
+  const values = getSheetValues_(sheet);
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const firstDataRow = headerIndex + 2;
+
+  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
+    throw new Error('Nomor baris spreadsheet tidak valid.');
+  }
+
+  headers.forEach(function(header, columnIndex) {
+    if (!Object.prototype.hasOwnProperty.call(data, header) || isComputedHeader_(header)) return;
+    const cell = sheet.getRange(rowNumber, columnIndex + 1);
+    if (cell.getFormula()) return;
+    cell.setValue(normalizeWriteValue_(data[header]));
+  });
+}
+
+function upsertRow_(sheet, data, matchColumn, matchValue) {
+  const values = getSheetValues_(sheet);
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const matchHeader = String(matchColumn || '').trim() || findBestMatchColumn_(headers, data);
+  const matchIndex = headers.indexOf(matchHeader);
+  const expected = String(matchValue || data[matchHeader] || '').trim();
+
+  if (matchIndex !== -1 && expected) {
+    for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+      if (String(values[rowIndex][matchIndex] || '').trim() === expected) {
+        updateRow_(sheet, rowIndex + 1, data);
+        return;
+      }
+    }
+  }
+
+  addRow_(sheet, data);
+}
+
+function deleteRow_(sheet, rowNumber) {
+  const values = getSheetValues_(sheet);
+  const firstDataRow = findHeaderRow_(values) + 2;
+  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
+    throw new Error('Nomor baris spreadsheet tidak valid.');
+  }
+  sheet.deleteRow(rowNumber);
+}
+
+function deleteRowByKey_(sheet, matchColumn, matchValue) {
+  const values = getSheetValues_(sheet);
+  const headerIndex = findHeaderRow_(values);
+  const headers = makeUniqueHeaders_(values[headerIndex]);
+  const matchIndex = headers.indexOf(String(matchColumn || '').trim());
+  const expected = String(matchValue || '').trim();
+  if (matchIndex === -1 || !expected) return;
+
+  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
+    if (String(values[rowIndex][matchIndex] || '').trim() === expected) {
+      sheet.deleteRow(rowIndex + 1);
+      return;
+    }
+  }
+}
+
+function getSheetValues_(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  return sheet.getRange(1, 1, lastRow, lastColumn).getDisplayValues();
+}
+
+function findHeaderRow_(rows) {
+  let bestIndex = 0;
+  let bestScore = -1;
+  const limit = Math.min(rows.length, 35);
+
+  for (let index = 0; index < limit; index += 1) {
+    const row = rows[index].map(function(value) {
+      return String(value || '').trim();
+    });
+    const nonEmpty = row.filter(Boolean).length;
+    const text = normalizeText_(row.join(' '));
+    const keywordScore = [
+      'id', 'nama', 'personil', 'jabatan', 'posisi', 'status', 'pekerjaan',
+      'tanggal', 'termin', 'inventaris', 'finance', 'nilai'
+    ].reduce(function(score, keyword) {
+      return score + (text.indexOf(keyword) !== -1 ? 4 : 0);
+    }, 0);
+    const score = nonEmpty + keywordScore;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+
+function makeUniqueHeaders_(row) {
+  const counts = {};
+  return row.map(function(value, index) {
+    const base = String(value || '').trim() || 'Kolom ' + (index + 1);
+    counts[base] = (counts[base] || 0) + 1;
+    return counts[base] === 1 ? base : base + ' ' + counts[base];
+  });
+}
+
+function mergeHeaders_(baseHeaders, extraHeaders) {
+  const seen = {};
+  return [].concat(baseHeaders || [], extraHeaders || []).filter(function(header) {
+    const key = String(header || '').trim();
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
+function findBestMatchColumn_(headers, data) {
+  return ['Row Key', 'ID', 'ID Tender', 'ID Pekerjaan', 'Pekerjaan', 'Nama Pekerjaan']
+    .find(function(header) {
+      return headers.indexOf(header) !== -1 && data[header];
+    }) || '';
+}
+
+function addAuditFields_(data, email) {
+  const result = {};
+  Object.keys(data || {}).forEach(function(key) {
+    result[key] = data[key];
+  });
+  if (!result['Updated At']) result['Updated At'] = new Date().toISOString();
+  if (!result['Updated By']) result['Updated By'] = email || '';
+  if (!result['Row Key']) result['Row Key'] = Utilities.getUuid();
+  return result;
+}
+
+function isComputedHeader_(header) {
+  const normalized = normalizeText_(header);
+  return [
+    'pekerjaan aktif', 'tugas aktif', 'project aktif', 'keterlibatan pekerjaan',
+    'status selesai', 'akumulasi'
+  ].some(function(keyword) {
+    return normalized.indexOf(keyword) !== -1;
+  });
+}
+
+function normalizeWriteValue_(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function normalizeText_(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizeName_(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function assertSource_(sourceId) {
+  if (!Object.prototype.hasOwnProperty.call(PERSONNEL_SHEETS, sourceId)) {
+    throw new Error('Sumber sheet tidak valid: ' + sourceId);
+  }
+}
+
 function getCachedSheets_() {
   const sheets = {};
   const sourceIds = Object.keys(PERSONNEL_SHEETS);
-
   for (let index = 0; index < sourceIds.length; index += 1) {
     const sourceId = sourceIds[index];
     const cachedRecords = getCacheJson_('sheet:' + sourceId);
     if (!Array.isArray(cachedRecords)) return null;
     sheets[sourceId] = cachedRecords;
   }
-
   return sheets;
 }
 
@@ -156,7 +483,7 @@ function setCachedSheets_(sheets) {
   });
 }
 
-function clearPersonnelCache_() {
+function clearBridgeCache_() {
   Object.keys(PERSONNEL_SHEETS).forEach(function(sourceId) {
     clearCacheValue_('sheet:' + sourceId);
   });
@@ -211,7 +538,6 @@ function getCacheText_(key) {
     }
     parts.push(chunk);
   }
-
   return parts.join('');
 }
 
@@ -237,7 +563,6 @@ function setCacheText_(key, text, ttlSeconds) {
     chunks: chunks.length,
     storedAt: new Date().toISOString()
   });
-
   cache.putAll(payload, ttlSeconds);
 }
 
@@ -255,248 +580,13 @@ function getBoundSpreadsheet_() {
   try {
     return SpreadsheetApp.openById(SPREADSHEET_ID);
   } catch (error) {
-    throw new Error('Spreadsheet Bemaco baru tidak dapat dibuka: ' + error.message);
+    throw new Error('Spreadsheet Bemaco tidak dapat dibuka: ' + error.message);
   }
-}
-
-function getSheetById_(spreadsheet, sheetConfig) {
-  const config = typeof sheetConfig === 'object' ? sheetConfig : { gid: Number(sheetConfig), names: [] };
-  const gid = Number(config.gid || 0);
-  let sheet = spreadsheet.getSheets().find(function(item) {
-    return gid && item.getSheetId() === gid;
-  });
-
-  if (!sheet && Array.isArray(config.names)) {
-    sheet = spreadsheet.getSheets().find(function(item) {
-      const name = String(item.getName() || '').trim().toLowerCase();
-      return config.names.some(function(candidate) {
-        return name === String(candidate || '').trim().toLowerCase();
-      });
-    });
-  }
-
-  if (!sheet) {
-    throw new Error('Sheet tidak ditemukan. Periksa GID atau nama tab: ' + JSON.stringify(config));
-  }
-  return sheet;
-}
-
-function ensureSourceHeaders_(sheet, sourceId, data) {
-  const defaultHeaders = DEFAULT_SOURCE_HEADERS[sourceId];
-  if (!Array.isArray(defaultHeaders) || !defaultHeaders.length) return;
-
-  const values = sheet.getDataRange().getDisplayValues();
-  const headerIndex = values.length ? findHeaderRow_(values) : 0;
-  const headers = values.length ? makeUniqueHeaders_(values[headerIndex]) : [];
-  const nonEmptyRows = values.filter(function(row) {
-    return row.some(function(value) { return String(value || '').trim() !== ''; });
-  }).length;
-  const genericHeaders = headers.length && headers.every(function(header) {
-    return /^column\s+\d+$/i.test(String(header || '').trim());
-  });
-  const missingDataHeaders = Object.keys(data || {}).some(function(key) {
-    return headers.indexOf(key) === -1;
-  });
-
-  if (!headers.length || genericHeaders || (nonEmptyRows <= 1 && missingDataHeaders)) {
-    if (sheet.getMaxColumns() < defaultHeaders.length) {
-      sheet.insertColumnsAfter(sheet.getMaxColumns(), defaultHeaders.length - sheet.getMaxColumns());
-    }
-    sheet.getRange(1, 1, 1, defaultHeaders.length).setValues([defaultHeaders]);
-    return;
-  }
-
-  if (missingDataHeaders) {
-    const additions = Object.keys(data || {}).filter(function(key) {
-      return headers.indexOf(key) === -1 && !isComputedHeader_(key);
-    });
-    if (additions.length) {
-      const startColumn = headers.length + 1;
-      if (sheet.getMaxColumns() < headers.length + additions.length) {
-        sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length + additions.length - sheet.getMaxColumns());
-      }
-      sheet.getRange(headerIndex + 1, startColumn, 1, additions.length).setValues([additions]);
-    }
-  }
-}
-
-function readSheet_(sheet) {
-  const values = sheet.getDataRange().getDisplayValues();
-  if (!values.length) return [];
-
-  const headerIndex = findHeaderRow_(values);
-  const headers = makeUniqueHeaders_(values[headerIndex]);
-  const records = [];
-
-  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
-    const row = values[rowIndex];
-    if (!row.some(function(value) { return String(value).trim() !== ''; })) continue;
-
-    const record = { '_Sumber Baris': rowIndex + 1 };
-    headers.forEach(function(header, columnIndex) {
-      record[header] = row[columnIndex] || '';
-    });
-    records.push(record);
-  }
-
-  return records;
-}
-
-function addPersonnelRow_(sheet, data) {
-  const values = sheet.getDataRange().getDisplayValues();
-  const headerIndex = findHeaderRow_(values);
-  const headers = makeUniqueHeaders_(values[headerIndex]);
-  const targetRow = Math.max(sheet.getLastRow() + 1, headerIndex + 2);
-  const sourceFormulaRow = Math.max(headerIndex + 2, targetRow - 1);
-
-  headers.forEach(function(header, columnIndex) {
-    const column = columnIndex + 1;
-    const targetCell = sheet.getRange(targetRow, column);
-    const sourceCell = sheet.getRange(sourceFormulaRow, column);
-    const formula = sourceFormulaRow < targetRow ? sourceCell.getFormulaR1C1() : '';
-
-    if (Object.prototype.hasOwnProperty.call(data, header) && !isComputedHeader_(header)) {
-      targetCell.setValue(normalizeWriteValue_(data[header]));
-    } else if (formula) {
-      targetCell.setFormulaR1C1(formula);
-    }
-  });
-}
-
-function upsertPersonnelRow_(sheet, data, matchColumn, matchValue) {
-  const values = sheet.getDataRange().getDisplayValues();
-  const headerIndex = findHeaderRow_(values);
-  const headers = makeUniqueHeaders_(values[headerIndex]);
-  const matchIndex = headers.indexOf(String(matchColumn || '').trim());
-  const expected = String(matchValue || data[matchColumn] || '').trim();
-
-  if (matchIndex !== -1 && expected) {
-    for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
-      if (String(values[rowIndex][matchIndex] || '').trim() === expected) {
-        updatePersonnelRow_(sheet, rowIndex + 1, data);
-        return;
-      }
-    }
-  }
-
-  addPersonnelRow_(sheet, data);
-}
-
-function deletePersonnelRowByKey_(sheet, matchColumn, matchValue) {
-  const values = sheet.getDataRange().getDisplayValues();
-  const headerIndex = findHeaderRow_(values);
-  const headers = makeUniqueHeaders_(values[headerIndex]);
-  const matchIndex = headers.indexOf(String(matchColumn || '').trim());
-  const expected = String(matchValue || '').trim();
-  if (matchIndex === -1 || !expected) return;
-
-  for (let rowIndex = headerIndex + 1; rowIndex < values.length; rowIndex += 1) {
-    if (String(values[rowIndex][matchIndex] || '').trim() === expected) {
-      sheet.deleteRow(rowIndex + 1);
-      return;
-    }
-  }
-}
-
-function updatePersonnelRow_(sheet, rowNumber, data) {
-  const values = sheet.getDataRange().getDisplayValues();
-  const headerIndex = findHeaderRow_(values);
-  const headers = makeUniqueHeaders_(values[headerIndex]);
-  const firstDataRow = headerIndex + 2;
-
-  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
-    throw new Error('Nomor baris personil tidak valid.');
-  }
-
-  headers.forEach(function(header, columnIndex) {
-    if (!Object.prototype.hasOwnProperty.call(data, header) || isComputedHeader_(header)) return;
-    const cell = sheet.getRange(rowNumber, columnIndex + 1);
-    if (cell.getFormula()) return;
-    cell.setValue(normalizeWriteValue_(data[header]));
-  });
-}
-
-function deletePersonnelRow_(sheet, rowNumber) {
-  const values = sheet.getDataRange().getDisplayValues();
-  const firstDataRow = findHeaderRow_(values) + 2;
-  if (!Number.isInteger(rowNumber) || rowNumber < firstDataRow || rowNumber > sheet.getLastRow()) {
-    throw new Error('Nomor baris personil tidak valid.');
-  }
-  sheet.deleteRow(rowNumber);
-}
-
-function findHeaderRow_(rows) {
-  let bestIndex = 0;
-  let bestScore = -1;
-  const limit = Math.min(rows.length, 35);
-
-  for (let index = 0; index < limit; index += 1) {
-    const row = rows[index].map(function(value) {
-      return String(value || '').trim();
-    });
-    const nonEmpty = row.filter(Boolean).length;
-    const text = normalizeText_(row.join(' '));
-    const keywordScore = [
-      'nama',
-      'personil',
-      'jabatan',
-      'posisi',
-      'status',
-      'pekerjaan',
-      'tanggal'
-    ].reduce(function(score, keyword) {
-      return score + (text.indexOf(keyword) !== -1 ? 4 : 0);
-    }, 0);
-    const score = nonEmpty + keywordScore;
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestIndex = index;
-    }
-  }
-
-  return bestIndex;
-}
-
-function makeUniqueHeaders_(row) {
-  const counts = {};
-  return row.map(function(value, index) {
-    const base = String(value || '').trim() || 'Kolom ' + (index + 1);
-    counts[base] = (counts[base] || 0) + 1;
-    return counts[base] === 1 ? base : base + ' ' + counts[base];
-  });
-}
-
-function isComputedHeader_(header) {
-  const normalized = normalizeText_(header);
-  return [
-    'pekerjaan aktif',
-    'tugas aktif',
-    'project aktif',
-    'keterlibatan pekerjaan',
-    'status selesai',
-    'akumulasi'
-  ].some(function(keyword) {
-    return normalized.indexOf(keyword) !== -1;
-  });
-}
-
-function normalizeWriteValue_(value) {
-  const text = String(value == null ? '' : value).trim();
-  if (text === '') return '';
-  return text;
-}
-
-function normalizeText_(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
 }
 
 function validateBridgeToken_(token) {
   if (!token || String(token) !== PERSONNEL_BRIDGE_TOKEN) {
-    throw new Error('Token Personnel Bridge tidak valid.');
+    throw new Error('Token Apps Script Bridge tidak valid.');
   }
 }
 

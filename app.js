@@ -102,41 +102,40 @@ let tenderJobSyncInProgress = false;
 let tenderSheetSyncInProgress = false;
 let lastTenderJobSignature = "";
 let lastTenderSheetSignature = "";
-const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v2";
+const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v3";
 const INVENTORY_CACHE_KEY = "bemaco.dashboard.inventory.v1";
-const BEMACO_SPREADSHEET_ID = "1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA";
-const LEGACY_EXTERNAL_SHEET_MARKERS = [
-  "2PACX-1vR20HvphHOLEYaiTrgLSlBqFPkqSq0y44IYFQE_MDzMVjNHRHNpdQkYrOX2sLeu6OzQ_a4sXGzT7CYq"
-];
-
-function buildSpreadsheetCsvUrl(gid) {
-  return "https://docs.google.com/spreadsheets/d/" + BEMACO_SPREADSHEET_ID + "/export?format=csv&gid=" + gid;
-}
 const DEFAULT_EXTERNAL_SHEET_SOURCES = [
   {
     id: "data-utama",
-    label: "Sheet DATA UTAMA",
-    url: buildSpreadsheetCsvUrl(2034016714)
+    label: "Sheet DATA UTAMA"
   },
   {
     id: "personil-bmc",
-    label: "Sheet PERSONIL BMC",
-    url: buildSpreadsheetCsvUrl(2048149704)
+    label: "Sheet PERSONIL BMC"
   },
   {
     id: "outsourcing",
-    label: "Sheet Outsourcing",
-    url: buildSpreadsheetCsvUrl(1030462578)
+    label: "Sheet Outsourcing"
   },
   {
     id: "bar-tender",
-    label: "Sheet BAR Tender",
-    url: ""
+    label: "Sheet BAR Tender"
   },
   {
     id: "finance",
-    label: "Sheet Finance",
-    url: ""
+    label: "Sheet Finance"
+  },
+  {
+    id: "finance-termin",
+    label: "Sheet FINANCE_TERMIN"
+  },
+  {
+    id: "finance-addendum",
+    label: "Sheet FINANCE_ADDENDUM"
+  },
+  {
+    id: "inventory",
+    label: "Sheet INVENTARIS"
   }
 ];
 const DEFAULT_DRIVE_URL = "https://drive.google.com/drive/folders/1d5-UJScndg70lIXMvM4DrqxAMEOCqkXR?usp=sharing";
@@ -201,7 +200,6 @@ const TENDER_SHEET_SOURCE_ID = "bar-tender";
 function createDefaultAppConfig() {
   return {
     driveUrl: DEFAULT_DRIVE_URL,
-    sheetUrls: Object.fromEntries(DEFAULT_EXTERNAL_SHEET_SOURCES.map(source => [source.id, source.url])),
     menuRoles: Object.fromEntries(
       Object.entries(DEFAULT_MENU_ROLES).map(([menu, roles]) => [menu, [...roles]])
     )
@@ -340,7 +338,6 @@ function bindControls() {
   document.getElementById("reportsResetButton").addEventListener("click", resetReportFilters);
   document.getElementById("reportsExportPdf").addEventListener("click", exportReportPdf);
   document.getElementById("reportsExportExcel").addEventListener("click", exportReportExcel);
-  document.getElementById("reportsExportCsv").addEventListener("click", exportReportCsv);
   document.getElementById("reportsPrint").addEventListener("click", printReportPreview);
   ["reportsType", "reportsStartDate", "reportsEndDate", "reportsSource", "reportsStatus", "reportsPerson"].forEach(id => {
     document.getElementById(id).addEventListener("change", renderReportsWorkspace);
@@ -348,7 +345,6 @@ function bindControls() {
   document.querySelectorAll("[data-report-template]").forEach(button => {
     button.addEventListener("click", () => applyReportTemplate(button.dataset.reportTemplate));
   });
-  document.getElementById("exportCsvButton").addEventListener("click", exportTasksCsv);
   document.getElementById("sendAllButton").addEventListener("click", sendAllReminders);
   document.getElementById("sendSelectedButton").addEventListener("click", sendSelectedReminders);
   document.getElementById("recipientSearch").addEventListener("focus", openRecipientCombobox);
@@ -393,7 +389,6 @@ function bindControls() {
   });
   document.getElementById("resetPersonnelFilters").addEventListener("click", resetPersonnelFilters);
   document.getElementById("refreshPersonnelButton").addEventListener("click", loadExternalSheetData);
-  document.getElementById("exportPersonnelButton").addEventListener("click", exportPersonnelCsv);
   document.getElementById("exportPersonnelExcelButton").addEventListener("click", exportPersonnelExcel);
   document.getElementById("exportPersonnelPdfButton").addEventListener("click", exportPersonnelPdf);
   document.getElementById("personnelToolsButton").addEventListener("click", togglePersonnelToolsMenu);
@@ -444,7 +439,6 @@ function bindControls() {
   document.getElementById("addJobButton").addEventListener("click", () => openJobRecordForm());
   document.getElementById("exportJobsPdfButton").addEventListener("click", exportJobsPdf);
   document.getElementById("exportJobsExcelButton").addEventListener("click", exportJobsExcel);
-  document.getElementById("exportJobsCsvButton").addEventListener("click", exportJobsCsv);
   document.getElementById("resetJobsFilters").addEventListener("click", resetJobsFilters);
   document.getElementById("jobsPrevPage").addEventListener("click", () => changeJobsPage(-1));
   document.getElementById("jobsNextPage").addEventListener("click", () => changeJobsPage(1));
@@ -855,19 +849,8 @@ function watchCurrentAccessRole(user) {
   });
 }
 
-function normalizeConfiguredSheetUrls(sheetUrls, defaultSheetUrls) {
-  return Object.fromEntries(Object.entries(sheetUrls).map(([sourceId, url]) => {
-    const cleanUrl = String(url || "").trim();
-    return [sourceId, isLegacyExternalSheetUrl(cleanUrl) ? defaultSheetUrls[sourceId] : cleanUrl];
-  }));
-}
-
-function isLegacyExternalSheetUrl(url) {
-  return LEGACY_EXTERNAL_SHEET_MARKERS.some(marker => url.includes(marker));
-}
 function normalizeAppConfig(value = {}) {
   const defaults = createDefaultAppConfig();
-  const sheetUrls = normalizeConfiguredSheetUrls({ ...defaults.sheetUrls, ...(value.sheetUrls || {}) }, defaults.sheetUrls);
   const menuRoles = {};
 
   MENU_DEFINITIONS.forEach(menu => {
@@ -879,7 +862,6 @@ function normalizeAppConfig(value = {}) {
 
   return {
     driveUrl: String(value.driveUrl || defaults.driveUrl).trim(),
-    sheetUrls,
     menuRoles
   };
 }
@@ -1063,12 +1045,7 @@ function renderSystemConfiguration() {
   if (driveLink) driveLink.href = config.driveUrl;
 
   const fields = {
-    configDriveUrl: config.driveUrl,
-    configDataUtamaUrl: config.sheetUrls["data-utama"],
-    configPersonilBmcUrl: config.sheetUrls["personil-bmc"],
-    configOutsourcingUrl: config.sheetUrls.outsourcing,
-    configBarTenderUrl: config.sheetUrls["bar-tender"],
-    configFinanceUrl: config.sheetUrls.finance
+    configDriveUrl: config.driveUrl
   };
   Object.entries(fields).forEach(([id, value]) => {
     const input = document.getElementById(id);
@@ -1116,11 +1093,6 @@ function validateHttpsUrl(value, label) {
   }
 }
 
-function validateOptionalHttpsUrl(value, label) {
-  const cleanValue = String(value || "").trim();
-  return cleanValue ? validateHttpsUrl(cleanValue, label) : "";
-}
-
 async function saveDataSourceConfig(event) {
   event.preventDefault();
   if (!requirePermission(canManageSystemConfig(), "Hanya Super Admin yang dapat mengubah sumber data.")) return;
@@ -1128,23 +1100,15 @@ async function saveDataSourceConfig(event) {
   const status = document.getElementById("dataSourceConfigStatus");
   try {
     const driveUrl = validateHttpsUrl(document.getElementById("configDriveUrl").value, "Google Drive");
-    const sheetUrls = {
-      "data-utama": validateHttpsUrl(document.getElementById("configDataUtamaUrl").value, "CSV DATA UTAMA"),
-      "personil-bmc": validateHttpsUrl(document.getElementById("configPersonilBmcUrl").value, "CSV PERSONIL BMC"),
-      outsourcing: validateHttpsUrl(document.getElementById("configOutsourcingUrl").value, "CSV Outsourcing"),
-      "bar-tender": validateOptionalHttpsUrl(document.getElementById("configBarTenderUrl").value, "CSV BAR Tender"),
-      finance: validateOptionalHttpsUrl(document.getElementById("configFinanceUrl").value, "CSV Finance")
-    };
     status.textContent = "Menyimpan...";
     await setDoc(doc(db, "appSettings", "general"), {
       driveUrl,
-      sheetUrls,
       updatedBy: normalizeEmail(currentUser?.email),
       updatedAt: serverTimestamp()
     }, { merge: true });
-    status.textContent = "Sumber data berhasil disimpan.";
+    status.textContent = "Folder Google Drive berhasil disimpan.";
   } catch (error) {
-    status.textContent = error.message || "Sumber data gagal disimpan.";
+    status.textContent = error.message || "Folder Google Drive gagal disimpan.";
   }
 }
 
@@ -1966,10 +1930,9 @@ function rankTextMatches(question, items) {
     .map(result => result.item);
 }
 
-function createInitialExternalSheets(config = createDefaultAppConfig()) {
+function createInitialExternalSheets() {
   return DEFAULT_EXTERNAL_SHEET_SOURCES.map(source => ({
     ...source,
-    url: config?.sheetUrls?.[source.id] || source.url,
     records: [],
     status: "idle",
     error: ""
@@ -1985,17 +1948,21 @@ async function loadExternalSheetData() {
   state.externalSheets = loadingSheets;
   renderExternalSheetStatus();
 
+  const cachedSheets = loadExternalSheetCache();
   let bridgeRecords = {};
-  if (window.PERSONNEL_BRIDGE_URL && window.PERSONNEL_BRIDGE_TOKEN) {
+  let bridgeError = "";
+
+  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) {
+    bridgeError = "Apps Script Bridge belum dikonfigurasi.";
+  } else {
     try {
       bridgeRecords = await loadPersonnelBridgeData();
     } catch (error) {
-      bridgeRecords = {};
+      bridgeError = error?.message || "Apps Script Bridge gagal membaca data.";
     }
   }
 
-  const cachedSheets = loadExternalSheetCache();
-  const results = await Promise.all(loadingSheets.map(async sheet => {
+  const results = loadingSheets.map(sheet => {
     if (Array.isArray(bridgeRecords[sheet.id])) {
       saveExternalSheetCache(sheet.id, bridgeRecords[sheet.id]);
       return {
@@ -2006,59 +1973,24 @@ async function loadExternalSheetData() {
         source: "bridge"
       };
     }
-    const sheetUrl = String(sheet.url || "").trim();
-    if (!sheetUrl) {
+
+    if (Array.isArray(cachedSheets[sheet.id]?.records) && cachedSheets[sheet.id].records.length) {
       return {
         ...sheet,
-        records: [],
-        status: "idle",
-        error: "URL CSV belum diisi."
-      };
-    }
-    try {
-      const separator = sheetUrl.includes("?") ? "&" : "?";
-      const response = await fetch(`${sheetUrl}${separator}_=${Date.now()}`, {
-        cache: "no-store"
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const csvText = await response.text();
-      if (!csvText.trim()) throw new Error("Data kosong");
-      const records = csvToRecords(csvText);
-      saveExternalSheetCache(sheet.id, records);
-      return {
-        ...sheet,
-        records,
+        records: cachedSheets[sheet.id].records,
         status: "ready",
-        error: "",
-        source: "csv"
-      };
-    } catch (error) {
-      if (Array.isArray(bridgeRecords[sheet.id])) {
-        saveExternalSheetCache(sheet.id, bridgeRecords[sheet.id]);
-        return {
-          ...sheet,
-          records: bridgeRecords[sheet.id],
-          status: "ready",
-          error: "",
-          source: "bridge"
-        };
-      }
-      if (Array.isArray(cachedSheets[sheet.id]?.records) && cachedSheets[sheet.id].records.length) {
-        return {
-          ...sheet,
-          records: cachedSheets[sheet.id].records,
-          status: "ready",
-          error: `Memakai cadangan lokal karena sumber utama gagal: ${error?.message || "Gagal memuat data"}`,
-          source: "cache"
-        };
-      }
-      return {
-        ...sheet,
-        status: "error",
-        error: error?.message || "Gagal memuat data"
+        error: bridgeError ? `Memakai cadangan lokal: ${bridgeError}` : "",
+        source: "cache"
       };
     }
-  }));
+
+    return {
+      ...sheet,
+      records: [],
+      status: "error",
+      error: bridgeError || "Apps Script Bridge tidak mengirim data sheet ini."
+    };
+  });
 
   state.externalSheets = results;
   externalSheetLastLoadedAt = Date.now();
@@ -2135,88 +2067,6 @@ function loadPersonnelBridgeData() {
       reject(new Error("Personnel Bridge gagal dimuat."));
     };
     document.head.appendChild(script);
-  });
-}
-
-function csvToRecords(csvText) {
-  const rows = parseCsv(csvText)
-    .map(row => row.map(value => String(value || "").trim()));
-  if (!rows.length) return [];
-
-  const headerIndex = findCsvHeaderRow(rows);
-  const headers = makeUniqueHeaders(rows[headerIndex]);
-
-  return rows.slice(headerIndex + 1)
-    .filter(row => row.some(value => value !== ""))
-    .map((row, index) => {
-      const record = { "_Sumber Baris": headerIndex + index + 2 };
-      headers.forEach((header, columnIndex) => {
-        record[header] = row[columnIndex] || "";
-      });
-      return record;
-    });
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let value = "";
-  let quoted = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    const nextCharacter = text[index + 1];
-
-    if (character === "\"") {
-      if (quoted && nextCharacter === "\"") {
-        value += "\"";
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === "," && !quoted) {
-      row.push(value);
-      value = "";
-    } else if ((character === "\n" || character === "\r") && !quoted) {
-      if (character === "\r" && nextCharacter === "\n") index += 1;
-      row.push(value);
-      rows.push(row);
-      row = [];
-      value = "";
-    } else {
-      value += character;
-    }
-  }
-
-  if (value || row.length) {
-    row.push(value);
-    rows.push(row);
-  }
-  return rows;
-}
-
-function findCsvHeaderRow(rows) {
-  let bestIndex = 0;
-  let bestScore = -1;
-  rows.slice(0, 30).forEach((row, index) => {
-    const nonEmpty = row.filter(value => value !== "");
-    const textCells = nonEmpty.filter(value => /[a-z]/i.test(value));
-    const score = (nonEmpty.length * 2) + textCells.length;
-    if (score > bestScore) {
-      bestScore = score;
-      bestIndex = index;
-    }
-  });
-  return bestIndex;
-}
-
-function makeUniqueHeaders(headerRow) {
-  const counts = new Map();
-  return headerRow.map((header, index) => {
-    const base = header || `Kolom ${index + 1}`;
-    const count = (counts.get(base) || 0) + 1;
-    counts.set(base, count);
-    return count === 1 ? base : `${base} (${count})`;
   });
 }
 
@@ -4671,26 +4521,6 @@ function exportJobsPdf() {
   printHtmlDocument(html);
 }
 
-function exportJobsCsv() {
-  closeJobsMenus();
-  const data = getJobsExportData();
-  if (!data) return;
-
-  const rows = data.records.map(record =>
-    data.columns.map(column => record[column] ?? "")
-  );
-  const csv = [data.columns, ...rows]
-    .map(row => row.map(csvCell).join(","))
-    .join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `daftar-pekerjaan-${state.today}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function getPersonnelSheet(sourceId = state.personnelSource) {
   return state.externalSheets.find(sheet => sheet.id === sourceId) || null;
 }
@@ -5025,7 +4855,7 @@ function renderPersonnel() {
     const message = sheet?.status === "loading"
       ? "Sedang memuat data spreadsheet..."
       : sheet?.status === "error"
-        ? "Spreadsheet belum dapat dibaca. Periksa publikasi CSV lalu klik Refresh."
+        ? "Spreadsheet belum dapat dibaca. Periksa Apps Script Bridge lalu klik Refresh."
         : "Menunggu sinkronisasi spreadsheet...";
     document.getElementById("personnelSyncText").textContent = message;
     document.getElementById("personnelResultCount").textContent = "0 data ditemukan";
@@ -5417,7 +5247,7 @@ async function deletePersonnelRecord(record) {
 
 async function sendPersonnelMutation(action, payload) {
   if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) {
-    notify("Personnel Bridge belum dikonfigurasi. Ikuti panduan PERSONNEL-BRIDGE.md.");
+    notify("Apps Script Bridge belum dikonfigurasi. Ikuti panduan BEMACO-SPREADSHEET-BRIDGE.md.");
     return;
   }
   if (!currentUser) return notify("Silakan login kembali.");
@@ -5453,21 +5283,6 @@ async function sendPersonnelMutation(action, payload) {
   } finally {
     if (submitButton) submitButton.disabled = false;
   }
-}
-
-function exportPersonnelCsv() {
-  const records = getFilteredPersonnelRecords();
-  if (!records.length) return notify("Tidak ada data personil untuk diekspor.");
-  const columns = getPersonnelColumns(records);
-  const rows = records.map(record => columns.map(column => getRecordDisplayValue(record, column)));
-  const csv = [columns, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${state.personnelSource}-${state.today}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function getPersonnelExportData() {
@@ -6999,7 +6814,7 @@ function renderFinance() {
     : sheet?.status === "loading"
       ? "Memuat Sheet Finance..."
       : sheet?.status === "idle"
-        ? "CSV Finance belum diisi. Daftar memakai data Portofolio sebagai kerangka."
+        ? "Sheet Finance belum tersedia dari Apps Script. Daftar memakai data Portofolio sebagai kerangka."
         : "Sheet Finance belum dapat dibaca. Daftar memakai data Portofolio sebagai kerangka.");
 
   if (!entries.length) {
@@ -7800,19 +7615,6 @@ function getCurrentReportModel() {
   return model;
 }
 
-function exportReportCsv() {
-  const model = getCurrentReportModel();
-  const rows = [["Bagian", "Isi"], ...model.sections.map(section => [section.title, section.text])];
-  const csv = rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `laporan-${state.today}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function exportReportExcel() {
   const model = getCurrentReportModel();
   const html = buildReportExportHtml(model);
@@ -8483,32 +8285,6 @@ function createReport() {
   generateReportPreview(true);
 }
 
-function exportTasksCsv() {
-  closeActionMenu();
-  const tasks = getFilteredTasks(false);
-  if (!tasks.length) return notify("Belum ada tugas untuk diekspor.");
-
-  const headers = ["Tanggal", "Nama Tugas", "Prioritas", "Status", "Deadline", "Penanggung Jawab", "Email", "Catatan"];
-  const rows = tasks.map(task => [
-    task.tanggal,
-    task.namaTugas,
-    task.prioritas,
-    task.status,
-    task.deadline,
-    task.penanggungJawab,
-    task.emailPenanggungJawab,
-    task.catatan
-  ]);
-  const csv = [headers, ...rows].map(row => row.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `asisten-harian-${state.today}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function buildStats(tasks) {
   const normalized = tasks.map(task => ({ ...task, terlambat: isOverdue(task) }));
   return {
@@ -8553,10 +8329,6 @@ function buildTaskPreview(task) {
   return [task.deadline ? `Deadline ${task.deadline}` : "", task.penanggungJawab ? `PJ ${task.penanggungJawab}` : "", task.catatan || ""]
     .filter(Boolean)
     .join(" - ") || "Tidak ada detail tambahan.";
-}
-
-function csvCell(value) {
-  return `"${String(value || "").replaceAll('"', '""')}"`;
 }
 
 function loadCachedTasks() {

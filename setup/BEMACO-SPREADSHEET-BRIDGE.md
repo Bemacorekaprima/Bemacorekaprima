@@ -1,49 +1,63 @@
-﻿# Bemaco Spreadsheet Bridge Baru
+# BEMACO Apps Script Bridge
 
-Bridge ini mengganti bridge lama dan diarahkan ke spreadsheet baru:
+Bridge ini menjadi satu pintu sinkronisasi web dengan Google Spreadsheet:
 
 https://docs.google.com/spreadsheets/d/1H5eAR4_Q3Du0C1zPxxI_ZoBm-gQibMsks_DxUdSUfjA/edit?usp=sharing
 
+Web tidak lagi membaca data melalui link CSV publik. Semua baca, tambah, edit, hapus, upsert, dan pembuatan sheet/header dilakukan melalui Apps Script.
+
 ## File Apps Script
 
-Copy seluruh isi file ini ke Apps Script:
+Salin seluruh isi file ini ke Apps Script:
 
-`	ext
+```text
 setup/bemaco-spreadsheet-bridge-Code.gs.txt
-`
+```
 
 ## Cara pasang
 
-1. Buka https://script.google.com atau buka spreadsheet baru lalu pilih Ekstensi > Apps Script.
-2. Buat project baru, hapus isi Code.gs, lalu paste isi emaco-spreadsheet-bridge-Code.gs.txt.
-3. Klik Simpan.
-4. Klik Terapkan > Deployment baru > Aplikasi web.
-5. Jalankan sebagai: Saya.
-6. Yang memiliki akses: Siapa saja.
-7. Klik Terapkan dan setujui izin Google.
-8. Copy URL yang berakhiran /exec.
-9. Paste URL tersebut ke irebase-config.js:
+1. Buka spreadsheet BEMACO.
+2. Pilih `Ekstensi > Apps Script`.
+3. Hapus isi `Code.gs`.
+4. Paste isi `setup/bemaco-spreadsheet-bridge-Code.gs.txt`.
+5. Klik `Simpan`.
+6. Klik `Terapkan > Deployment baru > Aplikasi web`.
+7. Jalankan sebagai: `Saya`.
+8. Yang memiliki akses: `Siapa saja`.
+9. Klik `Terapkan` dan setujui izin Google.
+10. Copy URL yang berakhiran `/exec`.
+11. Pastikan `firebase-config.js` berisi URL dan token berikut:
 
-`js
+```js
 window.PERSONNEL_BRIDGE_URL = "URL_APPS_SCRIPT_BARU_YANG_BERAKHIR_EXEC";
 window.PERSONNEL_BRIDGE_TOKEN = "Bemaco-20260630-spreadsheet-bridge";
-`
+```
 
-## Sheet yang dibaca
+## Sheet yang dikelola otomatis
 
-Bridge mencari tab dengan GID lama terlebih dahulu, lalu fallback ke nama tab:
+Apps Script akan mencari tab berdasarkan GID/nama. Jika tab belum ada, script akan membuat sheet dan header otomatis.
 
-- DATA UTAMA
-- PERSONIL BMC
-- Outsourcing
+- `DATA UTAMA`
+- `PERSONIL BMC`
+- `Outsourcing`
+- `BAR Tender`
+- `Finance`
+- `FINANCE_TERMIN`
+- `FINANCE_ADDENDUM`
+- `INVENTARIS`
 
-Jika tab pada spreadsheet baru punya nama berbeda, ubah daftar 
-ames pada PERSONNEL_SHEETS di Code.gs.
+## Aksi yang didukung
 
-## Catatan
+- `read`: membaca semua sheet untuk web.
+- `ensureSheet`: membuat sheet/header jika belum tersedia.
+- `add`: menambah baris baru.
+- `update`: mengubah baris berdasarkan `_Sumber Baris`.
+- `upsert`: update jika data ditemukan, tambah jika belum ada.
+- `delete`: hapus baris berdasarkan `_Sumber Baris`.
+- `deleteByKey`: hapus berdasarkan kolom kunci.
 
-Email Bridge lama sudah dinonaktifkan dari konfigurasi web. Tombol email akan kembali memakai mailto sampai dibuat bridge email baru khusus pengiriman reminder.
+## Catatan teknis
 
-## Update sinkronisasi dua arah
-
-Versi bridge ini membaca dan menulis tab DATA UTAMA, PERSONIL BMC, Outsourcing, BAR Tender, dan Finance. Setelah file emaco-spreadsheet-bridge-Code.gs.txt diperbarui, salin seluruh isi file tersebut ke Apps Script yang sudah ter-deploy, lalu Deploy > Manage deployments > Edit > New version agar web dapat menulis data Finance/BAR Tender ke spreadsheet.
+- Google Drive tetap disimpan dari halaman Pengaturan web untuk folder dokumen.
+- Sheet/header spreadsheet tidak perlu diisi manual untuk fitur baru yang sudah terdaftar di bridge.
+- Setelah mengubah Apps Script, gunakan `Deploy > Manage deployments > Edit > New version` agar web memakai versi terbaru.
