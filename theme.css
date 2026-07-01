@@ -201,7 +201,7 @@ input:focus, select:focus, textarea:focus {
     padding: 26px 14px;
     border-radius: 0;
   }
-  .brand-row.compact { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; min-height: auto; }
+  .brand-row.compact { display: grid; grid-template-columns: 1fr; gap: 0; justify-items: start; min-height: 42px; }
   .sidebar-menu-mark { position: absolute; left: 10px; top: 18px; }
   .nav {
     display: grid;
