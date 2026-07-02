@@ -3252,6 +3252,7 @@ function handleInventoryTableClick(event) {
   const rowTarget = event.target.closest("[data-inventory-id]");
   const id = actionButton?.dataset.inventoryId || rowTarget?.dataset.inventoryId || "";
   if (!id) return;
+  const scrollState = captureInventoryScrollState();
   const record = getInventoryRecords().find(item => item.id === id);
   if (!record) return;
   state.selectedInventoryId = id;
@@ -3262,9 +3263,11 @@ function handleInventoryTableClick(event) {
     else if (action === "edit") openInventoryUsageModal({ mode: "edit", record });
     else openInventoryUsageModal({ mode: "detail", record });
     renderInventoryWorkspace();
+    restoreInventoryScrollState(scrollState);
     return;
   }
   renderInventoryWorkspace();
+  restoreInventoryScrollState(scrollState);
 }
 
 function handleInventoryAction(action, inventoryId = "") {
@@ -3304,11 +3307,13 @@ function handleInventorySummaryClick(event) {
 }
 
 function openInventoryUsageModal(options = {}) {
+  const scrollState = captureInventoryScrollState();
   const mode = options.mode || "usage";
   const usageRecord = isInventoryAvailable(options.record) ? options.record : {};
   const record = mode === "usage" ? usageRecord : (options.record || getSelectedInventoryRecord() || {});
   const modal = document.getElementById("inventoryUsageModal");
   if (!modal) return;
+  modal.setAttribute("tabindex", "-1");
   state.inventoryFormMode = mode;
 
   setTextContent("inventoryUsageTitle", mode === "add" ? "Tambah Inventaris Kantor" :
@@ -3343,11 +3348,38 @@ function openInventoryUsageModal(options = {}) {
   populateInventoryDatalists();
   renderInventoryHistoryPreview(record);
   if (!modal.open) modal.showModal();
+  modal.focus({ preventScroll: true });
+  restoreInventoryScrollState(scrollState);
 }
 
 function closeInventoryUsageModal() {
   const modal = document.getElementById("inventoryUsageModal");
   if (modal?.open) modal.close();
+}
+
+function captureInventoryScrollState() {
+  const main = document.querySelector(".main");
+  return {
+    windowX: window.scrollX || 0,
+    windowY: window.scrollY || 0,
+    mainTop: main?.scrollTop || 0,
+    mainLeft: main?.scrollLeft || 0
+  };
+}
+
+function restoreInventoryScrollState(stateSnapshot) {
+  if (!stateSnapshot) return;
+  const restore = () => {
+    const main = document.querySelector(".main");
+    if (main) {
+      main.scrollTop = stateSnapshot.mainTop;
+      main.scrollLeft = stateSnapshot.mainLeft;
+    }
+    window.scrollTo(stateSnapshot.windowX, stateSnapshot.windowY);
+  };
+  restore();
+  requestAnimationFrame(restore);
+  window.setTimeout(restore, 80);
 }
 
 function saveInventoryUsage(event) {
