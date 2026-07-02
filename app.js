@@ -294,7 +294,6 @@ let state = {
   dashboardAssignmentFilter: "all",
   inventoryRecords: [],
   selectedInventoryId: "",
-  dashboardInventoryFilter: "",
   inventorySearch: "",
   inventoryStatusFilter: "all"
 };
@@ -410,7 +409,6 @@ function bindControls() {
   document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
   document.getElementById("dashInventorySummary")?.addEventListener("click", handleInventorySummaryClick);
   document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
-  document.getElementById("dashInventoryUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage" }));
   document.getElementById("inventoryAddItemButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
   document.getElementById("inventoryDetailUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage", record: getSelectedInventoryRecord() }));
   document.getElementById("inventoryDetailEditButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "edit", record: getSelectedInventoryRecord() }));
@@ -650,6 +648,12 @@ document.addEventListener("click", event => {
     const scrollState = captureInventoryScrollState();
     handleInventoryAction(inventoryAction.dataset.inventoryAction, inventoryAction.dataset.inventoryId);
     restoreInventoryScrollState(scrollState);
+    return;
+  }
+
+  const inventoryOpen = event.target.closest("[data-inventory-open-filter]");
+  if (inventoryOpen) {
+    openInventoryViewWithFilter(inventoryOpen.dataset.inventoryOpenFilter || "all");
     return;
   }
 
@@ -2972,24 +2976,34 @@ function getInventoryRecordById(id) {
   return getInventoryRecords().find(item => item.id === id) || null;
 }
 
-function getInventoryRecordsByDashboardFilter(filter = state.dashboardInventoryFilter || "") {
-  const records = getInventoryRecords();
-  const statusMap = {
+function getInventoryStatusByDashboardFilter(filter = "all") {
+  return {
+    all: "all",
     used: "Dipakai",
     available: "Tersedia",
     maintenance: "Perawatan"
-  };
-  const status = statusMap[filter];
-  return status ? records.filter(item => (item.status || "Tersedia") === status) : records;
+  }[filter] || "all";
+}
+
+function openInventoryViewWithFilter(filter = "all") {
+  const statusFilter = getInventoryStatusByDashboardFilter(filter);
+  const records = getInventoryRecords();
+  state.inventorySearch = "";
+  state.inventoryStatusFilter = statusFilter;
+  const selected = statusFilter === "all"
+    ? records[0]
+    : records.find(item => (item.status || "Tersedia") === statusFilter);
+  state.selectedInventoryId = selected?.id || "";
+  setView("inventory");
+  renderInventoryWorkspace();
 }
 
 function renderDashboardInventory() {
   const records = getInventoryRecords();
-  const selected = getSelectedInventoryRecord();
-  if (selected) state.selectedInventoryId = selected.id;
+  const usedRecords = records.filter(item => item.status === "Dipakai");
+  const selected = usedRecords.find(item => item.id === state.selectedInventoryId) || usedRecords[0] || null;
 
   const counts = getInventoryCounts(records);
-  const activeFilter = state.dashboardInventoryFilter || "";
 
   const summary = document.getElementById("dashInventorySummary");
   if (summary) {
@@ -2999,7 +3013,7 @@ function renderDashboardInventory() {
       { key: "available", label: "Tersedia", count: counts.available, note: "Siap digunakan", icon: "check" },
       { key: "maintenance", label: "Perawatan", count: counts.maintenance, note: "Dalam perawatan", icon: "wrench" }
     ].map(item => `
-      <button class="${activeFilter === item.key || (!activeFilter && item.key === "all") ? "active" : ""}" type="button" data-inventory-status-filter="${escapeHtml(item.key)}">
+      <button type="button" data-inventory-status-filter="${escapeHtml(item.key)}">
         <i data-lucide="${escapeHtml(item.icon)}" aria-hidden="true"></i>
         <span>
           <small>${escapeHtml(item.label)}</small>
@@ -3012,31 +3026,31 @@ function renderDashboardInventory() {
 
   const container = document.getElementById("dashInventoryItem");
   if (!container) return;
-  if (!selected) {
-    container.innerHTML = '<p class="dashboard-empty">Belum ada inventaris kantor.</p>';
+  if (!usedRecords.length) {
+    container.innerHTML = `
+      <div class="dashboard-inventory-filter-list dashboard-inventory-used-list">
+        <div class="dashboard-inventory-filter-head">
+          <div>
+            <strong>Inventaris Sedang Digunakan</strong>
+            <span>0 item</span>
+          </div>
+        </div>
+        <p class="dashboard-empty">Belum ada inventaris yang sedang digunakan.</p>
+      </div>
+    `;
     return;
   }
 
-  if (activeFilter) {
-    const filteredRecords = getInventoryRecordsByDashboardFilter(activeFilter);
-    const filterLabels = {
-      all: "Semua Inventaris",
-      used: "Inventaris Dipakai",
-      available: "Inventaris Tersedia",
-      maintenance: "Inventaris Perawatan"
-    };
+  if (usedRecords.length > 1) {
     container.innerHTML = `
-      <div class="dashboard-inventory-filter-list">
+      <div class="dashboard-inventory-filter-list dashboard-inventory-used-list">
         <div class="dashboard-inventory-filter-head">
           <div>
-            <strong>${escapeHtml(filterLabels[activeFilter] || "Inventaris Kantor")}</strong>
-            <span>${filteredRecords.length} item</span>
+            <strong>Inventaris Sedang Digunakan</strong>
+            <span>${usedRecords.length} item</span>
           </div>
-          <button class="text-button" type="button" data-inventory-action="collapse">Ringkas</button>
         </div>
-        ${filteredRecords.length ? filteredRecords.map(item => {
-          const status = item.status || "Tersedia";
-          const canUse = isInventoryAvailable(item);
+        ${usedRecords.map(item => {
           const time = [formatInventoryTime(item.departTime), formatInventoryTime(item.returnTime)]
             .filter(value => value && value !== "-")
             .join(" - ") || "-";
@@ -3046,14 +3060,10 @@ function renderDashboardInventory() {
                 <strong>${escapeHtml(item.name || "Inventaris Kantor")}</strong>
                 <span>${escapeHtml([item.user || "-", time].join(" | "))}</span>
               </button>
-              <em class="inventory-status ${escapeHtml(safeClassToken(status))}">${escapeHtml(getInventoryStatusLabel(status))}</em>
-              <div>
-                ${canUse ? `<button class="text-button" type="button" data-inventory-action="usage" data-inventory-id="${escapeHtml(item.id)}">Gunakan</button>` : ""}
-                <button class="text-button" type="button" data-inventory-action="edit" data-inventory-id="${escapeHtml(item.id)}">Edit</button>
-              </div>
+              <em class="inventory-status dipakai">Sedang Digunakan</em>
             </article>
           `;
-        }).join("") : '<p class="dashboard-empty">Belum ada item untuk status ini.</p>'}
+        }).join("")}
       </div>
     `;
     window.lucide?.createIcons?.();
@@ -3064,7 +3074,7 @@ function renderDashboardInventory() {
   const progress = getInventoryUsageProgress(selected);
   const usageHours = getInventoryUsageHours(selected);
   container.innerHTML = `
-    <button class="dashboard-inventory-main" type="button" data-inventory-action="detail">
+    <button class="dashboard-inventory-main" type="button" data-inventory-action="detail" data-inventory-id="${escapeHtml(selected.id)}">
       <span class="inventory-photo-frame">
         <img src="assets/inventory-car.svg" alt="${escapeHtml(selected.name || "Inventaris kantor")}">
       </span>
@@ -3281,12 +3291,10 @@ function handleInventoryAction(action, inventoryId = "") {
   const selected = inventoryId ? getInventoryRecordById(inventoryId) : getSelectedInventoryRecord();
   if (selected) state.selectedInventoryId = selected.id;
   if (action === "list") {
-    state.dashboardInventoryFilter = "all";
-    renderDashboardInventory();
+    openInventoryViewWithFilter("all");
     return;
   }
   if (action === "collapse") {
-    state.dashboardInventoryFilter = "";
     renderDashboardInventory();
     return;
   }
@@ -3302,27 +3310,8 @@ function handleInventoryAction(action, inventoryId = "") {
 function handleInventorySummaryClick(event) {
   const button = event.target.closest("[data-inventory-status-filter]");
   if (!button) return;
-  const scrollState = captureInventoryScrollState();
-  const records = getInventoryRecords();
   const filter = button.dataset.inventoryStatusFilter || "all";
-  const statusMap = {
-    used: "Dipakai",
-    available: "Tersedia",
-    maintenance: "Perawatan"
-  };
-  const targetStatus = statusMap[filter];
-  const match = targetStatus
-    ? records.find(item => item.status === targetStatus)
-    : records[0];
-  if (!match) {
-    notify(`Belum ada inventaris dengan status ${button.textContent.trim() || "tersebut"}.`, { type: "warning" });
-    return;
-  }
-  state.dashboardInventoryFilter = filter;
-  state.selectedInventoryId = match.id;
-  renderDashboardInventory();
-  renderInventoryWorkspace();
-  restoreInventoryScrollState(scrollState);
+  openInventoryViewWithFilter(filter);
 }
 
 function openInventoryUsageModal(options = {}) {
