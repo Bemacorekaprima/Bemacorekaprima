@@ -254,15 +254,7 @@
               <span class="dashboard-kpi-copy">
                 <small>Personil</small>
                 <strong id="dashKpiPersonnel">0</strong>
-                <em id="dashKpiPersonnelMeta">0 tidak aktif</em>
-              </span>
-            </button>
-            <button class="dashboard-kpi-card accent-indigo" type="button" data-dashboard-open="tenders">
-              <span class="dashboard-kpi-icon"><i data-lucide="folder-open"></i></span>
-              <span class="dashboard-kpi-copy">
-                <small>Dokumen</small>
-                <strong id="dashKpiDocuments">0</strong>
-                <em id="dashKpiDocumentsMeta">0 final</em>
+                <em id="dashKpiPersonnelMeta">0 Aktif &bull; 0 Idle &bull; 0 Cuti</em>
               </span>
             </button>
             <button class="dashboard-kpi-card accent-amber" type="button" data-dashboard-open="jobs">
@@ -270,15 +262,7 @@
               <span class="dashboard-kpi-copy">
                 <small>Paket Prioritas</small>
                 <strong id="dashKpiPriority">0</strong>
-                <em id="dashKpiPriorityMeta">0 tinggi</em>
-              </span>
-            </button>
-            <button class="dashboard-kpi-card accent-cyan" type="button" data-dashboard-open="reports">
-              <span class="dashboard-kpi-icon"><i data-lucide="line-chart"></i></span>
-              <span class="dashboard-kpi-copy">
-                <small>Status Hari Ini</small>
-                <strong id="dashKpiStatus">0%</strong>
-                <em>Progress keseluruhan</em>
+                <em id="dashKpiPriorityMeta">0 Tinggi &bull; 0 Sedang &bull; 0 Rendah</em>
               </span>
             </button>
           </section>
@@ -362,20 +346,29 @@
                 </button>
               </article>
 
-              <article class="dashboard-card">
+              <article class="dashboard-card dashboard-personnel-card">
                 <header class="dashboard-card-header">
                   <h3><i data-lucide="user-round" aria-hidden="true"></i> Personil</h3>
                   <button class="text-button" type="button" data-dashboard-open="personnel">Lihat Semua</button>
                 </header>
-                <div class="dashboard-personnel-total">
-                  <span>Total Personil</span>
-                  <strong id="dashPersonnelTotal">0</strong>
+                <div class="dashboard-personnel-content">
+                  <div class="dashboard-personnel-overview">
+                    <div class="dashboard-personnel-total">
+                      <span>Total Personil</span>
+                      <strong id="dashPersonnelTotal">0</strong>
+                    </div>
+                    <div class="dashboard-personnel-summary">
+                      <div id="dashPersonnelRing" class="dashboard-donut" aria-hidden="true"></div>
+                      <dl id="dashPersonnelLegend"></dl>
+                    </div>
+                  </div>
+                  <div class="dashboard-personnel-table-wrap">
+                    <table class="dashboard-personnel-table">
+                      <thead><tr><th>Nama Personil</th><th>Status</th><th>Pekerjaan</th></tr></thead>
+                      <tbody id="dashPersonnelRows"></tbody>
+                    </table>
+                  </div>
                 </div>
-                <div class="dashboard-personnel-summary">
-                  <div id="dashPersonnelRing" class="dashboard-donut" aria-hidden="true"></div>
-                  <dl id="dashPersonnelLegend"></dl>
-                </div>
-                <button class="dashboard-card-footer-button" type="button" data-dashboard-open="personnel">Kelola Personil</button>
               </article>
 
               <article class="dashboard-card dashboard-assignment-card">
@@ -404,30 +397,11 @@
                 </div>
               </article>
 
-              <article class="dashboard-card">
+              <article class="dashboard-card dashboard-progress-card">
                 <header class="dashboard-card-header">
-                  <h3><i data-lucide="file-text" aria-hidden="true"></i> Dokumen</h3>
-                  <button class="text-button" type="button" data-dashboard-open="tenders">Lihat Semua</button>
+                  <h3><i data-lucide="file-text" aria-hidden="true"></i> Progress Laporan &amp; BAST</h3>
                 </header>
-                <div class="dashboard-document-summary">
-                  <div class="dashboard-document-total">
-                    <i data-lucide="files" aria-hidden="true"></i>
-                    <span>Total Dokumen</span>
-                    <strong id="dashDocumentTotal">0</strong>
-                    <em id="dashDocumentFinal">0 final</em>
-                  </div>
-                  <div id="dashDocumentBreakdown" class="dashboard-document-breakdown"></div>
-                </div>
-                <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tenders">Kelola Dokumen</button>
-              </article>
-
-              <article class="dashboard-card">
-                <header class="dashboard-card-header">
-                  <h3><i data-lucide="bell" aria-hidden="true"></i> Pengingat Email</h3>
-                  <button class="text-button" type="button" data-dashboard-open="tasks">Lihat Semua</button>
-                </header>
-                <div id="dashReminderList" class="dashboard-reminder-list"></div>
-                <button class="dashboard-card-footer-button" type="button" data-dashboard-open="tasks">Lihat Semua Pengingat</button>
+                <div id="dashboardProgressBast" class="dashboard-progress-bast"></div>
               </article>
             </aside>
           </section>

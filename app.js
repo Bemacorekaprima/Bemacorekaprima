@@ -2558,10 +2558,11 @@ function renderDashboardPortfolioHome() {
   const taskStats = buildStats(state.tasks);
   const activeTenders = getDashboardActiveTenders();
   const personnel = getAllIntegratedPersonnelRecords(getCurrentSummaryYear());
-  const inactivePersonnel = personnel.filter(record => getPersonnelActiveWork(record) <= 0);
-  const documentSummary = getDashboardDocumentSummary();
-  const priorityItems = getDashboardPriorityItems(allJobs);
-  const statusPercent = getDashboardStatusPercent(taskStats, counts, documentSummary);
+  const personnelSummary = getDashboardPersonnelSummary(personnel);
+  const prioritySourceItems = getDashboardPrioritySourceItems(allJobs);
+  const priorityItems = prioritySourceItems.slice(0, 4);
+  const tenderSummary = getDashboardTenderKpiSummary(activeTenders);
+  const prioritySummary = getDashboardPriorityKpiSummary(prioritySourceItems);
 
   document.getElementById("dashboardPortfolioYearLabel").textContent = "Seluruh portofolio";
   document.getElementById("dashboardPortfolioTotal").textContent = counts.total;
@@ -2571,25 +2572,21 @@ function renderDashboardPortfolioHome() {
   document.getElementById("dashboardPortfolioUpcoming").textContent = counts.upcoming;
 
   setTextContent("dashKpiTasks", taskStats.total);
-  setTextContent("dashKpiTasksMeta", `${taskStats.selesai} selesai`);
+  setTextContent("dashKpiTasksMeta", `${taskStats.selesai} Selesai  •  ${taskStats.pending} Pending`);
   setTextContent("dashKpiTenders", activeTenders.length);
-  setTextContent("dashKpiTendersMeta", `${activeTenders.filter(isTenderDeadlineUrgent).length} akan closing`);
+  setTextContent("dashKpiTendersMeta", `${tenderSummary.baru} Baru  •  ${tenderSummary.evaluasi} Evaluasi  •  ${tenderSummary.penawaran} Penawaran`);
   setTextContent("dashKpiPersonnel", personnel.length);
-  setTextContent("dashKpiPersonnelMeta", `${inactivePersonnel.length} tidak aktif`);
-  setTextContent("dashKpiDocuments", documentSummary.total);
-  setTextContent("dashKpiDocumentsMeta", `${documentSummary.final} final`);
-  setTextContent("dashKpiPriority", priorityItems.length);
-  setTextContent("dashKpiPriorityMeta", `${priorityItems.filter(item => item.priority === "Tinggi").length} tinggi`);
-  setTextContent("dashKpiStatus", `${statusPercent}%`);
+  setTextContent("dashKpiPersonnelMeta", `${personnelSummary.aktif.count} Aktif  •  ${personnelSummary.idle.count} Idle  •  ${personnelSummary.cuti.count} Cuti`);
+  setTextContent("dashKpiPriority", prioritySourceItems.length);
+  setTextContent("dashKpiPriorityMeta", `${prioritySummary.tinggi} Tinggi  •  ${prioritySummary.sedang} Sedang  •  ${prioritySummary.rendah} Rendah`);
 
   renderDashboardDailyTasks();
   renderDashboardTenderRows(activeTenders);
   renderDashboardPersonnelSummary(personnel);
   renderDashboardAssignmentSummary(personnel.length);
-  renderDashboardDocuments(documentSummary);
   renderDashboardInventory();
-  renderDashboardReminders(activeTenders);
   renderDashboardPriorityRows(priorityItems);
+  renderDashboardProgressBast(prioritySourceItems);
 
   document.getElementById("dashboardActivityList").innerHTML =
     renderPortfolioActivityItems(buildPortfolioActivities(allJobs));
@@ -2606,43 +2603,38 @@ function setTextContent(id, value) {
   if (element) element.textContent = value;
 }
 
+function formatDashboardPercent(count, total) {
+  const percent = total ? (count / total) * 100 : 0;
+  return percent.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function getDashboardTenderKpiSummary(tenders) {
+  return tenders.reduce((summary, tender) => {
+    const status = normalizeSearchText(tender.status);
+    if (status.includes("evaluasi")) summary.evaluasi += 1;
+    else if (status.includes("penawaran")) summary.penawaran += 1;
+    else summary.baru += 1;
+    return summary;
+  }, { baru: 0, evaluasi: 0, penawaran: 0 });
+}
+
+function getDashboardPriorityKpiSummary(items) {
+  return items.reduce((summary, item) => {
+    const priority = normalizeSearchText(item.priority);
+    if (priority.includes("tinggi")) summary.tinggi += 1;
+    else if (priority.includes("rendah")) summary.rendah += 1;
+    else summary.sedang += 1;
+    return summary;
+  }, { tinggi: 0, sedang: 0, rendah: 0 });
+}
+
 function getDashboardActiveTenders() {
   return state.tenders
     .filter(tender => !["Kontrak", "Arsip", "Selesai"].includes(tender.status))
     .sort((left, right) => String(left.deadline || "9999").localeCompare(String(right.deadline || "9999")));
-}
-
-function getDashboardDocumentSummary() {
-  const groups = new Map();
-  let total = 0;
-  let final = 0;
-
-  state.tenders.forEach(tender => {
-    getTenderProgress(tender).documents.forEach(documentItem => {
-      total += 1;
-      if (documentItem.status === "Final") final += 1;
-      const group = documentItem.group || "Dokumen";
-      groups.set(group, (groups.get(group) || 0) + 1);
-    });
-  });
-
-  if (!total) {
-    TENDER_DOCUMENT_BLUEPRINT.forEach(([group]) => {
-      total += 1;
-      groups.set(group, (groups.get(group) || 0) + 1);
-    });
-  }
-
-  return { total, final, groups };
-}
-
-function getDashboardStatusPercent(taskStats, counts, documentSummary) {
-  const taskPart = taskStats.total ? taskStats.selesai / taskStats.total : 0;
-  const portfolioPart = counts.total ? (counts.finish + counts.active * 0.65 + counts.tender * 0.45 + counts.upcoming * 0.15) / counts.total : 0;
-  const documentPart = documentSummary.total ? documentSummary.final / documentSummary.total : 0;
-  const available = [taskPart, portfolioPart, documentPart].filter(value => Number.isFinite(value));
-  if (!available.length) return 0;
-  return Math.round((available.reduce((sum, value) => sum + value, 0) / available.length) * 100);
 }
 
 function renderDashboardDailyTasks() {
@@ -2686,21 +2678,8 @@ function renderDashboardTenderRows(tenders) {
 
 function renderDashboardPersonnelSummary(personnel) {
   const total = personnel.length;
-  const counts = new Map();
-  personnel.forEach(record => {
-    const rawStatus = normalizeSearchText(getPersonnelStatus(record));
-    const label = rawStatus.includes("cuti") ? "Cuti" :
-      rawStatus.includes("training") || rawStatus.includes("pelatihan") ? "Training" :
-      getPersonnelActiveWork(record) > 0 ? "Aktif" : "Tidak Aktif";
-    counts.set(label, (counts.get(label) || 0) + 1);
-  });
-
-  const palette = ["#22c55e", "#ef4444", "#f59e0b", "#2563eb"];
-  const entries = ["Aktif", "Tidak Aktif", "Cuti", "Training"].map((label, index) => ({
-    label,
-    count: counts.get(label) || 0,
-    color: palette[index]
-  }));
+  const summary = getDashboardPersonnelSummary(personnel);
+  const entries = Object.values(summary);
   let current = 0;
   const stops = entries.map(item => {
     const start = current;
@@ -2717,10 +2696,67 @@ function renderDashboardPersonnelSummary(personnel) {
     legend.innerHTML = entries.map(item => `
       <div>
         <dt><span style="background:${item.color}"></span>${escapeHtml(item.label)}</dt>
-        <dd>${item.count} ${total ? `(${Math.round((item.count / total) * 100)}%)` : "(0%)"}</dd>
+        <dd>${item.count} (${formatDashboardPercent(item.count, total)}%)</dd>
       </div>
     `).join("");
   }
+
+  const body = document.getElementById("dashPersonnelRows");
+  if (body) {
+    const rows = getDashboardPersonnelRows(personnel).slice(0, 30);
+    body.innerHTML = rows.length ? rows.map(row => `
+      <tr>
+        <td>${escapeHtml(row.name)}</td>
+        <td><span class="personnel-status-pill ${escapeHtml(row.statusKey)}">${escapeHtml(row.status)}</span></td>
+        <td>${escapeHtml(row.work)}</td>
+      </tr>
+    `).join("") : '<tr><td colspan="3" class="dashboard-empty">Belum ada data personil.</td></tr>';
+  }
+}
+
+function getDashboardPersonnelStatus(record) {
+  const rawStatus = normalizeSearchText(getPersonnelStatus(record));
+  if (rawStatus.includes("cuti")) return { key: "cuti", label: "Cuti" };
+  if (getPersonnelActiveWork(record) > 0) return { key: "aktif", label: "Aktif" };
+  return { key: "idle", label: "Idle" };
+}
+
+function getDashboardPersonnelSummary(personnel) {
+  const summary = {
+    aktif: { key: "aktif", label: "Aktif", count: 0, color: "#22c55e" },
+    idle: { key: "idle", label: "Idle", count: 0, color: "#ef4444" },
+    cuti: { key: "cuti", label: "Cuti", count: 0, color: "#f59e0b" }
+  };
+  personnel.forEach(record => {
+    const status = getDashboardPersonnelStatus(record);
+    summary[status.key].count += 1;
+  });
+  return summary;
+}
+
+function getDashboardPersonnelRows(personnel) {
+  return [...personnel]
+    .map(record => {
+      const status = getDashboardPersonnelStatus(record);
+      return {
+        name: getPersonnelName(record) || "-",
+        status: status.label,
+        statusKey: status.key,
+        activeWork: getPersonnelActiveWork(record),
+        work: getDashboardPersonnelWorkLabel(record)
+      };
+    })
+    .sort((left, right) =>
+      right.activeWork - left.activeWork ||
+      left.status.localeCompare(right.status, "id") ||
+      left.name.localeCompare(right.name, "id")
+    );
+}
+
+function getDashboardPersonnelWorkLabel(record) {
+  const history = getPersonnelWorkHistory(getPersonnelName(record));
+  const active = history.find(item => item.category === "active");
+  return active?.pekerjaan || "-";
 }
 
 const DASHBOARD_ASSIGNMENT_CATEGORIES = [
@@ -2801,11 +2837,10 @@ function renderDashboardAssignmentSummary(personnelTotal = 0) {
   const legend = document.getElementById("dashAssignmentLegend");
   if (legend) {
     legend.innerHTML = entries.map(item => {
-      const percent = totalPersonnel ? Math.round((item.count / totalPersonnel) * 100) : 0;
       return `
         <div class="assignment-legend-row">
           <dt><span style="background:${item.color}"></span>${escapeHtml(item.label)}</dt>
-          <dd><strong>${item.count}</strong><small>${percent}% dari total</small></dd>
+          <dd><strong>${item.count}</strong><small>${formatDashboardPercent(item.count, totalPersonnel)}% dari total</small></dd>
         </div>
       `;
     }).join("");
@@ -2820,7 +2855,7 @@ function renderDashboardAssignmentSummary(personnelTotal = 0) {
   if (!body) return;
   const filteredRows = rows
     .filter(row => filter === "all" || row.categories.some(category => category.key === filter))
-    .slice(0, 5);
+    .slice(0, 30);
   body.innerHTML = filteredRows.length ? filteredRows.map(row => `
     <tr>
       <td>${escapeHtml(getPersonnelName(row.record) || "-")}</td>
@@ -3008,20 +3043,23 @@ function handleInventoryAction(action) {
 
 function openInventoryUsageModal(options = {}) {
   const mode = options.mode || "usage";
-  const record = options.record || getSelectedInventoryRecord() || {};
+  const record = mode === "usage" ? {} : (options.record || getSelectedInventoryRecord() || {});
   const modal = document.getElementById("inventoryUsageModal");
   if (!modal) return;
+  state.inventoryFormMode = mode;
 
   setTextContent("inventoryUsageTitle", mode === "add" ? "Tambah Inventaris Kantor" :
     mode === "maintenance" ? "Jadwalkan Perawatan Inventaris" :
     mode === "history" ? "Riwayat Pemakaian Inventaris" :
     mode === "detail" ? "Rincian Inventaris Kantor" :
     "Catat Penggunaan Inventaris");
-  setTextContent("inventoryUsageSubtitle", "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
+  setTextContent("inventoryUsageSubtitle", mode === "usage"
+    ? "Hanya inventaris berstatus Tersedia yang disarankan. Setelah disimpan, status berubah menjadi Dipakai."
+    : "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
   setInputValue("inventoryRecordId", record.id || "");
   setInputValue("inventoryItemName", record.name || "");
   setInputValue("inventoryItemType", record.type || "Kendaraan");
-  setInputValue("inventoryStatus", mode === "maintenance" ? "Perawatan" : (record.status || "Dipakai"));
+  setInputValue("inventoryStatus", mode === "maintenance" ? "Perawatan" : (mode === "usage" ? "Dipakai" : (record.status || "Dipakai")));
   setInputValue("inventoryUser", record.user || "");
   setInputValue("inventoryPurpose", mode === "maintenance" ? "Perawatan berkala" : (record.purpose || ""));
   setInputValue("inventoryDestination", record.destination || "");
@@ -3042,15 +3080,21 @@ function closeInventoryUsageModal() {
 function saveInventoryUsage(event) {
   event.preventDefault();
   const records = getInventoryRecords();
-  const id = document.getElementById("inventoryRecordId")?.value || createInventoryId();
+  const selectedName = getInputValue("inventoryItemName");
+  const formMode = state.inventoryFormMode || "usage";
+  const selectedAvailableIndex = formMode === "usage"
+    ? records.findIndex(item => item.name === selectedName && item.status === "Tersedia")
+    : -1;
+  const id = document.getElementById("inventoryRecordId")?.value ||
+    (selectedAvailableIndex >= 0 ? records[selectedAvailableIndex].id : createInventoryId());
   const existingIndex = records.findIndex(item => item.id === id);
   const existing = existingIndex >= 0 ? records[existingIndex] : { id, history: [] };
-  const status = getInputValue("inventoryStatus") || "Dipakai";
+  const status = formMode === "usage" ? "Dipakai" : (getInputValue("inventoryStatus") || "Dipakai");
   const nextRecord = {
     ...existing,
     id,
-    name: getInputValue("inventoryItemName") || "Inventaris Kantor",
-    type: getInputValue("inventoryItemType") || "Lainnya",
+    name: selectedName || existing.name || "Inventaris Kantor",
+    type: getInputValue("inventoryItemType") || existing.type || "Lainnya",
     status,
     user: getInputValue("inventoryUser"),
     purpose: getInputValue("inventoryPurpose"),
@@ -3115,7 +3159,10 @@ function renderInventoryHistoryPreview(record = {}) {
 function populateInventoryDatalists() {
   const names = document.getElementById("inventoryNameSuggestions");
   if (names) {
-    names.innerHTML = getInventoryRecords().map(item => `<option value="${escapeHtml(item.name)}"></option>`).join("");
+    const records = state.inventoryFormMode === "usage"
+      ? getInventoryRecords().filter(item => item.status === "Tersedia")
+      : getInventoryRecords();
+    names.innerHTML = records.map(item => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.status || "Tersedia")}</option>`).join("");
   }
   const people = document.getElementById("inventoryPersonSuggestions");
   if (people) {
@@ -3212,48 +3259,7 @@ function saveInventoryCache(records) {
   localStorage.setItem(INVENTORY_CACHE_KEY, JSON.stringify(Array.isArray(records) ? records : []));
 }
 
-function renderDashboardDocuments(summary) {
-  setTextContent("dashDocumentTotal", summary.total);
-  setTextContent("dashDocumentFinal", `${summary.final} final`);
-  const container = document.getElementById("dashDocumentBreakdown");
-  if (!container) return;
-  container.innerHTML = Array.from(summary.groups.entries()).slice(0, 4).map(([group, count]) => `
-    <div>
-      <span>${escapeHtml(group)}</span>
-      <strong>${count}</strong>
-    </div>
-  `).join("");
-}
-
-function renderDashboardReminders(activeTenders) {
-  const taskReminders = getFocusTasks().slice(0, 3).map(task => ({
-    title: task.namaTugas || "Tugas",
-    meta: task.penanggungJawab || task.deadline || "Tugas aktif",
-    badge: getRelativeDateLabel(task.deadline || task.tanggal)
-  }));
-  const tenderReminders = activeTenders.filter(isTenderDeadlineUrgent).slice(0, 2).map(tender => ({
-    title: `Batas akhir tender ${tender.name || "paket"}`,
-    meta: formatTenderDateTime(tender.deadline),
-    badge: getRelativeDateLabel(tender.deadline)
-  }));
-  const reminders = [...tenderReminders, ...taskReminders].slice(0, 4);
-  const container = document.getElementById("dashReminderList");
-  if (!container) return;
-  container.innerHTML = reminders.length
-    ? reminders.map(item => `
-      <div class="dashboard-reminder-row">
-        <i data-lucide="bell" aria-hidden="true"></i>
-        <span>
-          <strong>${escapeHtml(item.title)}</strong>
-          <small>${escapeHtml(item.meta || "-")}</small>
-        </span>
-        <em>${escapeHtml(item.badge)}</em>
-      </div>
-    `).join("")
-    : '<p class="dashboard-empty">Belum ada pengingat prioritas.</p>';
-}
-
-function getDashboardPriorityItems(allJobs) {
+function getDashboardPrioritySourceItems(allJobs) {
   const tenderItems = getDashboardActiveTenders().map(tender => ({
     job: {
       id: `tender:${tender.id}`,
@@ -3293,8 +3299,11 @@ function getDashboardPriorityItems(allJobs) {
       return priorityScore[left.priority] - priorityScore[right.priority] ||
         left.progress - right.progress ||
         left.packageName.localeCompare(right.packageName, "id");
-    })
-    .slice(0, 4);
+    });
+}
+
+function getDashboardPriorityItems(allJobs) {
+  return getDashboardPrioritySourceItems(allJobs).slice(0, 4);
 }
 
 function renderDashboardPriorityRows(items) {
@@ -3315,6 +3324,40 @@ function renderDashboardPriorityRows(items) {
       </tr>
     `).join("")
     : '<tr><td colspan="5" class="dashboard-empty">Belum ada paket prioritas.</td></tr>';
+}
+
+function renderDashboardProgressBast(items) {
+  const container = document.getElementById("dashboardProgressBast");
+  if (!container) return;
+  const item = items.find(candidate => candidate.progress > 0) || items[0];
+  const report = item ? Math.max(0, Math.min(100, item.progress || 0)) : 0;
+  const bast = item?.progress >= 100 ? 100 : 0;
+  const main = Math.round(report * 0.6 + bast * 0.4);
+  const pic = item?.pic || "-";
+  container.innerHTML = `
+    <div class="dashboard-progress-bars">
+      ${renderDashboardProgressMetric("Laporan", report, "blue")}
+      ${renderDashboardProgressMetric("BAST", bast, "muted")}
+      ${renderDashboardProgressMetric("Progress Utama", main, "green")}
+    </div>
+    <div class="dashboard-progress-note">
+      <strong>Perhitungan Progress Utama</strong>
+      <span>60% Laporan + 40% BAST</span>
+      <small>PIC</small>
+      <b>${escapeHtml(pic)}</b>
+      <em>Update Terakhir: ${escapeHtml(formatHumanDate(state.today))} 09:15</em>
+    </div>
+  `;
+}
+
+function renderDashboardProgressMetric(label, value, tone) {
+  return `
+    <div class="dashboard-progress-metric ${escapeHtml(tone)}">
+      <span>${escapeHtml(label)}</span>
+      <div><i style="width:${value}%"></i></div>
+      <strong>${value}%</strong>
+    </div>
+  `;
 }
 
 function getRelativeDateLabel(value) {
@@ -8782,6 +8825,7 @@ function buildStats(tasks) {
     proses: normalized.filter(task => task.status === "Proses").length,
     belumSelesai: normalized.filter(task => task.status === "Belum Selesai").length,
     tertunda: normalized.filter(task => task.status === "Tertunda").length,
+    pending: normalized.filter(task => task.status !== "Selesai").length,
     terlambat: normalized.filter(task => task.terlambat).length
   };
 }

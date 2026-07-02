@@ -871,7 +871,7 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
   gap: 14px;
 }
 
@@ -904,7 +904,7 @@ input:focus, select:focus, textarea:focus {
   width: 54px;
   height: 54px;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 12px;
   color: #ffffff;
   background: var(--kpi-color, #087d8f);
 }
@@ -933,15 +933,14 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dashboard-kpi-copy em {
-  display: inline-flex;
-  width: fit-content;
+  display: block;
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--kpi-color, #087d8f) 24%, #ffffff);
-  border-radius: 8px;
-  padding: 4px 8px;
-  background: color-mix(in srgb, var(--kpi-color, #087d8f) 10%, #ffffff);
-  color: color-mix(in srgb, var(--kpi-color, #087d8f) 76%, #0f172a);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--kpi-color, #087d8f) 82%, #0f172a);
   font-size: 11px;
   font-style: normal;
   font-weight: 800;
@@ -958,7 +957,7 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-main-grid {
   display: grid;
-  grid-template-columns: minmax(560px, 1fr) minmax(320px, 0.42fr);
+  grid-template-columns: minmax(520px, 1fr) minmax(480px, 0.96fr);
   gap: 14px;
   align-items: start;
 }
@@ -1235,6 +1234,88 @@ input:focus, select:focus, textarea:focus {
   grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+  margin-top: 12px;
+}
+
+.dashboard-personnel-content {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.92fr) minmax(260px, 1.25fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.dashboard-personnel-overview {
+  min-width: 0;
+}
+
+.dashboard-personnel-table-wrap,
+.dashboard-assignment-table-wrap {
+  max-height: 188px;
+  overflow: auto;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.dashboard-personnel-table,
+.dashboard-assignment-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.dashboard-personnel-table th,
+.dashboard-personnel-table td {
+  padding: 8px 9px;
+  border-bottom: 1px solid #e8eef6;
+  overflow: hidden;
+  color: #1e293b;
+  font-size: 10px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-personnel-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f3f7fb;
+  color: #334155;
+  font-weight: 900;
+}
+
+.dashboard-personnel-table th:nth-child(1),
+.dashboard-personnel-table td:nth-child(1) { width: 46%; }
+.dashboard-personnel-table th:nth-child(2),
+.dashboard-personnel-table td:nth-child(2) { width: 22%; }
+.dashboard-personnel-table th:nth-child(3),
+.dashboard-personnel-table td:nth-child(3) { width: 32%; }
+
+.personnel-status-pill {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.personnel-status-pill.aktif {
+  background: #ecfdf5;
+  color: #16a34a;
+}
+
+.personnel-status-pill.idle {
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.personnel-status-pill.cuti {
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .dashboard-donut {
@@ -1368,10 +1449,8 @@ input:focus, select:focus, textarea:focus {
   font-weight: 800;
 }
 
-.dashboard-assignment-table-wrap { overflow: hidden; border: 1px solid #dbe5f1; border-radius: 8px; }
-.dashboard-assignment-table { width: 100%; min-width: 0; border-collapse: collapse; table-layout: fixed; }
 .dashboard-assignment-table th, .dashboard-assignment-table td { padding: 8px 9px; border-bottom: 1px solid #e8eef6; text-align: left; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dashboard-assignment-table th { background: #f3f7fb; color: #334155; font-weight: 900; white-space: nowrap; }
+.dashboard-assignment-table th { position: sticky; top: 0; z-index: 1; background: #f3f7fb; color: #334155; font-weight: 900; white-space: nowrap; }
 .dashboard-assignment-table th:first-child,
 .dashboard-assignment-table td:first-child { width: 48%; }
 .dashboard-assignment-table th:last-child,
@@ -1395,6 +1474,81 @@ input:focus, select:focus, textarea:focus {
 .assignment-badge.ho { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
 .assignment-badge.on-site { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
 .assignment-badge.intermitten { border-color: #fed7aa; background: #fff7ed; color: #c2410c; }
+
+.dashboard-progress-bast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 0.72fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.dashboard-progress-bars {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+}
+
+.dashboard-progress-metric {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 10px;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.dashboard-progress-metric div {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5eaf1;
+}
+
+.dashboard-progress-metric i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+}
+
+.dashboard-progress-metric.green i { background: #22c55e; }
+.dashboard-progress-metric.muted i { background: #cbd5e1; }
+
+.dashboard-progress-metric strong {
+  color: #0f172a;
+  font-size: 11px;
+  text-align: right;
+}
+
+.dashboard-progress-note {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-height: 104px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.dashboard-progress-note strong {
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.dashboard-progress-note span,
+.dashboard-progress-note small,
+.dashboard-progress-note em {
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.dashboard-progress-note b {
+  color: #0f172a;
+  font-size: 14px;
+}
 .dashboard-document-summary {
   display: grid;
   grid-template-columns: 136px minmax(0, 1fr);
@@ -4831,6 +4985,10 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   .dashboard-side-stack {
     grid-row: auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dashboard-personnel-content,
+  .dashboard-progress-bast {
+    grid-template-columns: minmax(0, 1fr);
   }
   .dashboard-side-stack .dashboard-card:last-child {
     grid-column: 1 / -1;
