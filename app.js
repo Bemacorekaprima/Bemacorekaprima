@@ -403,9 +403,11 @@ function bindControls() {
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
   document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
   document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
+  document.getElementById("dashInventorySummary")?.addEventListener("click", handleInventorySummaryClick);
   document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
   document.getElementById("dashInventoryUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage" }));
   document.getElementById("inventoryUsageForm")?.addEventListener("submit", saveInventoryUsage);
+  document.getElementById("inventoryAvailableSelect")?.addEventListener("change", handleInventoryAvailableSelectChange);
   document.getElementById("closeInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
   document.getElementById("cancelInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
@@ -2959,19 +2961,19 @@ function renderDashboardInventory() {
   const summary = document.getElementById("dashInventorySummary");
   if (summary) {
     summary.innerHTML = [
-      { label: "Total", count: counts.total, note: "Semua inventaris", icon: "briefcase" },
-      { label: "Dipakai", count: counts.used, note: "Sedang digunakan", icon: "car-front" },
-      { label: "Tersedia", count: counts.available, note: "Siap digunakan", icon: "check" },
-      { label: "Perawatan", count: counts.maintenance, note: "Dalam perawatan", icon: "wrench" }
+      { key: "all", label: "Total", count: counts.total, note: "Semua inventaris", icon: "briefcase" },
+      { key: "used", label: "Dipakai", count: counts.used, note: "Sedang digunakan", icon: "car-front" },
+      { key: "available", label: "Tersedia", count: counts.available, note: "Siap digunakan", icon: "check" },
+      { key: "maintenance", label: "Perawatan", count: counts.maintenance, note: "Dalam perawatan", icon: "wrench" }
     ].map(item => `
-      <span>
+      <button type="button" data-inventory-status-filter="${escapeHtml(item.key)}">
         <i data-lucide="${escapeHtml(item.icon)}" aria-hidden="true"></i>
         <span>
           <small>${escapeHtml(item.label)}</small>
           <strong>${item.count}</strong>
           <em>${escapeHtml(item.note)}</em>
         </span>
-      </span>
+      </button>
     `).join("");
   }
 
@@ -3041,6 +3043,28 @@ function handleInventoryAction(action) {
   return openInventoryUsageModal({ mode: "detail", record: selected });
 }
 
+function handleInventorySummaryClick(event) {
+  const button = event.target.closest("[data-inventory-status-filter]");
+  if (!button) return;
+  const records = getInventoryRecords();
+  const filter = button.dataset.inventoryStatusFilter || "all";
+  const statusMap = {
+    used: "Dipakai",
+    available: "Tersedia",
+    maintenance: "Perawatan"
+  };
+  const targetStatus = statusMap[filter];
+  const match = targetStatus
+    ? records.find(item => item.status === targetStatus)
+    : records[0];
+  if (!match) {
+    notify(`Belum ada inventaris dengan status ${button.textContent.trim() || "tersebut"}.`, { type: "warning" });
+    return;
+  }
+  state.selectedInventoryId = match.id;
+  renderDashboardInventory();
+}
+
 function openInventoryUsageModal(options = {}) {
   const mode = options.mode || "usage";
   const record = mode === "usage" ? {} : (options.record || getSelectedInventoryRecord() || {});
@@ -3067,6 +3091,9 @@ function openInventoryUsageModal(options = {}) {
   setInputValue("inventoryReturnTime", toDatetimeLocalValue(record.returnTime));
   setInputValue("inventoryCondition", record.condition || "Baik");
   setInputValue("inventoryNotes", record.notes || "");
+  setInputValue("inventoryAvailableSelect", "");
+  setInventoryFormMode(mode);
+  renderInventoryAvailableOptions();
   populateInventoryDatalists();
   renderInventoryHistoryPreview(record);
   if (!modal.open) modal.showModal();
@@ -3082,18 +3109,26 @@ function saveInventoryUsage(event) {
   const records = getInventoryRecords();
   const selectedName = getInputValue("inventoryItemName");
   const formMode = state.inventoryFormMode || "usage";
-  const selectedAvailableIndex = formMode === "usage"
-    ? records.findIndex(item => item.name === selectedName && item.status === "Tersedia")
-    : -1;
-  const id = document.getElementById("inventoryRecordId")?.value ||
-    (selectedAvailableIndex >= 0 ? records[selectedAvailableIndex].id : createInventoryId());
+  const selectedAvailableId = getInputValue("inventoryAvailableSelect");
+  if (formMode === "usage" && !selectedAvailableId) {
+    notify("Pilih inventaris yang tersedia terlebih dahulu.", { type: "warning" });
+    return;
+  }
+  const id = formMode === "usage"
+    ? selectedAvailableId
+    : (document.getElementById("inventoryRecordId")?.value || createInventoryId());
   const existingIndex = records.findIndex(item => item.id === id);
   const existing = existingIndex >= 0 ? records[existingIndex] : { id, history: [] };
+  if (formMode === "usage" && !isInventoryAvailable(existing)) {
+    notify("Inventaris ini tidak tersedia untuk digunakan. Pilih item lain.", { type: "warning" });
+    renderInventoryAvailableOptions();
+    return;
+  }
   const status = formMode === "usage" ? "Dipakai" : (getInputValue("inventoryStatus") || "Dipakai");
   const nextRecord = {
     ...existing,
     id,
-    name: selectedName || existing.name || "Inventaris Kantor",
+    name: formMode === "usage" ? existing.name : (selectedName || existing.name || "Inventaris Kantor"),
     type: getInputValue("inventoryItemType") || existing.type || "Lainnya",
     status,
     user: getInputValue("inventoryUser"),
@@ -3123,6 +3158,53 @@ function saveInventoryUsage(event) {
   renderDashboardInventory();
   closeInventoryUsageModal();
   notify("Data inventaris kantor tersimpan.");
+}
+
+function setInventoryFormMode(mode) {
+  const usageMode = mode === "usage";
+  document.getElementById("inventoryAvailableField")?.classList.toggle("hidden", !usageMode);
+  [
+    "inventoryItemNameField",
+    "inventoryItemTypeField",
+    "inventoryStatusField",
+    "inventoryDestinationField",
+    "inventoryDepartTimeField",
+    "inventoryReturnTimeField",
+    "inventoryConditionField",
+    "inventoryNotesField"
+  ].forEach(id => document.getElementById(id)?.classList.toggle("hidden", usageMode));
+
+  const itemName = document.getElementById("inventoryItemName");
+  const availableSelect = document.getElementById("inventoryAvailableSelect");
+  if (itemName) itemName.required = !usageMode;
+  if (availableSelect) availableSelect.required = usageMode;
+}
+
+function renderInventoryAvailableOptions() {
+  const select = document.getElementById("inventoryAvailableSelect");
+  if (!select) return;
+  const available = getInventoryRecords().filter(isInventoryAvailable);
+  select.innerHTML = `
+    <option value="">-- Pilih inventaris yang tersedia --</option>
+    ${available.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} (Tersedia)</option>`).join("")}
+  `;
+}
+
+function isInventoryAvailable(item) {
+  return !item?.status || item.status === "Tersedia";
+}
+
+function handleInventoryAvailableSelectChange() {
+  const selected = getInventoryRecords().find(item => item.id === getInputValue("inventoryAvailableSelect"));
+  if (!selected) {
+    renderInventoryHistoryPreview({});
+    return;
+  }
+  setInputValue("inventoryItemName", selected.name);
+  setInputValue("inventoryItemType", selected.type || "Kendaraan");
+  setInputValue("inventoryDestination", selected.destination || "");
+  setInputValue("inventoryCondition", selected.condition || "Baik");
+  renderInventoryHistoryPreview(selected);
 }
 
 function cycleInventoryStatus(record) {

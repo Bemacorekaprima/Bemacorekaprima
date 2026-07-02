@@ -1391,11 +1391,18 @@
       </header>
       <input id="inventoryRecordId" type="hidden">
       <div class="inventory-form-grid">
-        <label>
+        <label id="inventoryItemNameField">
           <span>Nama Inventaris</span>
           <input id="inventoryItemName" list="inventoryNameSuggestions" required placeholder="Contoh: Kendaraan Mobil - Merek A">
         </label>
-        <label>
+        <label id="inventoryAvailableField" class="full hidden">
+          <span>Pilih Inventaris</span>
+          <select id="inventoryAvailableSelect">
+            <option value="">-- Pilih inventaris yang tersedia --</option>
+          </select>
+          <small>Item yang sedang dipakai atau perawatan tidak ditampilkan.</small>
+        </label>
+        <label id="inventoryItemTypeField">
           <span>Jenis</span>
           <select id="inventoryItemType">
             <option>Kendaraan</option>
@@ -1405,7 +1412,7 @@
             <option>Lainnya</option>
           </select>
         </label>
-        <label>
+        <label id="inventoryStatusField">
           <span>Status</span>
           <select id="inventoryStatus">
             <option value="Dipakai">Sedang Digunakan</option>
@@ -1417,23 +1424,23 @@
           <span>Pengguna / Driver</span>
           <input id="inventoryUser" list="inventoryPersonSuggestions" placeholder="Contoh: Bpk A">
         </label>
-        <label class="full">
+        <label id="inventoryPurposeField" class="full">
           <span>Keperluan</span>
           <input id="inventoryPurpose" placeholder="Contoh: Mobilisasi personil proyek">
         </label>
-        <label class="full">
+        <label id="inventoryDestinationField" class="full">
           <span>Tujuan / Lokasi</span>
           <input id="inventoryDestination" placeholder="Contoh: Kantor -> Proyek Topografi">
         </label>
-        <label>
+        <label id="inventoryDepartTimeField">
           <span>Waktu Berangkat</span>
           <input id="inventoryDepartTime" type="datetime-local">
         </label>
-        <label>
+        <label id="inventoryReturnTimeField">
           <span>Estimasi Kembali</span>
           <input id="inventoryReturnTime" type="datetime-local">
         </label>
-        <label>
+        <label id="inventoryConditionField">
           <span>Kondisi Awal</span>
           <select id="inventoryCondition">
             <option>Baik</option>
@@ -1442,7 +1449,7 @@
             <option>Rusak berat</option>
           </select>
         </label>
-        <label>
+        <label id="inventoryNotesField">
           <span>Catatan</span>
           <input id="inventoryNotes" placeholder="Catatan tambahan">
         </label>
