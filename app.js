@@ -6569,6 +6569,10 @@ function getFinanceSheet() {
   return state.externalSheets.find(sheet => sheet.id === "finance") || null;
 }
 
+function getFinanceAuxSheet(sourceId) {
+  return state.externalSheets.find(sheet => sheet.id === sourceId) || null;
+}
+
 function parseFinanceNumber(value) {
   const parsed = parseIndonesianNumber(value);
   if (parsed != null) return parsed;
@@ -6893,8 +6897,46 @@ function openFinanceDetail(key) {
   document.getElementById("financeDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function getFinanceEntryIdentifier(entry) {
+  return entry?.key || getFinanceJobMatchKey(entry?.pekerjaan || "");
+}
+
+function financeRecordMatchesEntry(record, entry) {
+  const entryId = getFinanceEntryIdentifier(entry);
+  const recordJobId = getFinanceJobMatchKey(getRecordValue(record, ["id pekerjaan", "row key", "id"]));
+  const recordJobName = getFinanceJobMatchKey(getRecordValue(record, ["nama pekerjaan", "pekerjaan"]));
+  const entryJobName = getFinanceJobMatchKey(entry?.pekerjaan || "");
+  return Boolean(
+    (entryId && recordJobId && entryId === recordJobId) ||
+    (entryJobName && recordJobName && entryJobName === recordJobName)
+  );
+}
+
+function getFinanceRelatedRecords(sourceId, entry) {
+  const sheet = getFinanceAuxSheet(sourceId);
+  if (!sheet || sheet.status !== "ready") return [];
+  return (sheet.records || []).filter(record => financeRecordMatchesEntry(record, entry));
+}
+
 function getFinanceTerminPlan(entry) {
   const contractValue = entry?.nilaiKontrak || 0;
+  const records = getFinanceRelatedRecords("finance-termin", entry);
+  if (records.length) {
+    return records
+      .map((record, index) => {
+        const percent = parseFinanceNumber(getRecordValue(record, ["persentase", "prosentase", "persen"])) || 0;
+        const value = parseFinanceNumber(getRecordValue(record, ["nilai termin", "nominal termin"])) || Math.round(contractValue * percent / 100);
+        return {
+          label: getRecordValue(record, ["nama termin"]) || `Termin ${getRecordValue(record, ["termin ke"]) || index + 1}`,
+          percent,
+          value,
+          className: ["blue", "purple", "green"][index % 3],
+          record
+        };
+      })
+      .filter(item => item.label || item.percent || item.value);
+  }
+
   return [
     { label: "Termin 1", percent: 25, className: "blue" },
     { label: "Termin 2", percent: 45, className: "purple" },
@@ -6988,13 +7030,13 @@ function renderFinanceDetail(entry) {
           ${terminPlan.map(item => `<span class="${item.className}" style="width:${item.percent}%"><b>${item.percent}%</b></span>`).join("")}
         </div>
         <div class="finance-termin-list">
-          ${terminPlan.map(item => `
+          ${terminPlan.map((item, itemIndex) => `
             <div>
               <strong>${escapeHtml(item.label)}</strong>
               <span>${item.percent}% x ${formatFinanceMoney(nilaiKontrak)}</span>
               <b>${formatFinanceMoney(item.value)}</b>
-              <button class="text-button" type="button" data-finance-termin-action="edit">Edit</button>
-              <button class="text-button danger-text" type="button" data-finance-termin-action="delete">Hapus</button>
+              <button class="text-button" type="button" data-finance-termin-action="edit" data-finance-termin-index="${itemIndex}">Edit</button>
+              <button class="text-button danger-text" type="button" data-finance-termin-action="delete" data-finance-termin-index="${itemIndex}">Hapus</button>
             </div>
           `).join("")}
         </div>
@@ -7197,6 +7239,35 @@ const FINANCE_CONTRACT_FIELDS = [
   { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
 ];
 
+const FINANCE_TERMIN_FIELDS = [
+  { column: "ID", aliases: ["id"] },
+  { column: "ID Pekerjaan", aliases: ["id pekerjaan"], required: true },
+  { column: "Nama Pekerjaan", aliases: ["nama pekerjaan", "pekerjaan"], required: true, full: true },
+  { column: "Termin Ke", aliases: ["termin ke", "termin"] },
+  { column: "Nama Termin", aliases: ["nama termin"], required: true },
+  { column: "Persentase", aliases: ["persentase", "prosentase", "persen"], required: true },
+  { column: "Nilai Kontrak", aliases: ["nilai kontrak"], required: true },
+  { column: "Nilai Termin", aliases: ["nilai termin", "nominal termin"] },
+  { column: "Status", aliases: ["status"] },
+  { column: "Tanggal Tagihan", aliases: ["tanggal tagihan", "tgl tagihan"] },
+  { column: "Tanggal Bayar", aliases: ["tanggal bayar", "tgl bayar"] },
+  { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
+];
+
+const FINANCE_ADDENDUM_FIELDS = [
+  { column: "ID", aliases: ["id"] },
+  { column: "ID Pekerjaan", aliases: ["id pekerjaan"], required: true },
+  { column: "Nama Pekerjaan", aliases: ["nama pekerjaan", "pekerjaan"], required: true, full: true },
+  { column: "Addendum Ke", aliases: ["addendum ke", "addendum"] },
+  { column: "Nama Addendum", aliases: ["nama addendum"], required: true },
+  { column: "Nilai Kontrak Sebelum", aliases: ["nilai kontrak sebelum"] },
+  { column: "Nilai Addendum", aliases: ["nilai addendum"], required: true },
+  { column: "Nilai Kontrak Baru", aliases: ["nilai kontrak baru"] },
+  { column: "Tanggal Addendum", aliases: ["tanggal addendum", "tgl addendum"] },
+  { column: "Status", aliases: ["status"] },
+  { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
+];
+
 function resolveFinanceColumn(columns, field) {
   return columns.find(column => includesAny(normalizeSearchText(column), field.aliases)) || field.column;
 }
@@ -7215,6 +7286,79 @@ function applyFinanceSeedToRecord(target, columns, seed) {
   setFinanceSeedValue(target, columns, ["nama"], seed.nama);
   setFinanceSeedValue(target, columns, ["uraian", "jabatan", "posisi"], seed.uraian);
   setFinanceSeedValue(target, columns, ["jumlah bulan", "bulan", "durasi kontrak"], seed.bulan);
+}
+
+function makeFinanceLocalId(prefix) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
+}
+
+function setFinanceValueByField(target, columns, field, value) {
+  if (value == null || value === "") return;
+  const column = resolveFinanceColumn(columns, field);
+  target[column] = String(value);
+}
+
+function getFinanceColumnsForSource(sourceId, fallbackFields = []) {
+  const sheet = sourceId === "finance" ? getFinanceSheet() : getFinanceAuxSheet(sourceId);
+  const records = sheet?.records || [];
+  const columns = records.length
+    ? getFinanceEditableColumns(records)
+    : fallbackFields.map(field => field.column);
+  fallbackFields.forEach(field => {
+    if (!columns.some(column => normalizeSearchText(column) === normalizeSearchText(field.column))) {
+      columns.push(field.column);
+    }
+  });
+  return columns;
+}
+
+function seedFinanceTerminRecord(entry, terminItem = null) {
+  const columns = getFinanceColumnsForSource("finance-termin", FINANCE_TERMIN_FIELDS);
+  const nextIndex = getFinanceRelatedRecords("finance-termin", entry).length + 1;
+  const percent = terminItem?.percent || 0;
+  const nilaiKontrak = entry?.nilaiKontrak || 0;
+  const seed = {};
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[0], terminItem?.record ? "" : makeFinanceLocalId("TRM"));
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[1], getFinanceEntryIdentifier(entry));
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[2], entry?.pekerjaan || "");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[3], getRecordValue(terminItem?.record || {}, ["termin ke"]) || nextIndex);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[4], terminItem?.label || `Termin ${nextIndex}`);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[5], percent || "");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[6], nilaiKontrak || "");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[7], percent ? Math.round(nilaiKontrak * percent / 100) : "");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[8], getRecordValue(terminItem?.record || {}, ["status"]) || "Draft");
+  return seed;
+}
+
+function seedFinanceAddendumRecord(entry) {
+  const columns = getFinanceColumnsForSource("finance-addendum", FINANCE_ADDENDUM_FIELDS);
+  const nextIndex = getFinanceRelatedRecords("finance-addendum", entry).length + 1;
+  const nilaiKontrak = entry?.nilaiKontrak || 0;
+  const seed = {};
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[0], makeFinanceLocalId("ADD"));
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[1], getFinanceEntryIdentifier(entry));
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[2], entry?.pekerjaan || "");
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[3], nextIndex);
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[4], `Addendum ${nextIndex}`);
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[5], nilaiKontrak || "");
+  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[9], "Draft");
+  return seed;
+}
+
+function openFinanceAuxForm({ sourceId, title, entry, record = null, fields, seed = {} }) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
+  const columns = getFinanceColumnsForSource(sourceId, fields);
+  const initialRecord = { ...(record || {}), ...seed };
+  document.getElementById("financeRecordFormTitle").textContent = title;
+  document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || "Sheet Finance";
+  document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("financeRecordSourceId").value = sourceId;
+  document.getElementById("financeRecordFormStatus").textContent = "";
+  document.getElementById("financeRecordFormFields").innerHTML = fields.map(field => {
+    const column = resolveFinanceColumn(columns, field);
+    return '<label class="' + (field.full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, initialRecord[column] || "", field.required) + '</label>';
+  }).join("");
+  document.getElementById("financeRecordFormModal").showModal();
 }
 
 function getFinanceContractRecord(entry) {
@@ -7241,6 +7385,7 @@ function openFinanceContractForm(record = null, entry = null) {
   document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Kontrak Finance" : "Tambah Nilai Kontrak";
   document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || "Sheet Finance";
   document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("financeRecordSourceId").value = "finance";
   document.getElementById("financeRecordFormStatus").textContent = "";
   document.getElementById("financeRecordFormFields").innerHTML = FINANCE_CONTRACT_FIELDS.map(field => {
     const column = resolveFinanceColumn(columns, field);
@@ -7260,6 +7405,7 @@ function openFinanceRecordForm(record = null, entry = null, seed = null) {
   document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Nilai Personil" : "Tambah Nilai Personil";
   document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || record?.[jobColumn] || "Sheet Finance";
   document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("financeRecordSourceId").value = "finance";
   document.getElementById("financeRecordFormStatus").textContent = "";
   document.getElementById("financeRecordFormFields").innerHTML = columns.map((column, index) => {
     const full = column === jobColumn || includesAny(normalizeSearchText(column), ["keterangan", "catatan"]);
@@ -7277,10 +7423,11 @@ async function saveFinanceRecord(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const rowNumber = Number(document.getElementById("financeRecordRowNumber").value) || 0;
+  const sourceId = document.getElementById("financeRecordSourceId").value || "finance";
   const data = Object.fromEntries(Array.from(new FormData(form).entries()).filter(([key]) => key !== "").map(([key, value]) => [key, String(value).trim()]));
   document.getElementById("financeRecordFormStatus").textContent = "Mengirim perubahan...";
   document.getElementById("saveFinanceRecordButton").disabled = true;
-  await sendFinanceMutation(rowNumber ? "update" : "add", { rowNumber, data });
+  await sendFinanceMutation(rowNumber ? "update" : "add", { rowNumber, data, sourceId, targetSourceId: sourceId });
 }
 
 async function sendFinanceMutation(action, payload) {
@@ -7292,12 +7439,21 @@ async function sendFinanceMutation(action, payload) {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ token: window.PERSONNEL_BRIDGE_TOKEN, firebaseIdToken, action, sourceId: "finance", targetSourceId: "finance", rowNumber: payload.rowNumber || 0, data: payload.data || {} })
+      body: JSON.stringify({
+        token: window.PERSONNEL_BRIDGE_TOKEN,
+        firebaseIdToken,
+        action,
+        sourceId: payload.sourceId || "finance",
+        targetSourceId: payload.targetSourceId || payload.sourceId || "finance",
+        rowNumber: payload.rowNumber || 0,
+        data: payload.data || {}
+      })
     });
     if (action !== "delete") closeFinanceRecordForm();
     notify(action === "delete" ? "Permintaan hapus Finance dikirim ke Google Spreadsheet." : "Data Finance dikirim ke Google Spreadsheet.");
     await new Promise(resolve => window.setTimeout(resolve, 1400));
     await loadExternalSheetData();
+    refreshCurrentFinanceDetail();
   } catch (error) {
     notify("Data Finance gagal dikirim: " + error.message);
     const status = document.getElementById("financeRecordFormStatus");
@@ -7312,17 +7468,56 @@ function getCurrentFinanceEntry() {
   return buildFinanceEntries().find(item => item.key === state.selectedFinanceJobKey) || null;
 }
 
+function refreshCurrentFinanceDetail() {
+  const panelOpen = !document.getElementById("financeDetailPanel")?.classList.contains("hidden");
+  if (!panelOpen || !state.selectedFinanceJobKey) return;
+  const entry = getCurrentFinanceEntry();
+  if (entry) renderFinanceDetail(entry);
+}
+
+function openFinanceTerminForm(entry, terminItem = null) {
+  const record = terminItem?.record || null;
+  openFinanceAuxForm({
+    sourceId: "finance-termin",
+    title: terminItem ? "Edit Termin" : "Tambah Termin",
+    entry,
+    record,
+    fields: FINANCE_TERMIN_FIELDS,
+    seed: record ? {} : seedFinanceTerminRecord(entry, terminItem)
+  });
+}
+
+function openFinanceAddendumForm(entry, record = null) {
+  openFinanceAuxForm({
+    sourceId: "finance-addendum",
+    title: record ? "Edit Addendum" : "Tambah Addendum",
+    entry,
+    record,
+    fields: FINANCE_ADDENDUM_FIELDS,
+    seed: record ? {} : seedFinanceAddendumRecord(entry)
+  });
+}
+
+async function deleteFinanceAuxRecord(sourceId, record, label) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat menghapus data Finance.")) return;
+  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
+  if (!rowNumber) return notify(`${label} default belum tersimpan di spreadsheet.`);
+  if (!confirm(`Hapus ${label} dari Google Spreadsheet?`)) return;
+  await sendFinanceMutation("delete", { sourceId, targetSourceId: sourceId, rowNumber, data: {} });
+}
+
 function handleFinanceDetailAction(event) {
   const terminButton = event.target.closest("[data-finance-termin-action]");
   if (terminButton) {
+    const entry = getCurrentFinanceEntry();
+    if (!entry) return notify("Rincian Finance tidak ditemukan.");
     const action = terminButton.dataset.financeTerminAction;
-    const messages = {
-      add: "Struktur Termin siap ditampilkan. Untuk simpan permanen, tambahkan sheet FINANCE_TERMIN.",
-      addendum: "Struktur Addendum siap ditampilkan. Untuk simpan permanen, tambahkan sheet FINANCE_ADDENDUM.",
-      edit: "Edit Termin membutuhkan data dari sheet FINANCE_TERMIN.",
-      delete: "Hapus Termin membutuhkan data dari sheet FINANCE_TERMIN."
-    };
-    notify(messages[action] || "Fitur termin siap dikaitkan ke spreadsheet.");
+    const terminPlan = getFinanceTerminPlan(entry);
+    const selectedTermin = terminPlan[Number(terminButton.dataset.financeTerminIndex)] || null;
+    if (action === "add") openFinanceTerminForm(entry);
+    if (action === "addendum") openFinanceAddendumForm(entry);
+    if (action === "edit") openFinanceTerminForm(entry, selectedTermin);
+    if (action === "delete") deleteFinanceAuxRecord("finance-termin", selectedTermin?.record, "Termin");
     return;
   }
   const button = event.target.closest("[data-finance-record-action]");
