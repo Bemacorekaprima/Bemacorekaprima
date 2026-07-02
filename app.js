@@ -472,6 +472,7 @@ function bindControls() {
   document.getElementById("financeDetailDeleteButton")?.addEventListener("click", () => handleFinanceAction("delete"));
   document.getElementById("financeDetailBody")?.addEventListener("click", handleFinanceDetailAction);
   document.getElementById("financeRecordForm")?.addEventListener("submit", saveFinanceRecord);
+  document.getElementById("financeRecordForm")?.addEventListener("input", handleFinanceRecordFormInput);
   document.getElementById("closeFinanceRecordFormButton")?.addEventListener("click", closeFinanceRecordForm);
   document.getElementById("cancelFinanceRecordFormButton")?.addEventListener("click", closeFinanceRecordForm);
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
@@ -2099,7 +2100,9 @@ function getDataUtamaSheet() {
 }
 
 function findRecordColumn(record, keywords) {
-  return Object.keys(record || {}).find(key =>
+  const normalizedKeywords = (keywords || []).map(normalizeSearchText);
+  return Object.keys(record || {}).find(key => normalizedKeywords.includes(normalizeSearchText(key))) ||
+    Object.keys(record || {}).find(key =>
     includesAny(normalizeSearchText(key), keywords)
   ) || "";
 }
@@ -6921,18 +6924,27 @@ function getFinanceRelatedRecords(sourceId, entry) {
 function getFinanceTerminPlan(entry) {
   const contractValue = entry?.nilaiKontrak || 0;
   const records = getFinanceRelatedRecords("finance-termin", entry);
+  const upfrontRecord = records.find(record => normalizeSearchText(getRecordValue(record, ["tahap pembayaran", "nama termin"])).includes("uang muka"));
+  const upfrontPercent = parseFinanceNumber(getRecordValue(upfrontRecord || {}, ["persentase termin", "persentase", "prosentase", "persen"])) || 0;
+  const upfrontValue = parseFinanceNumber(getRecordValue(upfrontRecord || {}, ["nilai bruto", "nilai termin", "nominal termin", "nilai bersih", "netto"])) ||
+    Math.round(contractValue * upfrontPercent / 100);
   return records
     .map((record, index) => {
-      const percent = parseFinanceNumber(getRecordValue(record, ["persentase", "prosentase", "persen"])) || 0;
+      const label = getRecordValue(record, ["tahap pembayaran", "nama termin"]) || `Tahap ${getRecordValue(record, ["termin ke"]) || index + 1}`;
+      const isUpfront = normalizeSearchText(label).includes("uang muka");
+      const percent = parseFinanceNumber(getRecordValue(record, ["persentase termin", "persentase", "prosentase", "persen"])) || 0;
       const grossValue = parseFinanceNumber(getRecordValue(record, ["nilai bruto", "nilai termin", "nominal termin"])) || Math.round(contractValue * percent / 100);
-      const deduction = parseFinanceNumber(getRecordValue(record, ["potongan uang muka", "potongan"])) || 0;
+      const deductionPercent = isUpfront ? 0 : parseFinanceNumber(getRecordValue(record, ["persentase potongan uang muka", "persentase potongan", "potongan persen"])) || 0;
+      const deduction = parseFinanceNumber(getRecordValue(record, ["potongan uang muka", "potongan"])) ||
+        (deductionPercent ? Math.round(upfrontValue * deductionPercent / 100) : 0);
       const netValue = parseFinanceNumber(getRecordValue(record, ["nilai bersih", "netto"])) || Math.max(0, grossValue - deduction);
       return {
-        label: getRecordValue(record, ["tahap pembayaran", "nama termin"]) || `Tahap ${getRecordValue(record, ["termin ke"]) || index + 1}`,
+        label,
         percent,
         value: netValue,
         grossValue,
         deduction,
+        deductionPercent,
         status: getRecordValue(record, ["status"]) || "Draft",
         className: ["blue", "purple", "green"][index % 3],
         record
@@ -6947,6 +6959,11 @@ function getFinanceTerminPercentTotal(terminPlan) {
 
 function getFinanceTerminValueTotal(terminPlan) {
   return terminPlan.reduce((total, item) => total + Number(item.value || 0), 0);
+}
+
+function formatFinanceDeduction(item) {
+  if (!item?.deduction) return "-";
+  return `${formatFinanceMoney(item.deduction)}${item.deductionPercent ? ` (${item.deductionPercent}%)` : ""}`;
 }
 
 function renderFinanceTerminCard(entry, terminPlan, nilaiKontrak) {
@@ -6977,12 +6994,12 @@ function renderFinanceTerminCard(entry, terminPlan, nilaiKontrak) {
       </div>
       ${hasStages ? `
         <div class="finance-termin-stack" aria-label="Pembagian termin">
-          ${terminPlan.map(item => `<span class="${item.className}" style="width:${Math.max(0, item.percent)}%"><b>${item.percent}%</b></span>`).join("")}
+          ${terminPlan.map(item => `<span class="${item.className}" style="width:${terminPercentTotal ? Math.max(0, item.percent) / terminPercentTotal * 100 : 0}%"><b>${item.percent}%</b></span>`).join("")}
         </div>
         <div class="table-wrap finance-termin-table-wrap">
           <table class="finance-termin-table">
             <thead>
-              <tr><th>Tahap Pembayaran</th><th>Persentase</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
+              <tr><th>Tahap Pembayaran</th><th>Persentase Termin</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
             </thead>
             <tbody>
               ${terminPlan.map((item, itemIndex) => `
@@ -6990,7 +7007,7 @@ function renderFinanceTerminCard(entry, terminPlan, nilaiKontrak) {
                   <td><strong>${escapeHtml(item.label)}</strong></td>
                   <td>${escapeHtml(item.percent)}%</td>
                   <td>${formatFinanceMoney(item.grossValue || item.value)}</td>
-                  <td>${item.deduction ? formatFinanceMoney(item.deduction) : "-"}</td>
+                  <td>${formatFinanceDeduction(item)}</td>
                   <td><strong>${formatFinanceMoney(item.value)}</strong></td>
                   <td><span class="finance-status ${safeClassToken(item.status)}">${escapeHtml(item.status)}</span></td>
                   <td>
@@ -7021,7 +7038,7 @@ function renderFinanceTerminCard(entry, terminPlan, nilaiKontrak) {
         <div class="table-wrap finance-termin-table-wrap">
           <table class="finance-termin-table">
             <thead>
-              <tr><th>Tahap Pembayaran</th><th>Persentase</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
+              <tr><th>Tahap Pembayaran</th><th>Persentase Termin</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
             </thead>
             <tbody><tr><td class="personnel-empty" colspan="7">Belum ada data</td></tr></tbody>
           </table>
@@ -7297,7 +7314,8 @@ const FINANCE_TERMIN_FIELDS = [
   { column: "Nama Pekerjaan", aliases: ["nama pekerjaan", "pekerjaan"], required: true, full: true },
   { column: "Termin Ke", aliases: ["termin ke", "termin"] },
   { column: "Tahap Pembayaran", aliases: ["tahap pembayaran", "nama termin"], required: true },
-  { column: "Persentase", aliases: ["persentase", "prosentase", "persen"], required: true },
+  { column: "Persentase Termin", aliases: ["persentase termin", "persentase", "prosentase", "persen"], required: true },
+  { column: "Persentase Potongan Uang Muka", aliases: ["persentase potongan uang muka", "persentase potongan", "potongan persen"] },
   { column: "Nilai Kontrak", aliases: ["nilai kontrak"], required: true },
   { column: "Nilai Bruto", aliases: ["nilai bruto", "nilai termin", "nominal termin"] },
   { column: "Potongan Uang Muka", aliases: ["potongan uang muka", "potongan"] },
@@ -7323,11 +7341,34 @@ const FINANCE_ADDENDUM_FIELDS = [
 ];
 
 function resolveFinanceColumn(columns, field) {
-  return columns.find(column => includesAny(normalizeSearchText(column), field.aliases)) || field.column;
+  const normalizedField = normalizeSearchText(field.column);
+  const aliases = [normalizedField, ...(field.aliases || []).map(normalizeSearchText)];
+  return columns.find(column => aliases.includes(normalizeSearchText(column))) ||
+    columns.find(column => includesAny(normalizeSearchText(column), field.aliases || [])) ||
+    field.column;
 }
 
-function renderFinanceInput(column, value, required) {
-  return '<input name="' + escapeHtml(column) + '" value="' + escapeHtml(value) + '" autocomplete="off" ' + (required ? 'required' : '') + '>';
+function renderFinanceInput(column, value, required, options = {}) {
+  const attributes = [
+    'name="' + escapeHtml(column) + '"',
+    'value="' + escapeHtml(value) + '"',
+    'autocomplete="off"',
+    options.readonly ? 'readonly' : '',
+    options.inputMode ? 'inputmode="' + escapeHtml(options.inputMode) + '"' : '',
+    options.placeholder ? 'placeholder="' + escapeHtml(options.placeholder) + '"' : '',
+    required ? 'required' : ''
+  ].filter(Boolean).join(" ");
+  return '<input ' + attributes + '>';
+}
+
+function getFinanceInputOptions(sourceId, column) {
+  const normalized = normalizeSearchText(column);
+  if (sourceId !== "finance-termin") return {};
+  if (["id", "id pekerjaan", "nama pekerjaan", "nilai kontrak", "nilai bruto", "potongan uang muka", "nilai bersih"].includes(normalized)) {
+    return { readonly: true };
+  }
+  if (includesAny(normalized, ["persentase", "nilai", "termin ke"])) return { inputMode: "decimal" };
+  return {};
 }
 
 function setFinanceSeedValue(target, columns, keywords, value) {
@@ -7382,11 +7423,12 @@ function seedFinanceTerminRecord(entry, terminItem = null) {
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[3], sequence);
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[4], terminItem?.label || `Tahap ${sequence}`);
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[5], percent || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[6], nilaiKontrak || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[7], grossValue);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[8], deduction);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[9], netValue);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[10], terminItem?.status || getRecordValue(terminItem?.record || {}, ["status"]) || "Draft");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[6], terminItem?.deductionPercent || "");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[7], nilaiKontrak || "");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[8], grossValue);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[9], deduction);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[10], netValue);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[11], terminItem?.status || getRecordValue(terminItem?.record || {}, ["status"]) || "Draft");
   return seed;
 }
 
@@ -7396,14 +7438,70 @@ function buildFinanceTerminTemplateRecords(entry) {
   const uangMuka = Math.round(nilaiKontrak * 0.15);
   const templates = [
     { sequence: 1, label: "Uang Muka", percent: 15, grossValue: uangMuka, deduction: 0, value: uangMuka, status: "Rencana" },
-    { sequence: 2, label: "Termin 1", percent: 30, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.20), status: "Rencana" },
-    { sequence: 3, label: "Termin 2", percent: 40, grossValue: Math.round(nilaiKontrak * 0.40), deduction: Math.round(uangMuka * 0.40), status: "Rencana" },
-    { sequence: 4, label: "Termin 3", percent: 30, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.40), status: "Rencana" }
+    { sequence: 2, label: "Termin 1", percent: 30, deductionPercent: 20, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.20), status: "Rencana" },
+    { sequence: 3, label: "Termin 2", percent: 40, deductionPercent: 40, grossValue: Math.round(nilaiKontrak * 0.40), deduction: Math.round(uangMuka * 0.40), status: "Rencana" },
+    { sequence: 4, label: "Termin 3", percent: 30, deductionPercent: 40, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.40), status: "Rencana" }
   ];
   return templates.map(item => seedFinanceTerminRecord(entry, {
     ...item,
     value: item.value ?? Math.max(0, Number(item.grossValue || 0) - Number(item.deduction || 0))
   }));
+}
+
+function getFinanceDataKey(data, field) {
+  const keys = Object.keys(data || {});
+  const resolved = resolveFinanceColumn(keys, field);
+  return keys.find(key => normalizeSearchText(key) === normalizeSearchText(resolved)) || resolved;
+}
+
+function getFinanceDataByField(data, field) {
+  return data[getFinanceDataKey(data, field)] || "";
+}
+
+function setFinanceDataByField(data, field, value) {
+  const key = getFinanceDataKey(data, field);
+  data[key] = value == null ? "" : String(value);
+}
+
+function getFinanceUpfrontBase(entry, draftData = null) {
+  const draftLabel = draftData ? normalizeSearchText(getFinanceDataByField(draftData, FINANCE_TERMIN_FIELDS[4])) : "";
+  const draftPercent = draftData ? parseFinanceNumber(getFinanceDataByField(draftData, FINANCE_TERMIN_FIELDS[5])) : 0;
+  const draftContract = draftData ? parseFinanceNumber(getFinanceDataByField(draftData, FINANCE_TERMIN_FIELDS[7])) : 0;
+  if (draftLabel.includes("uang muka")) return Math.round(draftContract * draftPercent / 100);
+  const upfront = getFinanceTerminPlan(entry).find(item => normalizeSearchText(item.label).includes("uang muka"));
+  return Number(upfront?.grossValue || upfront?.value || 0);
+}
+
+function applyFinanceTerminCalculatedValues(data, entry) {
+  const contractValue = parseFinanceNumber(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[7])) || Number(entry?.nilaiKontrak || 0);
+  const label = normalizeSearchText(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[4]));
+  const percent = parseFinanceNumber(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[5])) || 0;
+  const deductionPercent = label.includes("uang muka") ? 0 : parseFinanceNumber(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[6])) || 0;
+  const grossValue = percent ? Math.round(contractValue * percent / 100) : 0;
+  const upfrontBase = getFinanceUpfrontBase(entry, data);
+  const deduction = deductionPercent && upfrontBase ? Math.round(upfrontBase * deductionPercent / 100) : 0;
+  const netValue = Math.max(0, grossValue - deduction);
+  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[7], contractValue || "");
+  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[8], grossValue || "");
+  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[9], deduction || "");
+  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[10], netValue || "");
+  return data;
+}
+
+function updateFinanceTerminComputedFields() {
+  const form = document.getElementById("financeRecordForm");
+  if (!form || document.getElementById("financeRecordSourceId")?.value !== "finance-termin") return;
+  const data = Object.fromEntries(Array.from(new FormData(form).entries()));
+  applyFinanceTerminCalculatedValues(data, getCurrentFinanceEntry());
+  [FINANCE_TERMIN_FIELDS[7], FINANCE_TERMIN_FIELDS[8], FINANCE_TERMIN_FIELDS[9], FINANCE_TERMIN_FIELDS[10]].forEach(field => {
+    const key = getFinanceDataKey(data, field);
+    const input = form.elements[key];
+    if (input) input.value = data[key] || "";
+  });
+}
+
+function handleFinanceRecordFormInput() {
+  updateFinanceTerminComputedFields();
 }
 
 function seedFinanceAddendumRecord(entry) {
@@ -7432,9 +7530,11 @@ function openFinanceAuxForm({ sourceId, title, entry, record = null, fields, see
   document.getElementById("financeRecordFormStatus").textContent = "";
   document.getElementById("financeRecordFormFields").innerHTML = fields.map(field => {
     const column = resolveFinanceColumn(columns, field);
-    return '<label class="' + (field.full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, initialRecord[column] || "", field.required) + '</label>';
+    const value = initialRecord[column] || getRecordValue(initialRecord, [field.column, ...(field.aliases || [])]);
+    return '<label class="' + (field.full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, value || "", field.required, getFinanceInputOptions(sourceId, column)) + '</label>';
   }).join("");
   document.getElementById("financeRecordFormModal").showModal();
+  updateFinanceTerminComputedFields();
 }
 
 function getFinanceContractRecord(entry) {
@@ -7500,7 +7600,8 @@ async function saveFinanceRecord(event) {
   const form = event.currentTarget;
   const rowNumber = Number(document.getElementById("financeRecordRowNumber").value) || 0;
   const sourceId = document.getElementById("financeRecordSourceId").value || "finance";
-  const data = Object.fromEntries(Array.from(new FormData(form).entries()).filter(([key]) => key !== "").map(([key, value]) => [key, String(value).trim()]));
+  let data = Object.fromEntries(Array.from(new FormData(form).entries()).filter(([key]) => key !== "").map(([key, value]) => [key, String(value).trim()]));
+  if (sourceId === "finance-termin") data = applyFinanceTerminCalculatedValues(data, getCurrentFinanceEntry());
   document.getElementById("financeRecordFormStatus").textContent = "Mengirim perubahan...";
   document.getElementById("saveFinanceRecordButton").disabled = true;
   await sendFinanceMutation(rowNumber ? "update" : "add", { rowNumber, data, sourceId, targetSourceId: sourceId });
