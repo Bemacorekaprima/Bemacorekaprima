@@ -3152,8 +3152,10 @@ function renderInventoryDetail(record) {
   setTextContent("inventoryDetailMeta", record.type || "Lainnya");
   setTextContent("inventoryDetailItemName", record.name || "Inventaris Kantor");
   setTextContent("inventoryDetailStatusPill", statusLabel);
-  document.getElementById("inventoryDetailStatus")?.className = `inventory-detail-badge ${statusClass}`;
-  document.getElementById("inventoryDetailStatusPill")?.className = `inventory-status ${statusClass}`;
+  const detailStatus = document.getElementById("inventoryDetailStatus");
+  const detailStatusPill = document.getElementById("inventoryDetailStatusPill");
+  if (detailStatus) detailStatus.className = `inventory-detail-badge ${statusClass}`;
+  if (detailStatusPill) detailStatusPill.className = `inventory-status ${statusClass}`;
   setTextContent("inventoryDetailProgressLabel", `${progress}%${usageHours ? ` (${usageHours})` : ""}`);
   const progressBar = document.getElementById("inventoryDetailProgressBar");
   if (progressBar) progressBar.style.width = `${progress}%`;
