@@ -645,7 +645,10 @@ document.addEventListener("click", event => {
 
   const inventoryAction = event.target.closest("[data-inventory-action]");
   if (inventoryAction) {
+    event.preventDefault();
+    const scrollState = captureInventoryScrollState();
     handleInventoryAction(inventoryAction.dataset.inventoryAction, inventoryAction.dataset.inventoryId);
+    restoreInventoryScrollState(scrollState);
     return;
   }
 
@@ -3024,8 +3027,11 @@ function renderDashboardInventory() {
     container.innerHTML = `
       <div class="dashboard-inventory-filter-list">
         <div class="dashboard-inventory-filter-head">
-          <strong>${escapeHtml(filterLabels[activeFilter] || "Inventaris Kantor")}</strong>
-          <span>${filteredRecords.length} item</span>
+          <div>
+            <strong>${escapeHtml(filterLabels[activeFilter] || "Inventaris Kantor")}</strong>
+            <span>${filteredRecords.length} item</span>
+          </div>
+          <button class="text-button" type="button" data-inventory-action="collapse">Ringkas</button>
         </div>
         ${filteredRecords.length ? filteredRecords.map(item => {
           const status = item.status || "Tersedia";
@@ -3273,6 +3279,16 @@ function handleInventoryTableClick(event) {
 function handleInventoryAction(action, inventoryId = "") {
   const selected = inventoryId ? getInventoryRecordById(inventoryId) : getSelectedInventoryRecord();
   if (selected) state.selectedInventoryId = selected.id;
+  if (action === "list") {
+    state.dashboardInventoryFilter = "all";
+    renderDashboardInventory();
+    return;
+  }
+  if (action === "collapse") {
+    state.dashboardInventoryFilter = "";
+    renderDashboardInventory();
+    return;
+  }
   if (!selected && action !== "usage") return openInventoryUsageModal({ mode: "add" });
   if (action === "usage") return openInventoryUsageModal({ mode: "usage", record: selected });
   if (action === "edit") return openInventoryUsageModal({ mode: "edit", record: selected });
@@ -3285,6 +3301,7 @@ function handleInventoryAction(action, inventoryId = "") {
 function handleInventorySummaryClick(event) {
   const button = event.target.closest("[data-inventory-status-filter]");
   if (!button) return;
+  const scrollState = captureInventoryScrollState();
   const records = getInventoryRecords();
   const filter = button.dataset.inventoryStatusFilter || "all";
   const statusMap = {
@@ -3304,6 +3321,7 @@ function handleInventorySummaryClick(event) {
   state.selectedInventoryId = match.id;
   renderDashboardInventory();
   renderInventoryWorkspace();
+  restoreInventoryScrollState(scrollState);
 }
 
 function openInventoryUsageModal(options = {}) {
@@ -3358,28 +3376,44 @@ function closeInventoryUsageModal() {
 }
 
 function captureInventoryScrollState() {
-  const main = document.querySelector(".main");
+  const selectors = [".main", ".dashboard-inventory-filter-list", "#dashInventoryItem"];
+  const containers = selectors.map(selector => {
+    const element = document.querySelector(selector);
+    return element ? {
+      selector,
+      top: element.scrollTop || 0,
+      left: element.scrollLeft || 0
+    } : null;
+  }).filter(Boolean);
   return {
     windowX: window.scrollX || 0,
     windowY: window.scrollY || 0,
-    mainTop: main?.scrollTop || 0,
-    mainLeft: main?.scrollLeft || 0
+    documentTop: document.scrollingElement?.scrollTop || 0,
+    documentLeft: document.scrollingElement?.scrollLeft || 0,
+    containers
   };
 }
 
 function restoreInventoryScrollState(stateSnapshot) {
   if (!stateSnapshot) return;
   const restore = () => {
-    const main = document.querySelector(".main");
-    if (main) {
-      main.scrollTop = stateSnapshot.mainTop;
-      main.scrollLeft = stateSnapshot.mainLeft;
+    if (document.scrollingElement) {
+      document.scrollingElement.scrollTop = stateSnapshot.documentTop;
+      document.scrollingElement.scrollLeft = stateSnapshot.documentLeft;
     }
+    stateSnapshot.containers?.forEach(item => {
+      const element = document.querySelector(item.selector);
+      if (!element) return;
+      element.scrollTop = item.top;
+      element.scrollLeft = item.left;
+    });
     window.scrollTo(stateSnapshot.windowX, stateSnapshot.windowY);
   };
   restore();
   requestAnimationFrame(restore);
+  window.setTimeout(restore, 0);
   window.setTimeout(restore, 80);
+  window.setTimeout(restore, 240);
 }
 
 function saveInventoryUsage(event) {
