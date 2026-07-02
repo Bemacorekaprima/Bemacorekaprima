@@ -327,7 +327,7 @@
                   </button>
                   <button class="dashboard-card-footer-button primary-soft" id="dashInventoryUsageButton" type="button">
                     <i data-lucide="calendar" aria-hidden="true"></i>
-                    Catat Penggunaan
+                    Gunakan
                   </button>
                 </div>
               </article>
@@ -1165,7 +1165,7 @@
                 <div class="inventory-detail-actions">
                   <button class="secondary-button" id="inventoryDetailEditButton" type="button">Edit</button>
                   <button class="secondary-button" id="inventoryDetailHistoryButton" type="button">Riwayat</button>
-                  <button class="primary-button" id="inventoryDetailUsageButton" type="button">Catat Penggunaan</button>
+                  <button class="primary-button" id="inventoryDetailUsageButton" type="button">Gunakan</button>
                 </div>
               </header>
               <section class="inventory-detail-card">
@@ -1192,7 +1192,7 @@
                 <i data-lucide="route" aria-hidden="true"></i>
                 <div>
                   <strong>Alur Inventaris</strong>
-                  <p>Catat Penggunaan -> status menjadi <b>Dipakai</b> -> dashboard otomatis update.</p>
+                  <p>Gunakan -> status menjadi <b>Dipakai</b> -> dashboard otomatis update.</p>
                 </div>
               </section>
             </div>
@@ -1477,7 +1477,7 @@
     <form method="dialog" class="modal-card inventory-form-card" id="inventoryUsageForm">
       <header>
         <div>
-          <h2 id="inventoryUsageTitle">Catat Penggunaan Inventaris</h2>
+          <h2 id="inventoryUsageTitle">Gunakan Inventaris</h2>
           <p id="inventoryUsageSubtitle">Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.</p>
         </div>
         <button type="button" class="icon-button" id="closeInventoryUsageButton">x</button>
@@ -1513,7 +1513,7 @@
             <option value="Perawatan">Perawatan</option>
           </select>
         </label>
-        <label>
+        <label id="inventoryUserField">
           <span>Pengguna / Driver</span>
           <input id="inventoryUser" list="inventoryPersonSuggestions" placeholder="Contoh: Bpk A">
         </label>
@@ -1552,7 +1552,7 @@
       <div id="inventoryHistoryPreview" class="inventory-history-preview"></div>
       <footer>
         <button type="button" class="secondary-button" id="cancelInventoryUsageButton">Batal</button>
-        <button class="primary-button" type="submit">Simpan</button>
+        <button class="primary-button" id="saveInventoryUsageButton" type="submit">Simpan</button>
       </footer>
     </form>
   </dialog>
@@ -1787,6 +1787,6 @@
       if (window.lucide) window.lucide.createIcons();
     });
   </script>
-  <script type="module" src="app.js?v=20260702205000"></script>
+  <script type="module" src="app.js?v=20260702211500"></script>
 </body>
 </html>

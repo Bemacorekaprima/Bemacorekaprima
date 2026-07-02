@@ -2908,7 +2908,7 @@ function createDefaultInventoryRecords() {
       history: [
         {
           at: `${state.today}T08:30`,
-          action: "Catat Penggunaan",
+          action: "Gunakan Inventaris",
           user: "Bpk A",
           note: "Berangkat untuk mobilisasi personil proyek."
         }
@@ -3316,14 +3316,19 @@ function openInventoryUsageModal(options = {}) {
     mode === "maintenance" ? "Jadwalkan Perawatan Inventaris" :
     mode === "history" ? "Riwayat Pemakaian Inventaris" :
     mode === "detail" ? "Rincian Inventaris Kantor" :
-    "Catat Penggunaan Inventaris");
+    "Gunakan Inventaris");
   setTextContent("inventoryUsageSubtitle", mode === "usage"
-    ? "Hanya inventaris berstatus Tersedia yang disarankan. Setelah disimpan, status berubah menjadi Dipakai."
-    : "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
+    ? "Pilih item yang tersedia, isi pengguna dan tujuan. Setelah disimpan, status berubah menjadi Dipakai."
+    : mode === "add"
+      ? "Tambah jenis/item/barang inventaris baru. Data penggunaan diisi melalui tombol Gunakan."
+      : "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
   setInputValue("inventoryRecordId", record.id || "");
   setInputValue("inventoryItemName", record.name || "");
   setInputValue("inventoryItemType", record.type || "Kendaraan");
-  setInputValue("inventoryStatus", mode === "maintenance" ? "Perawatan" : (mode === "usage" ? "Dipakai" : (record.status || "Dipakai")));
+  setInputValue("inventoryStatus", mode === "add" ? "Tersedia" :
+    mode === "maintenance" ? "Perawatan" :
+    mode === "usage" ? "Dipakai" :
+    (record.status || "Tersedia"));
   setInputValue("inventoryUser", record.user || "");
   setInputValue("inventoryPurpose", mode === "maintenance" ? "Perawatan berkala" : (record.purpose || ""));
   setInputValue("inventoryDestination", record.destination || "");
@@ -3350,6 +3355,7 @@ function saveInventoryUsage(event) {
   const records = getInventoryRecords();
   const selectedName = getInputValue("inventoryItemName");
   const formMode = state.inventoryFormMode || "usage";
+  const masterMode = formMode === "add" || formMode === "edit";
   const selectedAvailableId = getInputValue("inventoryAvailableSelect");
   if (formMode === "usage" && !selectedAvailableId) {
     notify("Pilih inventaris yang tersedia terlebih dahulu.", { type: "warning" });
@@ -3365,18 +3371,20 @@ function saveInventoryUsage(event) {
     renderInventoryAvailableOptions();
     return;
   }
-  const status = formMode === "usage" ? "Dipakai" : (getInputValue("inventoryStatus") || "Dipakai");
+  const status = formMode === "usage" ? "Dipakai" :
+    formMode === "add" ? "Tersedia" :
+    (getInputValue("inventoryStatus") || "Tersedia");
   const nextRecord = {
     ...existing,
     id,
     name: formMode === "usage" ? existing.name : (selectedName || existing.name || "Inventaris Kantor"),
     type: getInputValue("inventoryItemType") || existing.type || "Lainnya",
     status,
-    user: getInputValue("inventoryUser"),
-    purpose: getInputValue("inventoryPurpose"),
-    destination: getInputValue("inventoryDestination"),
-    departTime: getInputValue("inventoryDepartTime"),
-    returnTime: getInputValue("inventoryReturnTime"),
+    user: masterMode ? (existing.user || "") : getInputValue("inventoryUser"),
+    purpose: masterMode ? (existing.purpose || "") : getInputValue("inventoryPurpose"),
+    destination: masterMode ? (existing.destination || "Kantor") : getInputValue("inventoryDestination"),
+    departTime: masterMode ? (existing.departTime || "") : getInputValue("inventoryDepartTime"),
+    returnTime: masterMode ? (existing.returnTime || "") : getInputValue("inventoryReturnTime"),
     condition: getInputValue("inventoryCondition") || "Baik",
     notes: getInputValue("inventoryNotes"),
     updatedAt: new Date().toISOString()
@@ -3386,7 +3394,7 @@ function saveInventoryUsage(event) {
       at: new Date().toISOString(),
       action: formMode === "add" ? "Tambah Inventaris" :
         formMode === "edit" || formMode === "detail" ? "Edit Inventaris" :
-        status === "Perawatan" ? "Jadwalkan Perawatan" : "Catat Penggunaan",
+        status === "Perawatan" ? "Jadwalkan Perawatan" : "Gunakan Inventaris",
       user: nextRecord.user,
       note: [nextRecord.purpose, nextRecord.destination].filter(Boolean).join(" - ") || nextRecord.notes
     },
@@ -3406,22 +3414,67 @@ function saveInventoryUsage(event) {
 
 function setInventoryFormMode(mode) {
   const usageMode = mode === "usage";
+  const addMode = mode === "add";
+  const editMode = mode === "edit";
+  const masterMode = addMode || editMode;
+  const historyMode = mode === "history";
+  const detailMode = mode === "detail";
   document.getElementById("inventoryAvailableField")?.classList.toggle("hidden", !usageMode);
-  [
-    "inventoryItemNameField",
-    "inventoryItemTypeField",
-    "inventoryStatusField",
-    "inventoryDestinationField",
-    "inventoryDepartTimeField",
-    "inventoryReturnTimeField",
-    "inventoryConditionField",
-    "inventoryNotesField"
-  ].forEach(id => document.getElementById(id)?.classList.toggle("hidden", usageMode));
+  document.getElementById("inventoryItemNameField")?.classList.toggle("hidden", usageMode || historyMode);
+  document.getElementById("inventoryItemTypeField")?.classList.toggle("hidden", usageMode || historyMode);
+  document.getElementById("inventoryStatusField")?.classList.toggle("hidden", usageMode || addMode || historyMode);
+  document.getElementById("inventoryUserField")?.classList.toggle("hidden", masterMode || historyMode);
+  document.getElementById("inventoryPurposeField")?.classList.toggle("hidden", masterMode || historyMode);
+  document.getElementById("inventoryDestinationField")?.classList.toggle("hidden", masterMode || historyMode);
+  document.getElementById("inventoryDepartTimeField")?.classList.toggle("hidden", masterMode || historyMode);
+  document.getElementById("inventoryReturnTimeField")?.classList.toggle("hidden", masterMode || historyMode);
+  document.getElementById("inventoryConditionField")?.classList.toggle("hidden", historyMode);
+  document.getElementById("inventoryNotesField")?.classList.toggle("hidden", historyMode);
 
   const itemName = document.getElementById("inventoryItemName");
   const availableSelect = document.getElementById("inventoryAvailableSelect");
-  if (itemName) itemName.required = !usageMode;
+  const user = document.getElementById("inventoryUser");
+  const purpose = document.getElementById("inventoryPurpose");
+  const saveButton = document.getElementById("saveInventoryUsageButton");
+  if (itemName) itemName.required = !usageMode && !historyMode;
   if (availableSelect) availableSelect.required = usageMode;
+  if (user) user.required = usageMode;
+  if (purpose) purpose.required = usageMode;
+  if (saveButton) {
+    saveButton.classList.toggle("hidden", historyMode || detailMode);
+    saveButton.textContent = usageMode ? "Gunakan" :
+      addMode ? "Simpan Item" :
+      editMode ? "Simpan Perubahan" :
+      "Simpan";
+  }
+  if (detailMode) {
+    [
+      "inventoryItemName",
+      "inventoryItemType",
+      "inventoryStatus",
+      "inventoryUser",
+      "inventoryPurpose",
+      "inventoryDestination",
+      "inventoryDepartTime",
+      "inventoryReturnTime",
+      "inventoryCondition",
+      "inventoryNotes"
+    ].forEach(id => document.getElementById(id)?.setAttribute("readonly", "readonly"));
+  } else {
+    [
+      "inventoryItemName",
+      "inventoryUser",
+      "inventoryPurpose",
+      "inventoryDestination",
+      "inventoryDepartTime",
+      "inventoryReturnTime",
+      "inventoryNotes"
+    ].forEach(id => document.getElementById(id)?.removeAttribute("readonly"));
+  }
+  ["inventoryItemType", "inventoryStatus", "inventoryCondition"].forEach(id => {
+    const field = document.getElementById(id);
+    if (field) field.disabled = detailMode;
+  });
 }
 
 function renderInventoryAvailableOptions() {
