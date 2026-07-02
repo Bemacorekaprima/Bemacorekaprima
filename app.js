@@ -553,6 +553,7 @@ onAuthStateChanged(auth, async user => {
   window.clearTimeout(window.__appBootTimer);
   currentUser = user;
   document.body.classList.remove("auth-pending");
+  document.body.classList.toggle("app-active", !!user);
   document.getElementById("loadingView").classList.add("hidden");
   document.getElementById("authView").classList.toggle("hidden", !!user);
   document.getElementById("appView").classList.toggle("hidden", !user);
@@ -3365,14 +3366,14 @@ function openInventoryUsageModal(options = {}) {
   if (mode === "usage" && record.id) setInputValue("inventoryAvailableSelect", record.id);
   populateInventoryDatalists();
   renderInventoryHistoryPreview(record);
-  if (!modal.open) modal.showModal();
-  modal.focus({ preventScroll: true });
+  modal.setAttribute("open", "");
+  modal.querySelector(".inventory-form-card")?.focus?.({ preventScroll: true });
   restoreInventoryScrollState(scrollState);
 }
 
 function closeInventoryUsageModal() {
   const modal = document.getElementById("inventoryUsageModal");
-  if (modal?.open) modal.close();
+  if (modal?.open) modal.removeAttribute("open");
 }
 
 function captureInventoryScrollState() {
