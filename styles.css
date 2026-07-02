@@ -6054,18 +6054,26 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 
 .finance-detail-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   gap: 10px;
 }
 .finance-detail-kpis article,
 .finance-detail-grid article {
+  min-width: 0;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
 }
 .finance-detail-kpis span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
-.finance-detail-kpis strong { display: block; margin-top: 6px; color: #0f172a; font-size: 22px; overflow-wrap: anywhere; }
+.finance-detail-kpis strong {
+  display: block;
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: clamp(18px, 1.65vw, 22px);
+  line-height: 1.12;
+  white-space: nowrap;
+}
 .finance-detail-body { display: grid; gap: 14px; }
 .finance-summary-groups {
   display: grid;
@@ -6108,6 +6116,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   margin: 3px 0 0;
   color: var(--muted);
   font-size: 12px;
+  overflow-wrap: break-word;
 }
 .finance-validation-badge {
   display: inline-flex;
@@ -6139,6 +6148,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
+  line-height: 1.25;
 }
 .finance-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.7fr); gap: 12px; }
 .finance-detail-grid h3,
@@ -6184,7 +6194,7 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 .finance-termin-stack .green { background: linear-gradient(90deg, #16a34a, #22c55e); }
 .finance-termin-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -6208,9 +6218,9 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 }
 .finance-termin-kpis strong {
   color: #071a44;
-  font-size: clamp(18px, 2vw, 25px);
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+  font-size: clamp(18px, 1.65vw, 24px);
+  line-height: 1.12;
+  white-space: nowrap;
 }
 .finance-termin-empty {
   display: grid;
@@ -6315,7 +6325,9 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
 }
 .finance-personnel-cost-strip strong {
   color: #071a44;
-  overflow-wrap: anywhere;
+  font-size: clamp(16px, 1.45vw, 18px);
+  line-height: 1.15;
+  white-space: nowrap;
 }
 .finance-detail-table { min-width: 1040px; }
 .secondary-button.danger { color: #b91c1c; border-color: #fecaca; background: #fff7f7; }
