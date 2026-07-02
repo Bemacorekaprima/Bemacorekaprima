@@ -146,6 +146,7 @@ const MENU_DEFINITIONS = [
   { id: "jobs", label: "Portofolio" },
   { id: "personnel", label: "Personil" },
   { id: "finance", label: "Finance" },
+  { id: "inventory", label: "Inventaris" },
   { id: "tasks", label: "Tugas" },
   { id: "reports", label: "Laporan" },
   { id: "settings", label: "Pengaturan" }
@@ -156,6 +157,7 @@ const DEFAULT_MENU_ROLES = {
   jobs: [...CONFIGURABLE_ROLES],
   personnel: [...CONFIGURABLE_ROLES],
   finance: [...CONFIGURABLE_ROLES],
+  inventory: [...CONFIGURABLE_ROLES],
   tasks: [...CONFIGURABLE_ROLES],
   reports: [...CONFIGURABLE_ROLES],
   settings: ["admin", "editor", "author", "contributor"]
@@ -291,7 +293,9 @@ let state = {
   tenderStatusFilter: "all",
   dashboardAssignmentFilter: "all",
   inventoryRecords: [],
-  selectedInventoryId: ""
+  selectedInventoryId: "",
+  inventorySearch: "",
+  inventoryStatusFilter: "all"
 };
 
 const statusToList = {
@@ -406,6 +410,19 @@ function bindControls() {
   document.getElementById("dashInventorySummary")?.addEventListener("click", handleInventorySummaryClick);
   document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
   document.getElementById("dashInventoryUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage" }));
+  document.getElementById("inventoryAddItemButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
+  document.getElementById("inventoryDetailUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage", record: getSelectedInventoryRecord() }));
+  document.getElementById("inventoryDetailHistoryButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "history", record: getSelectedInventoryRecord() }));
+  document.getElementById("inventorySearch")?.addEventListener("input", event => {
+    state.inventorySearch = event.target.value;
+    renderInventoryWorkspace();
+  });
+  document.getElementById("inventoryStatusFilter")?.addEventListener("change", event => {
+    state.inventoryStatusFilter = event.target.value;
+    renderInventoryWorkspace();
+  });
+  document.getElementById("inventoryTableBody")?.addEventListener("click", handleInventoryTableClick);
+  document.getElementById("inventoryPageHistory")?.addEventListener("click", handleInventoryTableClick);
   document.getElementById("inventoryUsageForm")?.addEventListener("submit", saveInventoryUsage);
   document.getElementById("inventoryAvailableSelect")?.addEventListener("change", handleInventoryAvailableSelectChange);
   document.getElementById("closeInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
@@ -3033,6 +3050,169 @@ function renderDashboardInventory() {
   window.lucide?.createIcons?.();
 }
 
+function getInventoryCounts(records = getInventoryRecords()) {
+  return records.reduce((summary, item) => {
+    summary.total += 1;
+    if (item.status === "Dipakai") summary.used += 1;
+    else if (item.status === "Perawatan") summary.maintenance += 1;
+    else summary.available += 1;
+    return summary;
+  }, { total: 0, used: 0, available: 0, maintenance: 0 });
+}
+
+function getFilteredInventoryRecords() {
+  const keyword = normalizeSearchText(state.inventorySearch);
+  const status = state.inventoryStatusFilter || "all";
+  return getInventoryRecords().filter(item => {
+    const matchesStatus = status === "all" || (item.status || "Tersedia") === status;
+    const haystack = normalizeSearchText([
+      item.name,
+      item.type,
+      item.user,
+      item.purpose,
+      item.destination,
+      item.condition,
+      item.notes
+    ].join(" "));
+    return matchesStatus && (!keyword || haystack.includes(keyword));
+  });
+}
+
+function renderInventoryWorkspace() {
+  const records = getInventoryRecords();
+  const counts = getInventoryCounts(records);
+  setTextContent("inventoryStatTotal", counts.total);
+  setTextContent("inventoryStatUsed", counts.used);
+  setTextContent("inventoryStatAvailable", counts.available);
+  setTextContent("inventoryStatMaintenance", counts.maintenance);
+  setTextContent("inventorySyncStatus", `Tersinkron realtime - ${counts.total} item`);
+
+  const search = document.getElementById("inventorySearch");
+  if (search && document.activeElement !== search) search.value = state.inventorySearch || "";
+  const filter = document.getElementById("inventoryStatusFilter");
+  if (filter) filter.value = state.inventoryStatusFilter || "all";
+
+  const filtered = getFilteredInventoryRecords();
+  if (!records.some(item => item.id === state.selectedInventoryId)) {
+    state.selectedInventoryId = records[0]?.id || "";
+  }
+  if (filtered.length && !filtered.some(item => item.id === state.selectedInventoryId)) {
+    state.selectedInventoryId = filtered[0].id;
+  }
+
+  const body = document.getElementById("inventoryTableBody");
+  if (body) {
+    body.innerHTML = filtered.length ? filtered.map(item => {
+      const isSelected = item.id === state.selectedInventoryId;
+      const status = item.status || "Tersedia";
+      const canUse = isInventoryAvailable(item);
+      const time = [formatInventoryTime(item.departTime), formatInventoryTime(item.returnTime)]
+        .filter(value => value && value !== "-")
+        .join(" - ") || "-";
+      return `
+        <tr class="${isSelected ? "selected" : ""}" data-inventory-id="${escapeHtml(item.id)}">
+          <td>
+            <button class="inventory-row-title" type="button" data-inventory-id="${escapeHtml(item.id)}">
+              <strong>${escapeHtml(item.name || "Inventaris Kantor")}</strong>
+              <small>${escapeHtml(item.type || "Lainnya")}</small>
+            </button>
+          </td>
+          <td>${escapeHtml(item.user || "-")}</td>
+          <td>${escapeHtml(time)}</td>
+          <td><span class="inventory-table-status ${escapeHtml(safeClassToken(status))}">${escapeHtml(getInventoryStatusLabel(status))}</span></td>
+          <td>
+            <button class="text-button" type="button" data-inventory-row-action="${canUse ? "usage" : "detail"}" data-inventory-id="${escapeHtml(item.id)}">
+              ${canUse ? "Gunakan" : "Detail"}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("") : '<tr><td colspan="5" class="dashboard-empty">Belum ada inventaris yang cocok.</td></tr>';
+  }
+
+  renderInventoryDetail(filtered.length ? getSelectedInventoryRecord() : null);
+  window.lucide?.createIcons?.();
+}
+
+function renderInventoryDetail(record) {
+  const empty = document.getElementById("inventoryEmptyState");
+  const content = document.getElementById("inventoryDetailContent");
+  if (!empty || !content) return;
+  empty.classList.toggle("hidden", !!record);
+  content.classList.toggle("hidden", !record);
+  if (!record) return;
+
+  const status = record.status || "Tersedia";
+  const statusLabel = getInventoryStatusLabel(status);
+  const statusClass = safeClassToken(status);
+  const progress = getInventoryUsageProgress(record);
+  const usageHours = getInventoryUsageHours(record);
+  setTextContent("inventoryDetailStatus", statusLabel);
+  setTextContent("inventoryDetailTitle", record.name || "Inventaris Kantor");
+  setTextContent("inventoryDetailMeta", record.type || "Lainnya");
+  setTextContent("inventoryDetailItemName", record.name || "Inventaris Kantor");
+  setTextContent("inventoryDetailStatusPill", statusLabel);
+  document.getElementById("inventoryDetailStatus")?.className = `inventory-detail-badge ${statusClass}`;
+  document.getElementById("inventoryDetailStatusPill")?.className = `inventory-status ${statusClass}`;
+  setTextContent("inventoryDetailProgressLabel", `${progress}%${usageHours ? ` (${usageHours})` : ""}`);
+  const progressBar = document.getElementById("inventoryDetailProgressBar");
+  if (progressBar) progressBar.style.width = `${progress}%`;
+
+  const info = document.getElementById("inventoryDetailInfoGrid");
+  if (info) {
+    info.innerHTML = [
+      { icon: "target", label: "Tujuan", value: record.purpose || "-" },
+      { icon: "user-round", label: "Pengguna / Driver", value: record.user || "-" },
+      { icon: "clock", label: "Berangkat", value: formatInventoryTime(record.departTime) },
+      { icon: "clock-3", label: "Estimasi Kembali", value: formatInventoryTime(record.returnTime) },
+      { icon: "map-pin", label: "Lokasi / Tujuan", value: record.destination || "-" },
+      { icon: "badge-check", label: "Kondisi", value: record.condition || "-" }
+    ].map(item => `
+      <span class="inventory-info-cell">
+        <i data-lucide="${escapeHtml(item.icon)}" aria-hidden="true"></i>
+        <span><small>${escapeHtml(item.label)}</small><b>${escapeHtml(item.value)}</b></span>
+      </span>
+    `).join("");
+  }
+
+  const history = document.getElementById("inventoryPageHistory");
+  if (history) {
+    const rows = Array.isArray(record.history) ? record.history.slice(0, 5) : [];
+    history.innerHTML = `
+      <div class="inventory-page-history-head">
+        <strong>Riwayat Terakhir</strong>
+        <button class="text-button" type="button" data-inventory-row-action="history" data-inventory-id="${escapeHtml(record.id)}">Lihat Semua</button>
+      </div>
+      ${rows.length ? rows.map(item => `
+        <div class="inventory-page-history-row">
+          <span>${escapeHtml(formatInventoryDateTime(item.at))}</span>
+          <b>${escapeHtml(item.action || "-")}</b>
+          <small>${escapeHtml([item.user, item.note].filter(Boolean).join(" - ") || "-")}</small>
+        </div>
+      `).join("") : '<p>Belum ada riwayat pemakaian.</p>'}
+    `;
+  }
+}
+
+function handleInventoryTableClick(event) {
+  const actionButton = event.target.closest("[data-inventory-row-action]");
+  const rowTarget = event.target.closest("[data-inventory-id]");
+  const id = actionButton?.dataset.inventoryId || rowTarget?.dataset.inventoryId || "";
+  if (!id) return;
+  const record = getInventoryRecords().find(item => item.id === id);
+  if (!record) return;
+  state.selectedInventoryId = id;
+  if (actionButton) {
+    const action = actionButton.dataset.inventoryRowAction;
+    if (action === "usage") openInventoryUsageModal({ mode: "usage", record });
+    else if (action === "history") openInventoryUsageModal({ mode: "history", record });
+    else openInventoryUsageModal({ mode: "detail", record });
+    renderInventoryWorkspace();
+    return;
+  }
+  renderInventoryWorkspace();
+}
+
 function handleInventoryAction(action) {
   const selected = getSelectedInventoryRecord();
   if (!selected && action !== "usage") return openInventoryUsageModal({ mode: "add" });
@@ -3063,11 +3243,13 @@ function handleInventorySummaryClick(event) {
   }
   state.selectedInventoryId = match.id;
   renderDashboardInventory();
+  renderInventoryWorkspace();
 }
 
 function openInventoryUsageModal(options = {}) {
   const mode = options.mode || "usage";
-  const record = mode === "usage" ? {} : (options.record || getSelectedInventoryRecord() || {});
+  const usageRecord = isInventoryAvailable(options.record) ? options.record : {};
+  const record = mode === "usage" ? usageRecord : (options.record || getSelectedInventoryRecord() || {});
   const modal = document.getElementById("inventoryUsageModal");
   if (!modal) return;
   state.inventoryFormMode = mode;
@@ -3094,6 +3276,7 @@ function openInventoryUsageModal(options = {}) {
   setInputValue("inventoryAvailableSelect", "");
   setInventoryFormMode(mode);
   renderInventoryAvailableOptions();
+  if (mode === "usage" && record.id) setInputValue("inventoryAvailableSelect", record.id);
   populateInventoryDatalists();
   renderInventoryHistoryPreview(record);
   if (!modal.open) modal.showModal();
@@ -3156,6 +3339,7 @@ function saveInventoryUsage(event) {
   state.selectedInventoryId = nextRecord.id;
   saveInventoryCache(records);
   renderDashboardInventory();
+  renderInventoryWorkspace();
   closeInventoryUsageModal();
   notify("Data inventaris kantor tersimpan.");
 }
@@ -3219,6 +3403,7 @@ function cycleInventoryStatus(record) {
   ].slice(0, 12);
   saveInventoryCache(state.inventoryRecords);
   renderDashboardInventory();
+  renderInventoryWorkspace();
   notify(`Status inventaris menjadi ${getInventoryStatusLabel(nextStatus)}.`);
 }
 
@@ -6657,6 +6842,7 @@ function render() {
   renderJobs();
   renderFinance();
   renderTenders();
+  renderInventoryWorkspace();
   renderDashboardPortfolioHome();
   renderDashboardWorkSummary();
   renderAttentionBanner();
@@ -6680,6 +6866,7 @@ function renderView() {
     jobs: "Portofolio",
     personnel: "Personil",
     finance: "Finance",
+    inventory: "Inventaris",
     tasks: "Tugas",
     reports: "Laporan",
     settings: "Pengaturan"

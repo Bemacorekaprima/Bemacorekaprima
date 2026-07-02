@@ -139,9 +139,9 @@
           <span>Finance</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="wallet-cards"></i><span class="nav-icon-fallback">Rp</span></span>
         </button>
-        <button class="nav-item" data-view="tenders">
-          <span>Dokumen</span>
-          <span class="nav-icon" aria-hidden="true"><i data-lucide="file-text"></i><span class="nav-icon-fallback">?</span></span>
+        <button class="nav-item" data-view="inventory">
+          <span>Inventaris</span>
+          <span class="nav-icon" aria-hidden="true"><i data-lucide="truck"></i><span class="nav-icon-fallback">?</span></span>
         </button>
         <button class="nav-item" data-view="settings">
           <span>Google Drive</span>
@@ -1100,6 +1100,98 @@
                 </p>
                 <div id="tenderTemplatePreview" class="tender-template-preview" contenteditable="true" aria-label="Dokumen template yang dapat diedit">
                   Pilih jenis dokumen lalu klik Buat Template.
+                </div>
+              </section>
+            </div>
+          </aside>
+        </section>
+      </section>
+
+      <section id="inventoryView" class="view">
+        <section class="inventory-stats-grid">
+          <article class="stat-card"><span>Total Inventaris</span><strong id="inventoryStatTotal">0</strong></article>
+          <article class="stat-card blue"><span>Dipakai</span><strong id="inventoryStatUsed">0</strong></article>
+          <article class="stat-card green"><span>Tersedia</span><strong id="inventoryStatAvailable">0</strong></article>
+          <article class="stat-card red"><span>Perawatan</span><strong id="inventoryStatMaintenance">0</strong></article>
+        </section>
+
+        <section class="inventory-workspace">
+          <article class="panel inventory-list-panel">
+            <div class="section-header">
+              <div>
+                <h2>Monitoring Inventaris Kantor</h2>
+                <p>Pantau penggunaan aset kantor per item.</p>
+                <span class="inventory-sync-status ready" id="inventorySyncStatus">Tersinkron realtime - 0 item</span>
+              </div>
+              <button class="primary-button" id="inventoryAddItemButton" type="button">+ Tambah Item</button>
+            </div>
+            <div class="inventory-filter-row">
+              <input id="inventorySearch" type="search" placeholder="Cari inventaris, pengguna, tujuan, atau lokasi...">
+              <select id="inventoryStatusFilter">
+                <option value="all">Semua Status</option>
+                <option value="Dipakai">Dipakai</option>
+                <option value="Tersedia">Tersedia</option>
+                <option value="Perawatan">Perawatan</option>
+              </select>
+            </div>
+            <div class="table-wrap inventory-table-wrap">
+              <table class="inventory-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Pengguna</th>
+                    <th>Jam</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="inventoryTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside class="panel inventory-detail-panel" id="inventoryDetailPanel">
+            <div class="inventory-empty-state" id="inventoryEmptyState">
+              <strong>Pilih inventaris</strong>
+              <p>Detail penggunaan dan riwayat aset akan tampil di sini.</p>
+            </div>
+            <div class="hidden" id="inventoryDetailContent">
+              <header class="inventory-detail-header">
+                <div>
+                  <span class="inventory-detail-badge" id="inventoryDetailStatus">Tersedia</span>
+                  <h2 id="inventoryDetailTitle">Nama Inventaris</h2>
+                  <p id="inventoryDetailMeta">Jenis inventaris</p>
+                </div>
+                <div class="inventory-detail-actions">
+                  <button class="secondary-button" id="inventoryDetailHistoryButton" type="button">Riwayat</button>
+                  <button class="primary-button" id="inventoryDetailUsageButton" type="button">Catat Penggunaan</button>
+                </div>
+              </header>
+              <section class="inventory-detail-card">
+                <span class="inventory-photo-frame inventory-detail-photo">
+                  <img src="assets/inventory-car.svg" alt="Inventaris kantor">
+                </span>
+                <div class="inventory-content">
+                  <div class="inventory-item-topline">
+                    <strong id="inventoryDetailItemName">Inventaris Kantor</strong>
+                    <em class="inventory-status" id="inventoryDetailStatusPill">Tersedia</em>
+                  </div>
+                  <div class="inventory-info-grid" id="inventoryDetailInfoGrid"></div>
+                </div>
+              </section>
+              <section class="inventory-progress-section">
+                <div>
+                  <strong>Progress Penggunaan</strong>
+                  <span id="inventoryDetailProgressLabel">0%</span>
+                </div>
+                <div class="inventory-time-track"><i id="inventoryDetailProgressBar"></i></div>
+              </section>
+              <section class="inventory-page-history" id="inventoryPageHistory"></section>
+              <section class="inventory-flow-note">
+                <i data-lucide="route" aria-hidden="true"></i>
+                <div>
+                  <strong>Alur Inventaris</strong>
+                  <p>Catat Penggunaan -> status menjadi <b>Dipakai</b> -> dashboard otomatis update.</p>
                 </div>
               </section>
             </div>

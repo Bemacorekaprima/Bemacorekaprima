@@ -2327,6 +2327,260 @@ input:focus, select:focus, textarea:focus {
   background: #2563eb;
 }
 
+.inventory-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.inventory-workspace {
+  display: grid;
+  grid-template-columns: minmax(380px, 0.82fr) minmax(560px, 1.18fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.inventory-list-panel,
+.inventory-detail-panel {
+  min-width: 0;
+}
+
+.inventory-filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inventory-sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.inventory-sync-status::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  content: "";
+}
+
+.inventory-table-wrap {
+  max-height: calc(100dvh - 330px);
+}
+
+.inventory-table {
+  min-width: 720px;
+}
+
+.inventory-table tr.selected {
+  background: #eff6ff;
+  box-shadow: inset 3px 0 #2563eb;
+}
+
+.inventory-row-title {
+  display: grid;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #102a56;
+  text-align: left;
+}
+
+.inventory-row-title strong {
+  font-size: 13px;
+}
+
+.inventory-row-title small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.inventory-table-status,
+.inventory-detail-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.inventory-table-status.Tersedia,
+.inventory-table-status.tersedia,
+.inventory-detail-badge.Tersedia,
+.inventory-detail-badge.tersedia {
+  border-color: #bbf7d0;
+  background: #ecfdf5;
+  color: #15803d;
+}
+
+.inventory-table-status.Perawatan,
+.inventory-table-status.perawatan,
+.inventory-detail-badge.Perawatan,
+.inventory-detail-badge.perawatan {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.inventory-empty-state {
+  display: grid;
+  min-height: 410px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.inventory-empty-state strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.inventory-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.inventory-detail-header h2 {
+  margin: 8px 0 4px;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.inventory-detail-header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.inventory-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.inventory-detail-card {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fbff;
+}
+
+.inventory-detail-photo {
+  min-height: 140px;
+}
+
+.inventory-progress-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.inventory-progress-section div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #102a56;
+  font-weight: 900;
+}
+
+.inventory-page-history {
+  margin-top: 14px;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.inventory-page-history-head,
+.inventory-page-history-row {
+  display: grid;
+  grid-template-columns: 120px minmax(120px, 0.9fr) minmax(0, 1.4fr);
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid #e5edf8;
+  padding: 10px 12px;
+}
+
+.inventory-page-history-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.inventory-page-history-row:last-child {
+  border-bottom: 0;
+}
+
+.inventory-page-history-row span,
+.inventory-page-history-row small,
+.inventory-page-history p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inventory-page-history-row b {
+  color: #102a56;
+  font-size: 12px;
+}
+
+.inventory-page-history p {
+  margin: 0;
+  padding: 12px;
+}
+
+.inventory-flow-note {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 14px;
+  background: #eff6ff;
+  color: #102a56;
+}
+
+.inventory-flow-note svg {
+  width: 22px;
+  height: 22px;
+  color: #0b57d0;
+}
+
+.inventory-flow-note strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.inventory-flow-note p {
+  margin: 0;
+  color: #334155;
+}
+
+.inventory-flow-note b {
+  color: #15803d;
+}
+
 .tender-status-badge {
   display: inline-flex;
   align-items: center;
@@ -5195,8 +5449,11 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
   .dashboard-work-summary { grid-template-columns: 1fr; }
   .dashboard-active-jobs-panel { grid-column: auto; }
   .personnel-history-profile { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inventory-workspace,
   .tender-workspace { grid-template-columns: 1fr; }
+  .inventory-table-wrap,
   .tender-table-wrap { max-height: 420px; }
+  .inventory-detail-card { grid-template-columns: 132px minmax(0, 1fr); }
   .tender-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .job-record-form-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .personnel-form-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -5796,14 +6053,35 @@ dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
     min-width: 640px;
   }
 
+  .inventory-stats-grid,
   .tender-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
+  .inventory-filter-row,
   .tender-filter-row,
   .template-generator-controls,
   .tender-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-detail-header,
+  .inventory-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inventory-detail-card {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-detail-photo {
+    min-height: 116px;
+  }
+
+  .inventory-page-history-head,
+  .inventory-page-history-row {
     grid-template-columns: 1fr;
   }
 
