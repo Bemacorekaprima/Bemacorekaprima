@@ -57,8 +57,8 @@ const PERSONNEL_SHEETS = {
     gid: 0,
     names: ['FINANCE_TERMIN', 'Finance Termin', 'TERMIN'],
     headers: [
-      'ID', 'ID Pekerjaan', 'Nama Pekerjaan', 'Termin Ke', 'Nama Termin', 'Persentase',
-      'Nilai Kontrak', 'Nilai Termin', 'Status', 'Tanggal Tagihan', 'Tanggal Bayar',
+      'ID', 'ID Pekerjaan', 'Nama Pekerjaan', 'Termin Ke', 'Tahap Pembayaran', 'Persentase',
+      'Nilai Kontrak', 'Nilai Bruto', 'Potongan Uang Muka', 'Nilai Bersih', 'Status', 'Tanggal Tagihan', 'Tanggal Bayar',
       'Keterangan', 'Updated At', 'Updated By', 'Row Key'
     ]
   },

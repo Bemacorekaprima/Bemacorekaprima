@@ -6921,30 +6921,24 @@ function getFinanceRelatedRecords(sourceId, entry) {
 function getFinanceTerminPlan(entry) {
   const contractValue = entry?.nilaiKontrak || 0;
   const records = getFinanceRelatedRecords("finance-termin", entry);
-  if (records.length) {
-    return records
-      .map((record, index) => {
-        const percent = parseFinanceNumber(getRecordValue(record, ["persentase", "prosentase", "persen"])) || 0;
-        const value = parseFinanceNumber(getRecordValue(record, ["nilai termin", "nominal termin"])) || Math.round(contractValue * percent / 100);
-        return {
-          label: getRecordValue(record, ["nama termin"]) || `Termin ${getRecordValue(record, ["termin ke"]) || index + 1}`,
-          percent,
-          value,
-          className: ["blue", "purple", "green"][index % 3],
-          record
-        };
-      })
-      .filter(item => item.label || item.percent || item.value);
-  }
-
-  return [
-    { label: "Termin 1", percent: 25, className: "blue" },
-    { label: "Termin 2", percent: 45, className: "purple" },
-    { label: "Termin 3", percent: 30, className: "green" }
-  ].map(item => ({
-    ...item,
-    value: Math.round(contractValue * item.percent / 100)
-  }));
+  return records
+    .map((record, index) => {
+      const percent = parseFinanceNumber(getRecordValue(record, ["persentase", "prosentase", "persen"])) || 0;
+      const grossValue = parseFinanceNumber(getRecordValue(record, ["nilai bruto", "nilai termin", "nominal termin"])) || Math.round(contractValue * percent / 100);
+      const deduction = parseFinanceNumber(getRecordValue(record, ["potongan uang muka", "potongan"])) || 0;
+      const netValue = parseFinanceNumber(getRecordValue(record, ["nilai bersih", "netto"])) || Math.max(0, grossValue - deduction);
+      return {
+        label: getRecordValue(record, ["tahap pembayaran", "nama termin"]) || `Tahap ${getRecordValue(record, ["termin ke"]) || index + 1}`,
+        percent,
+        value: netValue,
+        grossValue,
+        deduction,
+        status: getRecordValue(record, ["status"]) || "Draft",
+        className: ["blue", "purple", "green"][index % 3],
+        record
+      };
+    })
+    .filter(item => item.label || item.percent || item.grossValue || item.value);
 }
 
 function getFinanceTerminPercentTotal(terminPlan) {
@@ -6953,6 +6947,88 @@ function getFinanceTerminPercentTotal(terminPlan) {
 
 function getFinanceTerminValueTotal(terminPlan) {
   return terminPlan.reduce((total, item) => total + Number(item.value || 0), 0);
+}
+
+function renderFinanceTerminCard(entry, terminPlan, nilaiKontrak) {
+  const hasStages = terminPlan.length > 0;
+  const terminPercentTotal = getFinanceTerminPercentTotal(terminPlan);
+  const terminGrossTotal = terminPlan.reduce((total, item) => total + Number(item.grossValue || item.value || 0), 0);
+  const terminValueTotal = getFinanceTerminValueTotal(terminPlan);
+  return `
+    <article class="finance-termin-card">
+      <header class="finance-card-title-row">
+        <div>
+          <h3>Skema Termin dan Uang Muka</h3>
+          <p>${hasStages
+            ? "Tahapan pembayaran dihitung dari nilai kontrak dan potongan uang muka."
+            : "Belum ada tahapan pembayaran untuk pekerjaan ini."}</p>
+        </div>
+        <div class="finance-inline-actions">
+          <button class="primary-button" type="button" data-finance-termin-action="add">+ Tambah Tahap</button>
+          <button class="secondary-button" type="button" data-finance-termin-action="template">Pakai Template</button>
+          <button class="secondary-button" type="button" data-finance-termin-action="reset" ${hasStages ? "" : "disabled"}>Reset Skema</button>
+        </div>
+      </header>
+      <div class="finance-termin-kpis">
+        <span><small>Nilai Kontrak</small><strong>${formatFinanceMoney(nilaiKontrak)}</strong></span>
+        <span><small>Tahapan</small><strong>${terminPlan.length}</strong></span>
+        <span><small>Total Bruto</small><strong>${formatFinanceMoney(terminGrossTotal)}</strong></span>
+        <span><small>Total Diterima</small><strong>${formatFinanceMoney(terminValueTotal)}</strong></span>
+      </div>
+      ${hasStages ? `
+        <div class="finance-termin-stack" aria-label="Pembagian termin">
+          ${terminPlan.map(item => `<span class="${item.className}" style="width:${Math.max(0, item.percent)}%"><b>${item.percent}%</b></span>`).join("")}
+        </div>
+        <div class="table-wrap finance-termin-table-wrap">
+          <table class="finance-termin-table">
+            <thead>
+              <tr><th>Tahap Pembayaran</th><th>Persentase</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
+            </thead>
+            <tbody>
+              ${terminPlan.map((item, itemIndex) => `
+                <tr>
+                  <td><strong>${escapeHtml(item.label)}</strong></td>
+                  <td>${escapeHtml(item.percent)}%</td>
+                  <td>${formatFinanceMoney(item.grossValue || item.value)}</td>
+                  <td>${item.deduction ? formatFinanceMoney(item.deduction) : "-"}</td>
+                  <td><strong>${formatFinanceMoney(item.value)}</strong></td>
+                  <td><span class="finance-status ${safeClassToken(item.status)}">${escapeHtml(item.status)}</span></td>
+                  <td>
+                    <button class="text-button" type="button" data-finance-termin-action="edit" data-finance-termin-index="${itemIndex}">Edit</button>
+                    <button class="text-button danger-text" type="button" data-finance-termin-action="delete" data-finance-termin-index="${itemIndex}">Hapus</button>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="finance-termin-total-note">Total diterima = ${formatFinanceMoney(terminValueTotal)}${nilaiKontrak ? ` dari nilai kontrak ${formatFinanceMoney(nilaiKontrak)}` : ""}.</div>
+      ` : `
+        <div class="finance-termin-empty">
+          <div class="finance-termin-empty-icon" aria-hidden="true">Rp</div>
+          <strong>Tahapan belum diisi</strong>
+          <p>Tambahkan uang muka, termin, retensi, atau tahap pembayaran lain sesuai kontrak.</p>
+        </div>
+        <div class="finance-termin-rules">
+          <strong>Logika Default</strong>
+          <ul>
+            <li>Pekerjaan baru tidak membuat termin otomatis.</li>
+            <li>Uang muka opsional.</li>
+            <li>Total diterima divalidasi terhadap nilai kontrak.</li>
+            <li>Persentase boleh fleksibel sesuai kontrak.</li>
+          </ul>
+        </div>
+        <div class="table-wrap finance-termin-table-wrap">
+          <table class="finance-termin-table">
+            <thead>
+              <tr><th>Tahap Pembayaran</th><th>Persentase</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
+            </thead>
+            <tbody><tr><td class="personnel-empty" colspan="7">Belum ada data</td></tr></tbody>
+          </table>
+        </div>
+      `}
+    </article>
+  `;
 }
 
 function renderFinanceDetail(entry) {
@@ -6969,19 +7045,21 @@ function renderFinanceDetail(entry) {
   const terminPercentTotal = getFinanceTerminPercentTotal(terminPlan);
   const terminValueTotal = getFinanceTerminValueTotal(terminPlan);
   const terminRemaining = Math.max(0, nilaiKontrak - terminValueTotal);
+  const terminReceiptPercent = nilaiKontrak ? Math.round((terminValueTotal / nilaiKontrak) * 100) : terminPercentTotal;
+  const terminIsBalanced = Boolean(nilaiKontrak && Math.abs(terminValueTotal - nilaiKontrak) <= 1);
   body.innerHTML = `
     <section class="finance-summary-groups">
       <article class="finance-summary-group contract">
         <header>
           <div>
             <span class="section-eyebrow">KONTRAK DAN TERMIN</span>
-            <h3>Nilai Kontrak tersinkron ke termin</h3>
+          <h3>Nilai Kontrak tersinkron ke termin</h3>
           </div>
-          <span class="finance-validation-badge ${terminPercentTotal === 100 ? "valid" : "warning"}">${terminPercentTotal}% termin</span>
+          <span class="finance-validation-badge ${terminIsBalanced ? "valid" : "warning"}">${terminReceiptPercent}% diterima</span>
         </header>
         <div class="finance-detail-kpis finance-contract-kpis">
           <article class="primary"><span>Nilai Kontrak</span><strong>${formatFinanceMoney(nilaiKontrak)}</strong><small>Dasar perhitungan termin</small></article>
-          <article><span>Total Termin</span><strong>${terminPercentTotal}%</strong><small>Alokasi kontrak</small></article>
+          <article><span>Total Tahap</span><strong>${terminPercentTotal}%</strong><small>Total persentase bruto</small></article>
           <article><span>Nilai Termin</span><strong>${formatFinanceMoney(terminValueTotal)}</strong><small>Akumulasi rencana termin</small></article>
           <article><span>Sisa Alokasi</span><strong>${formatFinanceMoney(terminRemaining)}</strong><small>Terhadap nilai kontrak</small></article>
         </div>
@@ -7006,10 +7084,6 @@ function renderFinanceDetail(entry) {
       <article class="finance-summary-card">
         <header class="finance-card-title-row">
           <h3>Ringkasan Pekerjaan</h3>
-          <div class="finance-inline-actions">
-            <button class="primary-button" type="button" data-finance-termin-action="add">+ Tambah Termin</button>
-            <button class="secondary-button" type="button" data-finance-termin-action="addendum">+ Tambah Addendum</button>
-          </div>
         </header>
         <dl>
           <div><dt>Pemberi Kerja</dt><dd>${escapeHtml(entry.pemberiKerja || "-")}</dd></div>
@@ -7018,29 +7092,7 @@ function renderFinanceDetail(entry) {
           <div><dt>Status Portofolio</dt><dd>${escapeHtml(entry.status || "-")}</dd></div>
         </dl>
       </article>
-      <article class="finance-termin-card">
-        <header class="finance-card-title-row">
-          <div>
-            <h3>Skema Termin dari Nilai Kontrak</h3>
-            <p>Persentase termin dihitung dari Nilai Kontrak, bukan dari biaya personil.</p>
-          </div>
-          <span class="finance-validation-badge ${terminPercentTotal === 100 ? "valid" : "warning"}">Total ${terminPercentTotal}%</span>
-        </header>
-        <div class="finance-termin-stack" aria-label="Pembagian termin">
-          ${terminPlan.map(item => `<span class="${item.className}" style="width:${item.percent}%"><b>${item.percent}%</b></span>`).join("")}
-        </div>
-        <div class="finance-termin-list">
-          ${terminPlan.map((item, itemIndex) => `
-            <div>
-              <strong>${escapeHtml(item.label)}</strong>
-              <span>${item.percent}% x ${formatFinanceMoney(nilaiKontrak)}</span>
-              <b>${formatFinanceMoney(item.value)}</b>
-              <button class="text-button" type="button" data-finance-termin-action="edit" data-finance-termin-index="${itemIndex}">Edit</button>
-              <button class="text-button danger-text" type="button" data-finance-termin-action="delete" data-finance-termin-index="${itemIndex}">Hapus</button>
-            </div>
-          `).join("")}
-        </div>
-      </article>
+      ${renderFinanceTerminCard(entry, terminPlan, nilaiKontrak)}
     </section>
     <section class="finance-personnel-value-section">
       <header class="finance-card-title-row">
@@ -7244,10 +7296,12 @@ const FINANCE_TERMIN_FIELDS = [
   { column: "ID Pekerjaan", aliases: ["id pekerjaan"], required: true },
   { column: "Nama Pekerjaan", aliases: ["nama pekerjaan", "pekerjaan"], required: true, full: true },
   { column: "Termin Ke", aliases: ["termin ke", "termin"] },
-  { column: "Nama Termin", aliases: ["nama termin"], required: true },
+  { column: "Tahap Pembayaran", aliases: ["tahap pembayaran", "nama termin"], required: true },
   { column: "Persentase", aliases: ["persentase", "prosentase", "persen"], required: true },
   { column: "Nilai Kontrak", aliases: ["nilai kontrak"], required: true },
-  { column: "Nilai Termin", aliases: ["nilai termin", "nominal termin"] },
+  { column: "Nilai Bruto", aliases: ["nilai bruto", "nilai termin", "nominal termin"] },
+  { column: "Potongan Uang Muka", aliases: ["potongan uang muka", "potongan"] },
+  { column: "Nilai Bersih", aliases: ["nilai bersih", "netto"] },
   { column: "Status", aliases: ["status"] },
   { column: "Tanggal Tagihan", aliases: ["tanggal tagihan", "tgl tagihan"] },
   { column: "Tanggal Bayar", aliases: ["tanggal bayar", "tgl bayar"] },
@@ -7315,19 +7369,41 @@ function getFinanceColumnsForSource(sourceId, fallbackFields = []) {
 function seedFinanceTerminRecord(entry, terminItem = null) {
   const columns = getFinanceColumnsForSource("finance-termin", FINANCE_TERMIN_FIELDS);
   const nextIndex = getFinanceRelatedRecords("finance-termin", entry).length + 1;
+  const sequence = terminItem?.sequence || getRecordValue(terminItem?.record || {}, ["termin ke"]) || nextIndex;
   const percent = terminItem?.percent || 0;
   const nilaiKontrak = entry?.nilaiKontrak || 0;
+  const grossValue = terminItem?.grossValue ?? (percent ? Math.round(nilaiKontrak * percent / 100) : "");
+  const deduction = terminItem?.deduction || "";
+  const netValue = terminItem?.value ?? (grossValue ? Math.max(0, Number(grossValue) - Number(deduction || 0)) : "");
   const seed = {};
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[0], terminItem?.record ? "" : makeFinanceLocalId("TRM"));
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[1], getFinanceEntryIdentifier(entry));
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[2], entry?.pekerjaan || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[3], getRecordValue(terminItem?.record || {}, ["termin ke"]) || nextIndex);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[4], terminItem?.label || `Termin ${nextIndex}`);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[3], sequence);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[4], terminItem?.label || `Tahap ${sequence}`);
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[5], percent || "");
   setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[6], nilaiKontrak || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[7], percent ? Math.round(nilaiKontrak * percent / 100) : "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[8], getRecordValue(terminItem?.record || {}, ["status"]) || "Draft");
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[7], grossValue);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[8], deduction);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[9], netValue);
+  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[10], terminItem?.status || getRecordValue(terminItem?.record || {}, ["status"]) || "Draft");
   return seed;
+}
+
+function buildFinanceTerminTemplateRecords(entry) {
+  const nilaiKontrak = Number(entry?.nilaiKontrak || 0);
+  if (!nilaiKontrak) return [];
+  const uangMuka = Math.round(nilaiKontrak * 0.15);
+  const templates = [
+    { sequence: 1, label: "Uang Muka", percent: 15, grossValue: uangMuka, deduction: 0, value: uangMuka, status: "Rencana" },
+    { sequence: 2, label: "Termin 1", percent: 30, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.20), status: "Rencana" },
+    { sequence: 3, label: "Termin 2", percent: 40, grossValue: Math.round(nilaiKontrak * 0.40), deduction: Math.round(uangMuka * 0.40), status: "Rencana" },
+    { sequence: 4, label: "Termin 3", percent: 30, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.40), status: "Rencana" }
+  ];
+  return templates.map(item => seedFinanceTerminRecord(entry, {
+    ...item,
+    value: item.value ?? Math.max(0, Number(item.grossValue || 0) - Number(item.deduction || 0))
+  }));
 }
 
 function seedFinanceAddendumRecord(entry) {
@@ -7449,11 +7525,13 @@ async function sendFinanceMutation(action, payload) {
         data: payload.data || {}
       })
     });
-    if (action !== "delete") closeFinanceRecordForm();
-    notify(action === "delete" ? "Permintaan hapus Finance dikirim ke Google Spreadsheet." : "Data Finance dikirim ke Google Spreadsheet.");
-    await new Promise(resolve => window.setTimeout(resolve, 1400));
-    await loadExternalSheetData();
-    refreshCurrentFinanceDetail();
+    if (action !== "delete" && !payload.keepFormOpen) closeFinanceRecordForm();
+    if (!payload.silent) notify(action === "delete" ? "Permintaan hapus Finance dikirim ke Google Spreadsheet." : "Data Finance dikirim ke Google Spreadsheet.");
+    if (!payload.skipRefresh) {
+      await new Promise(resolve => window.setTimeout(resolve, 1400));
+      await loadExternalSheetData();
+      refreshCurrentFinanceDetail();
+    }
   } catch (error) {
     notify("Data Finance gagal dikirim: " + error.message);
     const status = document.getElementById("financeRecordFormStatus");
@@ -7506,7 +7584,52 @@ async function deleteFinanceAuxRecord(sourceId, record, label) {
   await sendFinanceMutation("delete", { sourceId, targetSourceId: sourceId, rowNumber, data: {} });
 }
 
-function handleFinanceDetailAction(event) {
+async function applyFinanceTerminTemplate(entry) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
+  const rows = buildFinanceTerminTemplateRecords(entry);
+  if (!rows.length) return notify("Isi Nilai Kontrak terlebih dahulu sebelum memakai template termin.");
+  const existingRows = getFinanceRelatedRecords("finance-termin", entry).length;
+  if (existingRows && !confirm("Pakai template akan menambahkan tahapan baru di atas data yang sudah ada. Lanjutkan?")) return;
+  for (const data of rows) {
+    await sendFinanceMutation("add", {
+      sourceId: "finance-termin",
+      targetSourceId: "finance-termin",
+      data,
+      silent: true,
+      skipRefresh: true,
+      keepFormOpen: true
+    });
+  }
+  notify("Template termin dikirim ke Google Spreadsheet.");
+  await new Promise(resolve => window.setTimeout(resolve, 1400));
+  await loadExternalSheetData();
+  refreshCurrentFinanceDetail();
+}
+
+async function resetFinanceTerminScheme(entry) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat menghapus data Finance.")) return;
+  const rows = getFinanceRelatedRecords("finance-termin", entry);
+  if (!rows.length) return notify("Belum ada tahapan termin untuk direset.");
+  const rowsWithNumbers = rows.filter(row => Number(row?.["_Sumber Baris"]) > 0);
+  if (rowsWithNumbers.length !== rows.length) return notify("Sebagian tahapan belum memiliki nomor baris spreadsheet. Refresh data lalu coba lagi.");
+  if (!confirm("Reset skema akan menghapus semua tahapan termin pekerjaan ini dari Google Spreadsheet. Lanjutkan?")) return;
+  for (const record of rowsWithNumbers) {
+    await sendFinanceMutation("delete", {
+      sourceId: "finance-termin",
+      targetSourceId: "finance-termin",
+      rowNumber: Number(record["_Sumber Baris"]),
+      data: {},
+      silent: true,
+      skipRefresh: true
+    });
+  }
+  notify("Skema termin direset di Google Spreadsheet.");
+  await new Promise(resolve => window.setTimeout(resolve, 1400));
+  await loadExternalSheetData();
+  refreshCurrentFinanceDetail();
+}
+
+async function handleFinanceDetailAction(event) {
   const terminButton = event.target.closest("[data-finance-termin-action]");
   if (terminButton) {
     const entry = getCurrentFinanceEntry();
@@ -7516,8 +7639,10 @@ function handleFinanceDetailAction(event) {
     const selectedTermin = terminPlan[Number(terminButton.dataset.financeTerminIndex)] || null;
     if (action === "add") openFinanceTerminForm(entry);
     if (action === "addendum") openFinanceAddendumForm(entry);
+    if (action === "template") await applyFinanceTerminTemplate(entry);
+    if (action === "reset") await resetFinanceTerminScheme(entry);
     if (action === "edit") openFinanceTerminForm(entry, selectedTermin);
-    if (action === "delete") deleteFinanceAuxRecord("finance-termin", selectedTermin?.record, "Termin");
+    if (action === "delete") await deleteFinanceAuxRecord("finance-termin", selectedTermin?.record, "Termin");
     return;
   }
   const button = event.target.closest("[data-finance-record-action]");
