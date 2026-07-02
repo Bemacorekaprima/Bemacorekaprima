@@ -6625,6 +6625,21 @@ function getFinanceRecordPersonName(record) {
   return getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
 }
 
+function isFinancePersonnelRecord(record) {
+  if (getFinanceRecordPersonName(record)) return true;
+  return Boolean(getRecordValue(record, [
+    "uraian",
+    "jabatan",
+    "posisi",
+    "jumlah bulan",
+    "harga satuan",
+    "total biaya personil",
+    "total harga",
+    "pajak pph 21",
+    "netto"
+  ]));
+}
+
 function getFinancePphTaxValue(record) {
   const keys = Object.keys(record || {});
   const exactKey = keys.find(key => {
@@ -6986,7 +7001,10 @@ function renderFinanceDetail(entry) {
       </article>
     </section>
     <section class="finance-personnel-value-section">
-      <h3>Personil dan Nilai</h3>
+      <header class="finance-card-title-row">
+        <h3>Personil dan Nilai</h3>
+        <button class="secondary-button" type="button" data-finance-record-action="add-personnel">+ Tambah Nilai Personil</button>
+      </header>
       <div class="finance-personnel-cost-strip" aria-label="Ringkasan biaya personil">
         <span><small>Total Biaya Personil</small><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong></span>
         <span><small>PPH 21</small><strong>${formatFinanceMoney(entry.pajak)}</strong></span>
@@ -7005,7 +7023,7 @@ function renderFinanceDetail(entry) {
               <td data-label="Pajak PPH 21">${row.hasFinance ? formatFinanceMoney(row.pajak) : "-"}</td>
               <td data-label="Netto">${row.hasFinance ? formatFinanceMoney(row.netto) : "-"}</td>
               <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
-              <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : `<button class="text-button" type="button" data-finance-record-action="complete" data-finance-record-index="${rowIndex}">Edit</button>`}</td>
+              <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit Nilai</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : `<button class="text-button" type="button" data-finance-record-action="complete" data-finance-record-index="${rowIndex}">Tambah Nilai</button>`}</td>
             </tr>
           `).join("") : '<tr><td class="personnel-empty" colspan="9">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
         </table>
@@ -7063,7 +7081,8 @@ function buildFinanceDetailRowFromRecord(record, fallback = {}) {
 
 function buildFinanceDetailPersonnel(entry) {
   const financeByName = new Map();
-  (entry.financeRecords || []).forEach(record => {
+  const personnelRecords = (entry.financeRecords || []).filter(isFinancePersonnelRecord);
+  personnelRecords.forEach(record => {
     const key = getFinanceRecordKey(record);
     if (key && !financeByName.has(key)) financeByName.set(key, record);
   });
@@ -7093,7 +7112,7 @@ function buildFinanceDetailPersonnel(entry) {
     });
   });
 
-  (entry.financeRecords || []).forEach(record => {
+  personnelRecords.forEach(record => {
     const key = getFinanceRecordKey(record);
     if (key && usedFinanceKeys.has(key)) return;
     rows.push(buildFinanceDetailRowFromRecord(record));
@@ -7145,15 +7164,15 @@ function handleFinanceAction(action) {
   document.getElementById("financeToolsButton")?.setAttribute("aria-expanded", "false");
   const entry = buildFinanceEntries().find(item => item.key === state.selectedFinanceJobKey) || getFilteredFinanceEntries()[0] || null;
   if (action === "add") {
-    openFinanceRecordForm(null, entry);
+    openFinanceContractForm(null, entry);
     return;
   }
-  const record = entry?.financeRecords?.[0];
+  const record = getFinanceContractRecord(entry);
   if (!record) {
-    notify("Pilih pekerjaan yang sudah memiliki rincian Finance, atau gunakan Tambah untuk membuat baris baru.");
+    notify("Nilai kontrak belum ada. Gunakan Tambah untuk membuat data kontrak Finance.");
     return;
   }
-  if (action === "edit") openFinanceRecordForm(record, entry);
+  if (action === "edit") openFinanceContractForm(record, entry);
   if (action === "delete") deleteFinanceRecord(record, entry);
 }
 
@@ -7167,6 +7186,19 @@ function getFinanceEditableColumns(records = []) {
   });
   if (columns.length) return columns;
   return ["Pekerjaan", "Nama", "Uraian", "Pemberi Kerja", "Nilai Kontrak", "Jumlah Bulan", "Harga Satuan", "Total Biaya Personil", "Tarif Pajak", "Pajak PPH 21", "Netto", "Tanggal Mulai", "Tanggal Selesai", "Durasi Kontrak", "Keterangan"];
+}
+
+const FINANCE_CONTRACT_FIELDS = [
+  { column: "Pekerjaan", aliases: ["pekerjaan", "nama pekerjaan", "project", "proyek"], required: true, full: true },
+  { column: "Nilai Kontrak", aliases: ["nilai kontrak", "kontrak awal", "nilai pekerjaan", "nilai pagu"], required: true },
+  { column: "Pemberi Kerja", aliases: ["pemberi kerja", "instansi", "klien", "owner"] },
+  { column: "Tanggal Mulai", aliases: ["tanggal mulai", "tgl mulai", "mulai"] },
+  { column: "Tanggal Selesai", aliases: ["tanggal selesai", "tgl selesai", "selesai"] },
+  { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
+];
+
+function resolveFinanceColumn(columns, field) {
+  return columns.find(column => includesAny(normalizeSearchText(column), field.aliases)) || field.column;
 }
 
 function renderFinanceInput(column, value, required) {
@@ -7185,6 +7217,38 @@ function applyFinanceSeedToRecord(target, columns, seed) {
   setFinanceSeedValue(target, columns, ["jumlah bulan", "bulan", "durasi kontrak"], seed.bulan);
 }
 
+function getFinanceContractRecord(entry) {
+  return (entry?.financeRecords || []).find(record => getFinanceContractValue(record) > 0) ||
+    (entry?.financeRecords || []).find(record => !isFinancePersonnelRecord(record)) ||
+    null;
+}
+
+function openFinanceContractForm(record = null, entry = null) {
+  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
+  const sheet = getFinanceSheet();
+  const columns = getFinanceEditableColumns(sheet?.records || []);
+  const initialRecord = { ...(record || {}) };
+  FINANCE_CONTRACT_FIELDS.forEach(field => {
+    const column = resolveFinanceColumn(columns, field);
+    if (!initialRecord[column]) {
+      if (field.column === "Pekerjaan") initialRecord[column] = entry?.pekerjaan || "";
+      if (field.column === "Nilai Kontrak") initialRecord[column] = entry?.nilaiKontrak ? String(entry.nilaiKontrak) : "";
+      if (field.column === "Pemberi Kerja") initialRecord[column] = entry?.pemberiKerja || "";
+      if (field.column === "Tanggal Mulai") initialRecord[column] = entry?.tanggalMulai || "";
+      if (field.column === "Tanggal Selesai") initialRecord[column] = entry?.tanggalSelesai || "";
+    }
+  });
+  document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Kontrak Finance" : "Tambah Nilai Kontrak";
+  document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || "Sheet Finance";
+  document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
+  document.getElementById("financeRecordFormStatus").textContent = "";
+  document.getElementById("financeRecordFormFields").innerHTML = FINANCE_CONTRACT_FIELDS.map(field => {
+    const column = resolveFinanceColumn(columns, field);
+    return '<label class="' + (field.full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, initialRecord[column] || "", field.required) + '</label>';
+  }).join("");
+  document.getElementById("financeRecordFormModal").showModal();
+}
+
 function openFinanceRecordForm(record = null, entry = null, seed = null) {
   if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
   const sheet = getFinanceSheet();
@@ -7193,7 +7257,7 @@ function openFinanceRecordForm(record = null, entry = null, seed = null) {
   const initialRecord = { ...(record || {}) };
   if (!record && entry?.pekerjaan && jobColumn) initialRecord[jobColumn] = entry.pekerjaan;
   if (!record && seed) applyFinanceSeedToRecord(initialRecord, columns, seed);
-  document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Rincian Finance" : "Tambah Rincian Finance";
+  document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Nilai Personil" : "Tambah Nilai Personil";
   document.getElementById("financeRecordFormSource").textContent = entry?.pekerjaan || record?.[jobColumn] || "Sheet Finance";
   document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
   document.getElementById("financeRecordFormStatus").textContent = "";
@@ -7265,6 +7329,10 @@ function handleFinanceDetailAction(event) {
   if (!button) return;
   const entry = getCurrentFinanceEntry();
   if (!entry) return notify("Rincian Finance tidak ditemukan.");
+  if (button.dataset.financeRecordAction === "add-personnel") {
+    openFinanceRecordForm(null, entry);
+    return;
+  }
   const row = buildFinanceDetailPersonnel(entry)[Number(button.dataset.financeRecordIndex)];
   const record = row?.record;
   if (button.dataset.financeRecordAction === "complete") {
