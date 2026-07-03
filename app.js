@@ -25,6 +25,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { createRouter } from "./core/router.js";
+import { createInventoryFeature } from "./components/inventory.js";
 
 const firebaseConfig = window.FIREBASE_CONFIG;
 if (!firebaseConfig || firebaseConfig.apiKey === "ISI_API_KEY_ANDA") {
@@ -408,27 +409,7 @@ function bindControls() {
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
   document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
   document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
-  document.getElementById("dashInventorySummary")?.addEventListener("click", handleInventorySummaryClick);
-  document.getElementById("dashInventoryUsageButton")?.remove();
-  document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
-  document.getElementById("inventoryAddItemButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
-  document.getElementById("inventoryDetailUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage", record: getSelectedInventoryRecord() }));
-  document.getElementById("inventoryDetailEditButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "edit", record: getSelectedInventoryRecord() }));
-  document.getElementById("inventoryDetailHistoryButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "history", record: getSelectedInventoryRecord() }));
-  document.getElementById("inventorySearch")?.addEventListener("input", event => {
-    state.inventorySearch = event.target.value;
-    renderInventoryWorkspace();
-  });
-  document.getElementById("inventoryStatusFilter")?.addEventListener("change", event => {
-    state.inventoryStatusFilter = event.target.value;
-    renderInventoryWorkspace();
-  });
-  document.getElementById("inventoryTableBody")?.addEventListener("click", handleInventoryTableClick);
-  document.getElementById("inventoryPageHistory")?.addEventListener("click", handleInventoryTableClick);
-  document.getElementById("inventoryUsageForm")?.addEventListener("submit", saveInventoryUsage);
-  document.getElementById("inventoryAvailableSelect")?.addEventListener("change", handleInventoryAvailableSelectChange);
-  document.getElementById("closeInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
-  document.getElementById("cancelInventoryUsageButton")?.addEventListener("click", closeInventoryUsageModal);
+  bindInventoryControls();
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
@@ -589,8 +570,7 @@ onAuthStateChanged(auth, async user => {
     watchAppSettings();
     renderUserProfile();
     state.tasks = loadCachedTasks();
-    state.inventoryRecords = loadInventoryCache();
-    state.selectedInventoryId = state.inventoryRecords.find(item => item.status === "Dipakai")?.id || state.inventoryRecords[0]?.id || "";
+    initializeInventoryState();
     state.syncMessage = state.tasks.length
       ? "Menampilkan cadangan lokal. Sinkronisasi Firebase berjalan..."
       : "Memuat data dari Firebase...";
@@ -612,8 +592,7 @@ onAuthStateChanged(auth, async user => {
     state.tasks = [];
     state.tenders = [];
     state.people = [];
-    state.inventoryRecords = [];
-    state.selectedInventoryId = "";
+    resetInventoryState();
     state.externalSheets = createInitialExternalSheets(state.appConfig);
     externalSheetLastLoadedAt = 0;
     state.syncMessage = "Menunggu login...";
@@ -664,9 +643,7 @@ function handleGlobalInventoryModalClick(event) {
   const inventoryAction = event.target.closest("[data-inventory-action]");
   if (!inventoryAction) return false;
   event.preventDefault();
-  const scrollState = captureInventoryScrollState();
   handleInventoryAction(inventoryAction.dataset.inventoryAction, inventoryAction.dataset.inventoryId);
-  restoreInventoryScrollState(scrollState);
   return true;
 }
 
@@ -2907,820 +2884,54 @@ function renderDashboardAssignmentSummary(personnelTotal = 0) {
   `).join("") : '<tr><td colspan="2" class="dashboard-empty">Belum ada data posisi penugasan.</td></tr>';
 }
 
-function createDefaultInventoryRecords() {
-  const base = {
-    user: "",
-    purpose: "",
-    destination: "Kantor",
-    departTime: "",
-    returnTime: "",
-    condition: "Baik",
-    notes: "",
-    history: []
-  };
-  const item = (id, name, type, status = "Tersedia", extra = {}) => ({ ...base, id, name, type, status, ...extra });
-  return [
-    item("inventory-car-a", "Kendaraan Mobil - Merek A", "Kendaraan", "Dipakai", {
-      user: "Bpk A",
-      purpose: "Mobilisasi personil proyek",
-      destination: "Kantor -> Proyek Topografi",
-      departTime: `${state.today}T08:30`,
-      returnTime: `${state.today}T16:30`,
-      notes: "Unit prioritas untuk mobilisasi lapangan.",
-      history: [
-        {
-          at: `${state.today}T08:30`,
-          action: "Gunakan Inventaris",
-          user: "Bpk A",
-          note: "Berangkat untuk mobilisasi personil proyek."
-        }
-      ]
-    }),
-    item("inventory-car-b", "Kendaraan Mobil - Merek B", "Kendaraan", "Dipakai", {
-      user: "Bpk B",
-      purpose: "Survey lapangan",
-      destination: "Kantor -> Proyek Supervisi",
-      departTime: `${state.today}T09:00`,
-      returnTime: `${state.today}T17:00`
-    }),
-    item("inventory-camera-01", "Kamera Dokumentasi - Unit 01", "Peralatan Lapangan", "Dipakai", {
-      user: "Tim Dokumentasi",
-      purpose: "Dokumentasi pekerjaan",
-      destination: "Area proyek",
-      departTime: `${state.today}T10:00`,
-      returnTime: `${state.today}T15:00`
-    }),
-    item("inventory-laptop-survey", "Laptop Survey - Unit 01", "Elektronik"),
-    item("inventory-laptop-admin", "Laptop Administrasi - Unit 02", "Elektronik"),
-    item("inventory-printer-office", "Printer Administrasi", "Peralatan Kantor", "Tersedia", {
-      destination: "Ruang Administrasi"
-    }),
-    item("inventory-projector-01", "Proyektor Meeting - Unit 01", "Peralatan Kantor"),
-    item("inventory-gps-02", "GPS Geodetik - Unit 02", "Peralatan Lapangan"),
-    item("inventory-total-station", "Total Station - Unit 01", "Peralatan Lapangan"),
-    item("inventory-drone-01", "Drone Survey - Unit 01", "Peralatan Lapangan"),
-    item("inventory-radio-01", "Radio Komunikasi - Set 01", "Peralatan Lapangan"),
-    item("inventory-gps-01", "GPS Geodetik - Unit 01", "Peralatan Lapangan", "Perawatan", {
-      user: "Tim Teknis",
-      purpose: "Kalibrasi alat",
-      destination: "Workshop",
-      condition: "Perlu dicek",
-      notes: "Menunggu pemeriksaan baterai."
-    })
-  ];
-}
+let inventoryFeature = null;
 
-function getInventoryRecords() {
-  if (!Array.isArray(state.inventoryRecords) || !state.inventoryRecords.length) {
-    state.inventoryRecords = createDefaultInventoryRecords();
-    saveInventoryCache(state.inventoryRecords);
+function getInventoryFeature() {
+  if (!inventoryFeature) {
+    inventoryFeature = createInventoryFeature({
+      state,
+      cacheKey: INVENTORY_CACHE_KEY,
+      notify,
+      setView,
+      escapeHtml,
+      safeClassToken,
+      normalizeSearchText,
+      setTextContent,
+      getCurrentProfile: () => currentProfile,
+      getCurrentSummaryYear,
+      getAllIntegratedPersonnelRecords,
+      getPersonnelName
+    });
   }
-  return state.inventoryRecords;
+  return inventoryFeature;
 }
 
-function getSelectedInventoryRecord() {
-  const records = getInventoryRecords();
-  return records.find(item => item.id === state.selectedInventoryId) ||
-    records.find(item => item.status === "Dipakai") ||
-    records[0] ||
-    null;
+function bindInventoryControls() {
+  getInventoryFeature().bindControls();
 }
 
-function getInventoryRecordById(id) {
-  return getInventoryRecords().find(item => item.id === id) || null;
+function initializeInventoryState() {
+  getInventoryFeature().initializeState();
 }
 
-function getInventoryStatusByDashboardFilter(filter = "all") {
-  return {
-    all: "all",
-    used: "Dipakai",
-    available: "Tersedia",
-    maintenance: "Perawatan"
-  }[filter] || "all";
-}
-
-function openInventoryViewWithFilter(filter = "all", options = {}) {
-  const { scroll = "top" } = options || {};
-  const statusFilter = getInventoryStatusByDashboardFilter(filter);
-  const records = getInventoryRecords();
-  state.inventorySearch = "";
-  state.inventoryStatusFilter = statusFilter;
-  const selected = statusFilter === "all"
-    ? records[0]
-    : records.find(item => (item.status || "Tersedia") === statusFilter);
-  state.selectedInventoryId = selected?.id || "";
-  if (!setView("inventory", { scroll })) return;
-  renderInventoryWorkspace();
-}
-
-function renderDashboardInventory() {
-  const records = getInventoryRecords();
-  const usedRecords = records.filter(item => item.status === "Dipakai");
-  const selected = usedRecords.find(item => item.id === state.selectedInventoryId) || usedRecords[0] || null;
-
-  const counts = getInventoryCounts(records);
-
-  const summary = document.getElementById("dashInventorySummary");
-  if (summary) {
-    summary.innerHTML = [
-      { key: "all", label: "Total", count: counts.total, note: "Semua inventaris", icon: "briefcase" },
-      { key: "used", label: "Dipakai", count: counts.used, note: "Sedang digunakan", icon: "car-front" },
-      { key: "available", label: "Tersedia", count: counts.available, note: "Siap digunakan", icon: "check" },
-      { key: "maintenance", label: "Perawatan", count: counts.maintenance, note: "Dalam perawatan", icon: "wrench" }
-    ].map(item => `
-      <button type="button" data-inventory-status-filter="${escapeHtml(item.key)}">
-        <i data-lucide="${escapeHtml(item.icon)}" aria-hidden="true"></i>
-        <span>
-          <small>${escapeHtml(item.label)}</small>
-          <strong>${item.count}</strong>
-          <em>${escapeHtml(item.note)}</em>
-        </span>
-      </button>
-    `).join("");
-  }
-
-  const container = document.getElementById("dashInventoryItem");
-  if (!container) return;
-  if (!usedRecords.length) {
-    container.innerHTML = `
-      <div class="dashboard-inventory-filter-list dashboard-inventory-used-list">
-        <div class="dashboard-inventory-filter-head">
-          <div>
-            <strong>Inventaris Sedang Digunakan</strong>
-            <span>0 item</span>
-          </div>
-        </div>
-        <p class="dashboard-empty">Belum ada inventaris yang sedang digunakan.</p>
-      </div>
-    `;
-    return;
-  }
-
-  if (usedRecords.length > 1) {
-    container.innerHTML = `
-      <div class="dashboard-inventory-filter-list dashboard-inventory-used-list">
-        <div class="dashboard-inventory-filter-head">
-          <div>
-            <strong>Inventaris Sedang Digunakan</strong>
-            <span>${usedRecords.length} item</span>
-          </div>
-        </div>
-        ${usedRecords.map(item => {
-          const time = [formatInventoryTime(item.departTime), formatInventoryTime(item.returnTime)]
-            .filter(value => value && value !== "-")
-            .join(" - ") || "-";
-          return `
-            <article class="dashboard-inventory-filter-row">
-              <button type="button" data-inventory-action="detail" data-inventory-id="${escapeHtml(item.id)}">
-                <strong>${escapeHtml(item.name || "Inventaris Kantor")}</strong>
-                <span>${escapeHtml([item.user || "-", time].join(" | "))}</span>
-              </button>
-              <em class="inventory-status dipakai">Sedang Digunakan</em>
-            </article>
-          `;
-        }).join("")}
-      </div>
-    `;
-    window.lucide?.createIcons?.();
-    return;
-  }
-
-  const statusClass = safeClassToken(selected.status || "Tersedia");
-  const progress = getInventoryUsageProgress(selected);
-  const usageHours = getInventoryUsageHours(selected);
-  container.innerHTML = `
-    <button class="dashboard-inventory-main" type="button" data-inventory-action="detail" data-inventory-id="${escapeHtml(selected.id)}">
-      <span class="inventory-photo-frame">
-        <img src="assets/inventory-car.svg" alt="${escapeHtml(selected.name || "Inventaris kantor")}">
-      </span>
-      <span class="inventory-content">
-        <span class="inventory-item-topline">
-          <strong>${escapeHtml(selected.name || "Inventaris")}</strong>
-          <em class="inventory-status ${statusClass}">${escapeHtml(getInventoryStatusLabel(selected.status))}</em>
-        </span>
-        <span class="inventory-info-grid">
-          <span class="inventory-info-cell">
-            <i data-lucide="target" aria-hidden="true"></i>
-            <span><small>Tujuan</small><b>${escapeHtml(selected.purpose || "-")}</b></span>
-          </span>
-          <span class="inventory-info-cell">
-            <i data-lucide="clock" aria-hidden="true"></i>
-            <span><small>Berangkat</small><b>${escapeHtml(formatInventoryTime(selected.departTime))}</b></span>
-          </span>
-          <span class="inventory-info-cell">
-            <i data-lucide="map-pin" aria-hidden="true"></i>
-            <span><small>Lokasi / Tujuan</small><b>${escapeHtml(selected.destination || "-")}</b></span>
-          </span>
-          <span class="inventory-info-cell">
-            <i data-lucide="user-round" aria-hidden="true"></i>
-            <span><small>Pengguna / Driver</small><b>${escapeHtml(selected.user || "-")}</b></span>
-          </span>
-          <span class="inventory-info-cell">
-            <i data-lucide="clock-3" aria-hidden="true"></i>
-            <span><small>Estimasi Kembali</small><b>${escapeHtml(formatInventoryTime(selected.returnTime))}</b></span>
-          </span>
-          <span class="inventory-info-cell inventory-progress-cell">
-            <i data-lucide="car-front" aria-hidden="true"></i>
-            <span>
-              <small>Progress Penggunaan</small>
-              <span class="inventory-time-track"><i style="width:${progress}%"></i></span>
-              <em>${progress}%${usageHours ? ` (${escapeHtml(usageHours)})` : ""}</em>
-            </span>
-          </span>
-        </span>
-      </span>
-    </button>
-  `;
-  window.lucide?.createIcons?.();
-}
-
-function getInventoryCounts(records = getInventoryRecords()) {
-  return records.reduce((summary, item) => {
-    summary.total += 1;
-    if (item.status === "Dipakai") summary.used += 1;
-    else if (item.status === "Perawatan") summary.maintenance += 1;
-    else summary.available += 1;
-    return summary;
-  }, { total: 0, used: 0, available: 0, maintenance: 0 });
-}
-
-function getFilteredInventoryRecords() {
-  const keyword = normalizeSearchText(state.inventorySearch);
-  const status = state.inventoryStatusFilter || "all";
-  return getInventoryRecords().filter(item => {
-    const matchesStatus = status === "all" || (item.status || "Tersedia") === status;
-    const haystack = normalizeSearchText([
-      item.name,
-      item.type,
-      item.user,
-      item.purpose,
-      item.destination,
-      item.condition,
-      item.notes
-    ].join(" "));
-    return matchesStatus && (!keyword || haystack.includes(keyword));
-  });
-}
-
-function renderInventoryWorkspace() {
-  const records = getInventoryRecords();
-  const counts = getInventoryCounts(records);
-  setTextContent("inventoryStatTotal", counts.total);
-  setTextContent("inventoryStatUsed", counts.used);
-  setTextContent("inventoryStatAvailable", counts.available);
-  setTextContent("inventoryStatMaintenance", counts.maintenance);
-  setTextContent("inventorySyncStatus", `Tersinkron realtime - ${counts.total} item`);
-
-  const search = document.getElementById("inventorySearch");
-  if (search && document.activeElement !== search) search.value = state.inventorySearch || "";
-  const filter = document.getElementById("inventoryStatusFilter");
-  if (filter) filter.value = state.inventoryStatusFilter || "all";
-
-  const filtered = getFilteredInventoryRecords();
-  if (!records.some(item => item.id === state.selectedInventoryId)) {
-    state.selectedInventoryId = records[0]?.id || "";
-  }
-  if (filtered.length && !filtered.some(item => item.id === state.selectedInventoryId)) {
-    state.selectedInventoryId = filtered[0].id;
-  }
-
-  const body = document.getElementById("inventoryTableBody");
-  if (body) {
-    body.innerHTML = filtered.length ? filtered.map(item => {
-      const isSelected = item.id === state.selectedInventoryId;
-      const status = item.status || "Tersedia";
-      const canUse = isInventoryAvailable(item);
-      const time = [formatInventoryTime(item.departTime), formatInventoryTime(item.returnTime)]
-        .filter(value => value && value !== "-")
-        .join(" - ") || "-";
-      return `
-        <tr class="${isSelected ? "selected" : ""}" data-inventory-id="${escapeHtml(item.id)}">
-          <td>
-            <button class="inventory-row-title" type="button" data-inventory-id="${escapeHtml(item.id)}">
-              <strong>${escapeHtml(item.name || "Inventaris Kantor")}</strong>
-              <small>${escapeHtml(item.type || "Lainnya")}</small>
-            </button>
-          </td>
-          <td>${escapeHtml(item.user || "-")}</td>
-          <td>${escapeHtml(time)}</td>
-          <td><span class="inventory-table-status ${escapeHtml(safeClassToken(status))}">${escapeHtml(getInventoryStatusLabel(status))}</span></td>
-          <td>
-            ${canUse ? `<button class="text-button" type="button" data-inventory-row-action="usage" data-inventory-id="${escapeHtml(item.id)}">Gunakan</button>` : ""}
-            <button class="text-button" type="button" data-inventory-row-action="edit" data-inventory-id="${escapeHtml(item.id)}">Edit</button>
-          </td>
-        </tr>
-      `;
-    }).join("") : '<tr><td colspan="5" class="dashboard-empty">Belum ada inventaris yang cocok.</td></tr>';
-  }
-
-  renderInventoryDetail(filtered.length ? getSelectedInventoryRecord() : null);
-  window.lucide?.createIcons?.();
-}
-
-function renderInventoryDetail(record) {
-  const empty = document.getElementById("inventoryEmptyState");
-  const content = document.getElementById("inventoryDetailContent");
-  if (!empty || !content) return;
-  empty.classList.toggle("hidden", !!record);
-  content.classList.toggle("hidden", !record);
-  if (!record) return;
-
-  const status = record.status || "Tersedia";
-  const statusLabel = getInventoryStatusLabel(status);
-  const statusClass = safeClassToken(status);
-  const progress = getInventoryUsageProgress(record);
-  const usageHours = getInventoryUsageHours(record);
-  setTextContent("inventoryDetailStatus", statusLabel);
-  setTextContent("inventoryDetailTitle", record.name || "Inventaris Kantor");
-  setTextContent("inventoryDetailMeta", record.type || "Lainnya");
-  setTextContent("inventoryDetailItemName", record.name || "Inventaris Kantor");
-  setTextContent("inventoryDetailStatusPill", statusLabel);
-  const detailStatus = document.getElementById("inventoryDetailStatus");
-  const detailStatusPill = document.getElementById("inventoryDetailStatusPill");
-  if (detailStatus) detailStatus.className = `inventory-detail-badge ${statusClass}`;
-  if (detailStatusPill) detailStatusPill.className = `inventory-status ${statusClass}`;
-  setTextContent("inventoryDetailProgressLabel", `${progress}%${usageHours ? ` (${usageHours})` : ""}`);
-  const progressBar = document.getElementById("inventoryDetailProgressBar");
-  if (progressBar) progressBar.style.width = `${progress}%`;
-
-  const info = document.getElementById("inventoryDetailInfoGrid");
-  if (info) {
-    info.innerHTML = [
-      { icon: "target", label: "Tujuan", value: record.purpose || "-" },
-      { icon: "user-round", label: "Pengguna / Driver", value: record.user || "-" },
-      { icon: "clock", label: "Berangkat", value: formatInventoryTime(record.departTime) },
-      { icon: "clock-3", label: "Estimasi Kembali", value: formatInventoryTime(record.returnTime) },
-      { icon: "map-pin", label: "Lokasi / Tujuan", value: record.destination || "-" },
-      { icon: "badge-check", label: "Kondisi", value: record.condition || "-" }
-    ].map(item => `
-      <span class="inventory-info-cell">
-        <i data-lucide="${escapeHtml(item.icon)}" aria-hidden="true"></i>
-        <span><small>${escapeHtml(item.label)}</small><b>${escapeHtml(item.value)}</b></span>
-      </span>
-    `).join("");
-  }
-
-  const history = document.getElementById("inventoryPageHistory");
-  if (history) {
-    const rows = Array.isArray(record.history) ? record.history.slice(0, 5) : [];
-    history.innerHTML = `
-      <div class="inventory-page-history-head">
-        <strong>Riwayat Terakhir</strong>
-        <button class="text-button" type="button" data-inventory-row-action="history" data-inventory-id="${escapeHtml(record.id)}">Lihat Semua</button>
-      </div>
-      ${rows.length ? rows.map(item => `
-        <div class="inventory-page-history-row">
-          <span>${escapeHtml(formatInventoryDateTime(item.at))}</span>
-          <b>${escapeHtml(item.action || "-")}</b>
-          <small>${escapeHtml([item.user, item.note].filter(Boolean).join(" - ") || "-")}</small>
-        </div>
-      `).join("") : '<p>Belum ada riwayat pemakaian.</p>'}
-    `;
-  }
-}
-
-function handleInventoryTableClick(event) {
-  const actionButton = event.target.closest("[data-inventory-row-action]");
-  if (actionButton) {
-    event.preventDefault();
-    handleInventoryTableAction(actionButton);
-    return;
-  }
-
-  const rowTarget = event.target.closest(".inventory-row-title[data-inventory-id], tr[data-inventory-id]");
-  const id = rowTarget?.dataset.inventoryId || "";
-  if (!id) return;
-  const record = getInventoryRecords().find(item => item.id === id);
-  if (!record) return;
-  const scrollState = captureInventoryScrollState();
-  state.selectedInventoryId = id;
-  renderInventoryWorkspace();
-  restoreInventoryScrollState(scrollState);
-}
-
-function handleInventoryTableAction(actionButton) {
-  const id = actionButton.dataset.inventoryId || "";
-  if (!id) return;
-  const record = getInventoryRecords().find(item => item.id === id);
-  if (!record) return;
-  const scrollState = captureInventoryScrollState();
-  state.selectedInventoryId = id;
-  const action = actionButton.dataset.inventoryRowAction;
-  if (action === "usage") openInventoryUsageModal({ mode: "usage", record });
-  else if (action === "history") openInventoryUsageModal({ mode: "history", record });
-  else if (action === "edit") openInventoryUsageModal({ mode: "edit", record });
-  else openInventoryUsageModal({ mode: "detail", record });
-  renderInventoryWorkspace();
-  restoreInventoryScrollState(scrollState);
+function resetInventoryState() {
+  getInventoryFeature().resetState();
 }
 
 function handleInventoryAction(action, inventoryId = "") {
-  const selected = inventoryId ? getInventoryRecordById(inventoryId) : getSelectedInventoryRecord();
-  if (selected) state.selectedInventoryId = selected.id;
-  if (action === "list") {
-    openInventoryViewWithFilter("all");
-    return;
-  }
-  if (action === "collapse") {
-    renderDashboardInventory();
-    return;
-  }
-  if (!selected && action !== "usage") return openInventoryUsageModal({ mode: "add" });
-  if (action === "usage") return openInventoryUsageModal({ mode: "usage", record: selected });
-  if (action === "edit") return openInventoryUsageModal({ mode: "edit", record: selected });
-  if (action === "status") return cycleInventoryStatus(selected);
-  if (action === "maintenance") return openInventoryUsageModal({ mode: "maintenance", record: selected });
-  if (action === "history") return openInventoryUsageModal({ mode: "history", record: selected });
-  return openInventoryUsageModal({ mode: "detail", record: selected });
+  getInventoryFeature().handleAction(action, inventoryId);
 }
 
-function handleInventorySummaryClick(event) {
-  const button = event.target.closest("[data-inventory-status-filter]");
-  if (!button) return;
-  event.preventDefault();
-  const filter = button.dataset.inventoryStatusFilter || "all";
-  openInventoryViewWithFilter(filter);
+function openInventoryViewWithFilter(filter = "all", options = {}) {
+  getInventoryFeature().openViewWithFilter(filter, options);
 }
 
-function openInventoryUsageModal(options = {}) {
-  const scrollState = captureInventoryScrollState();
-  const mode = options.mode || "usage";
-  const usageRecord = isInventoryAvailable(options.record) ? options.record : {};
-  const record = mode === "usage" ? usageRecord : (options.record || getSelectedInventoryRecord() || {});
-  const modal = document.getElementById("inventoryUsageModal");
-  if (!modal) return;
-  modal.setAttribute("tabindex", "-1");
-  state.inventoryFormMode = mode;
-
-  setTextContent("inventoryUsageTitle", mode === "add" ? "Tambah Inventaris Kantor" :
-    mode === "edit" ? "Edit Inventaris Kantor" :
-    mode === "maintenance" ? "Jadwalkan Perawatan Inventaris" :
-    mode === "history" ? "Riwayat Pemakaian Inventaris" :
-    mode === "detail" ? "Rincian Inventaris Kantor" :
-    "Gunakan Inventaris");
-  setTextContent("inventoryUsageSubtitle", mode === "usage"
-    ? "Pilih item yang tersedia, isi pengguna dan tujuan. Setelah disimpan, status berubah menjadi Dipakai."
-    : mode === "add"
-      ? "Tambah jenis/item/barang inventaris baru. Data penggunaan diisi melalui tombol Gunakan."
-      : "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
-  setInputValue("inventoryRecordId", record.id || "");
-  setInputValue("inventoryItemName", record.name || "");
-  setInputValue("inventoryItemType", record.type || "Kendaraan");
-  setInputValue("inventoryStatus", mode === "add" ? "Tersedia" :
-    mode === "maintenance" ? "Perawatan" :
-    mode === "usage" ? "Dipakai" :
-    (record.status || "Tersedia"));
-  setInputValue("inventoryUser", record.user || "");
-  setInputValue("inventoryPurpose", mode === "maintenance" ? "Perawatan berkala" : (record.purpose || ""));
-  setInputValue("inventoryDestination", record.destination || "");
-  setInputValue("inventoryDepartTime", toDatetimeLocalValue(record.departTime) || (mode === "usage" ? toDatetimeLocalValue(new Date()) : ""));
-  setInputValue("inventoryReturnTime", toDatetimeLocalValue(record.returnTime));
-  setInputValue("inventoryCondition", record.condition || "Baik");
-  setInputValue("inventoryNotes", record.notes || "");
-  setInputValue("inventoryAvailableSelect", "");
-  setInventoryFormMode(mode);
-  renderInventoryAvailableOptions();
-  if (mode === "usage" && record.id) setInputValue("inventoryAvailableSelect", record.id);
-  populateInventoryDatalists();
-  renderInventoryHistoryPreview(record);
-  modal.setAttribute("open", "");
-  modal.querySelector(".inventory-form-card")?.focus?.({ preventScroll: true });
-  restoreInventoryScrollState(scrollState);
+function renderDashboardInventory() {
+  getInventoryFeature().renderDashboard();
 }
 
-function closeInventoryUsageModal() {
-  const modal = document.getElementById("inventoryUsageModal");
-  if (modal?.open) modal.removeAttribute("open");
-}
-
-function captureInventoryScrollState() {
-  const selectors = [".main", ".dashboard-inventory-filter-list", "#dashInventoryItem"];
-  const containers = selectors.map(selector => {
-    const element = document.querySelector(selector);
-    return element ? {
-      selector,
-      top: element.scrollTop || 0,
-      left: element.scrollLeft || 0
-    } : null;
-  }).filter(Boolean);
-  return {
-    windowX: window.scrollX || 0,
-    windowY: window.scrollY || 0,
-    documentTop: document.scrollingElement?.scrollTop || 0,
-    documentLeft: document.scrollingElement?.scrollLeft || 0,
-    containers
-  };
-}
-
-function restoreInventoryScrollState(stateSnapshot) {
-  if (!stateSnapshot) return;
-  const restore = () => {
-    if (document.scrollingElement) {
-      document.scrollingElement.scrollTop = stateSnapshot.documentTop;
-      document.scrollingElement.scrollLeft = stateSnapshot.documentLeft;
-    }
-    stateSnapshot.containers?.forEach(item => {
-      const element = document.querySelector(item.selector);
-      if (!element) return;
-      element.scrollTop = item.top;
-      element.scrollLeft = item.left;
-    });
-    window.scrollTo(stateSnapshot.windowX, stateSnapshot.windowY);
-  };
-  restore();
-  requestAnimationFrame(restore);
-  window.setTimeout(restore, 0);
-  window.setTimeout(restore, 80);
-  window.setTimeout(restore, 240);
-}
-
-function saveInventoryUsage(event) {
-  event.preventDefault();
-  const records = getInventoryRecords();
-  const selectedName = getInputValue("inventoryItemName");
-  const formMode = state.inventoryFormMode || "usage";
-  const masterMode = formMode === "add" || formMode === "edit";
-  const selectedAvailableId = getInputValue("inventoryAvailableSelect");
-  if (formMode === "usage" && !selectedAvailableId) {
-    notify("Pilih inventaris yang tersedia terlebih dahulu.", { type: "warning" });
-    return;
-  }
-  const id = formMode === "usage"
-    ? selectedAvailableId
-    : (document.getElementById("inventoryRecordId")?.value || createInventoryId());
-  const existingIndex = records.findIndex(item => item.id === id);
-  const existing = existingIndex >= 0 ? records[existingIndex] : { id, history: [] };
-  if (formMode === "usage" && !isInventoryAvailable(existing)) {
-    notify("Inventaris ini tidak tersedia untuk digunakan. Pilih item lain.", { type: "warning" });
-    renderInventoryAvailableOptions();
-    return;
-  }
-  const status = formMode === "usage" ? "Dipakai" :
-    formMode === "add" ? "Tersedia" :
-    (getInputValue("inventoryStatus") || "Tersedia");
-  const nextRecord = {
-    ...existing,
-    id,
-    name: formMode === "usage" ? existing.name : (selectedName || existing.name || "Inventaris Kantor"),
-    type: getInputValue("inventoryItemType") || existing.type || "Lainnya",
-    status,
-    user: masterMode ? (existing.user || "") : getInputValue("inventoryUser"),
-    purpose: masterMode ? (existing.purpose || "") : getInputValue("inventoryPurpose"),
-    destination: masterMode ? (existing.destination || "Kantor") : getInputValue("inventoryDestination"),
-    departTime: masterMode ? (existing.departTime || "") : getInputValue("inventoryDepartTime"),
-    returnTime: masterMode ? (existing.returnTime || "") : getInputValue("inventoryReturnTime"),
-    condition: getInputValue("inventoryCondition") || "Baik",
-    notes: getInputValue("inventoryNotes"),
-    updatedAt: new Date().toISOString()
-  };
-  nextRecord.history = [
-    {
-      at: new Date().toISOString(),
-      action: formMode === "add" ? "Tambah Inventaris" :
-        formMode === "edit" || formMode === "detail" ? "Edit Inventaris" :
-        status === "Perawatan" ? "Jadwalkan Perawatan" : "Gunakan Inventaris",
-      user: nextRecord.user,
-      note: [nextRecord.purpose, nextRecord.destination].filter(Boolean).join(" - ") || nextRecord.notes
-    },
-    ...(Array.isArray(existing.history) ? existing.history : [])
-  ].slice(0, 12);
-
-  if (existingIndex >= 0) records[existingIndex] = nextRecord;
-  else records.unshift(nextRecord);
-  state.inventoryRecords = records;
-  state.selectedInventoryId = nextRecord.id;
-  saveInventoryCache(records);
-  renderDashboardInventory();
-  renderInventoryWorkspace();
-  closeInventoryUsageModal();
-  notify("Data inventaris kantor tersimpan.");
-}
-
-function setInventoryFormMode(mode) {
-  const usageMode = mode === "usage";
-  const addMode = mode === "add";
-  const editMode = mode === "edit";
-  const masterMode = addMode || editMode;
-  const historyMode = mode === "history";
-  const detailMode = mode === "detail";
-  document.getElementById("inventoryAvailableField")?.classList.toggle("hidden", !usageMode);
-  document.getElementById("inventoryItemNameField")?.classList.toggle("hidden", usageMode || historyMode);
-  document.getElementById("inventoryItemTypeField")?.classList.toggle("hidden", usageMode || historyMode);
-  document.getElementById("inventoryStatusField")?.classList.toggle("hidden", usageMode || addMode || historyMode);
-  document.getElementById("inventoryUserField")?.classList.toggle("hidden", masterMode || historyMode);
-  document.getElementById("inventoryPurposeField")?.classList.toggle("hidden", masterMode || historyMode);
-  document.getElementById("inventoryDestinationField")?.classList.toggle("hidden", masterMode || historyMode);
-  document.getElementById("inventoryDepartTimeField")?.classList.toggle("hidden", masterMode || historyMode);
-  document.getElementById("inventoryReturnTimeField")?.classList.toggle("hidden", masterMode || historyMode);
-  document.getElementById("inventoryConditionField")?.classList.toggle("hidden", historyMode);
-  document.getElementById("inventoryNotesField")?.classList.toggle("hidden", historyMode);
-
-  const itemName = document.getElementById("inventoryItemName");
-  const availableSelect = document.getElementById("inventoryAvailableSelect");
-  const user = document.getElementById("inventoryUser");
-  const purpose = document.getElementById("inventoryPurpose");
-  const saveButton = document.getElementById("saveInventoryUsageButton");
-  if (itemName) itemName.required = !usageMode && !historyMode;
-  if (availableSelect) availableSelect.required = usageMode;
-  if (user) user.required = usageMode;
-  if (purpose) purpose.required = usageMode;
-  if (saveButton) {
-    saveButton.classList.toggle("hidden", historyMode || detailMode);
-    saveButton.textContent = usageMode ? "Gunakan" :
-      addMode ? "Simpan Item" :
-      editMode ? "Simpan Perubahan" :
-      "Simpan";
-  }
-  if (detailMode) {
-    [
-      "inventoryItemName",
-      "inventoryItemType",
-      "inventoryStatus",
-      "inventoryUser",
-      "inventoryPurpose",
-      "inventoryDestination",
-      "inventoryDepartTime",
-      "inventoryReturnTime",
-      "inventoryCondition",
-      "inventoryNotes"
-    ].forEach(id => document.getElementById(id)?.setAttribute("readonly", "readonly"));
-  } else {
-    [
-      "inventoryItemName",
-      "inventoryUser",
-      "inventoryPurpose",
-      "inventoryDestination",
-      "inventoryDepartTime",
-      "inventoryReturnTime",
-      "inventoryNotes"
-    ].forEach(id => document.getElementById(id)?.removeAttribute("readonly"));
-  }
-  ["inventoryItemType", "inventoryStatus", "inventoryCondition"].forEach(id => {
-    const field = document.getElementById(id);
-    if (field) field.disabled = detailMode;
-  });
-}
-
-function renderInventoryAvailableOptions() {
-  const select = document.getElementById("inventoryAvailableSelect");
-  if (!select) return;
-  const available = getInventoryRecords().filter(isInventoryAvailable);
-  select.innerHTML = `
-    <option value="">-- Pilih inventaris yang tersedia --</option>
-    ${available.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} (Tersedia)</option>`).join("")}
-  `;
-}
-
-function isInventoryAvailable(item) {
-  return !item?.status || item.status === "Tersedia";
-}
-
-function handleInventoryAvailableSelectChange() {
-  const selected = getInventoryRecords().find(item => item.id === getInputValue("inventoryAvailableSelect"));
-  if (!selected) {
-    renderInventoryHistoryPreview({});
-    return;
-  }
-  setInputValue("inventoryItemName", selected.name);
-  setInputValue("inventoryItemType", selected.type || "Kendaraan");
-  setInputValue("inventoryDestination", selected.destination || "");
-  setInputValue("inventoryCondition", selected.condition || "Baik");
-  renderInventoryHistoryPreview(selected);
-}
-
-function cycleInventoryStatus(record) {
-  if (!record) return;
-  const sequence = ["Tersedia", "Dipakai", "Perawatan"];
-  const nextStatus = sequence[(sequence.indexOf(record.status) + 1) % sequence.length] || "Tersedia";
-  record.status = nextStatus;
-  record.updatedAt = new Date().toISOString();
-  record.history = [
-    { at: record.updatedAt, action: "Ubah Status", user: currentProfile?.displayName || "", note: getInventoryStatusLabel(nextStatus) },
-    ...(Array.isArray(record.history) ? record.history : [])
-  ].slice(0, 12);
-  saveInventoryCache(state.inventoryRecords);
-  renderDashboardInventory();
-  renderInventoryWorkspace();
-  notify(`Status inventaris menjadi ${getInventoryStatusLabel(nextStatus)}.`);
-}
-
-function renderInventoryHistoryPreview(record = {}) {
-  const container = document.getElementById("inventoryHistoryPreview");
-  if (!container) return;
-  const history = Array.isArray(record.history) ? record.history.slice(0, 4) : [];
-  container.innerHTML = `
-    <strong>Riwayat Pemakaian</strong>
-    ${history.length ? history.map(item => `
-      <div>
-        <span>${escapeHtml(formatInventoryDateTime(item.at))}</span>
-        <b>${escapeHtml(item.action || "-")}</b>
-        <small>${escapeHtml([item.user, item.note].filter(Boolean).join(" - ") || "-")}</small>
-      </div>
-    `).join("") : '<p>Belum ada riwayat pemakaian.</p>'}
-  `;
-}
-
-function populateInventoryDatalists() {
-  const names = document.getElementById("inventoryNameSuggestions");
-  if (names) {
-    const records = state.inventoryFormMode === "usage"
-      ? getInventoryRecords().filter(item => item.status === "Tersedia")
-      : getInventoryRecords();
-    names.innerHTML = records.map(item => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.status || "Tersedia")}</option>`).join("");
-  }
-  const people = document.getElementById("inventoryPersonSuggestions");
-  if (people) {
-    const suggestions = new Set([
-      ...getAllIntegratedPersonnelRecords(getCurrentSummaryYear()).map(getPersonnelName).filter(Boolean),
-      ...getInventoryRecords().map(item => item.user).filter(Boolean)
-    ]);
-    people.innerHTML = Array.from(suggestions).slice(0, 80).map(name => `<option value="${escapeHtml(name)}"></option>`).join("");
-  }
-}
-
-function getInventoryUsageProgress(record) {
-  const start = new Date(record.departTime || "").getTime();
-  const end = new Date(record.returnTime || "").getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return record.status === "Dipakai" ? 50 : 0;
-  return Math.max(0, Math.min(100, Math.round(((Date.now() - start) / (end - start)) * 100)));
-}
-
-function getInventoryUsageHours(record) {
-  const start = new Date(record.departTime || "").getTime();
-  const end = new Date(record.returnTime || "").getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return "";
-  const totalHours = Math.max(1, Math.round((end - start) / 3600000));
-  const usedHours = Math.max(0, Math.min(totalHours, Math.round((Date.now() - start) / 3600000)));
-  return `${usedHours} / ${totalHours} jam`;
-}
-
-function getInventoryStatusLabel(status) {
-  if (status === "Dipakai") return "Sedang Digunakan";
-  return status || "Tersedia";
-}
-
-function formatInventoryDateTime(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
-}
-
-function formatInventoryTime(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(date);
-}
-
-function toDatetimeLocalValue(value) {
-  if (!value) return "";
-  const date = value instanceof Date ? value : new Date(value);
-  if (!Number.isFinite(date.getTime())) return "";
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
-}
-
-function setInputValue(id, value) {
-  const input = document.getElementById(id);
-  if (input) input.value = value || "";
-}
-
-function getInputValue(id) {
-  return document.getElementById(id)?.value?.trim() || "";
-}
-
-function createInventoryId() {
-  return `inventory-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function loadInventoryCache() {
-  try {
-    const records = JSON.parse(localStorage.getItem(INVENTORY_CACHE_KEY) || "[]");
-    if (!Array.isArray(records) || !records.length) return createDefaultInventoryRecords();
-    if (isLegacyDefaultInventoryRecords(records)) {
-      const defaults = createDefaultInventoryRecords();
-      saveInventoryCache(defaults);
-      return defaults;
-    }
-    return records;
-  } catch (error) {
-    return createDefaultInventoryRecords();
-  }
-}
-
-function isLegacyDefaultInventoryRecords(records) {
-  const legacyIds = ["inventory-car-a", "inventory-laptop-survey", "inventory-printer-office", "inventory-gps-01"];
-  return records.length === legacyIds.length && legacyIds.every(id => records.some(item => item?.id === id));
-}
-
-function saveInventoryCache(records) {
-  localStorage.setItem(INVENTORY_CACHE_KEY, JSON.stringify(Array.isArray(records) ? records : []));
+function renderInventoryWorkspace() {
+  getInventoryFeature().renderWorkspace();
 }
 
 function getDashboardPrioritySourceItems(allJobs) {
