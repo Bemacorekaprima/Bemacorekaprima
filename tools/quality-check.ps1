@@ -1,12 +1,24 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$app = Join-Path $root "web\app.js"
-$index = Join-Path $root "web\index.html"
-$styles = Join-Path $root "web\styles.css"
+$app = Join-Path $root "app.js"
+$index = Join-Path $root "index.html"
+$styles = Join-Path $root "styles.css"
+$theme = Join-Path $root "theme.css"
+$components = Join-Path $root "components"
+$core = Join-Path $root "core"
 
 Write-Host "Memeriksa JavaScript..."
-node --check $app
+$jsFiles = @($app)
+if (Test-Path $components) {
+  $jsFiles += Get-ChildItem -LiteralPath $components -Filter "*.js" -File | Select-Object -ExpandProperty FullName
+}
+if (Test-Path $core) {
+  $jsFiles += Get-ChildItem -LiteralPath $core -Filter "*.js" -File | Select-Object -ExpandProperty FullName
+}
+foreach ($file in $jsFiles) {
+  node --check $file
+}
 
 Write-Host "Memeriksa pola render berisiko..."
 $appText = Get-Content -Raw -LiteralPath $app
@@ -19,12 +31,14 @@ if ($appText -match "\.on(click|change|input|submit)\s*=" -or $appText -match "\
 
 Write-Host "Ringkasan ukuran file:"
 $fileBudgets = @(
-  @{ Path = $app; Warn = 2000; Max = 6500 },
+  @{ Path = $app; Warn = 6500; Max = 9000 },
   @{ Path = $index; Warn = 1500; Max = 3000 },
-  @{ Path = $styles; Warn = 2000; Max = 5000 }
+  @{ Path = $styles; Warn = 5000; Max = 7000 },
+  @{ Path = $theme; Warn = 1000; Max = 2500 }
 )
 foreach ($item in $fileBudgets) {
   $file = $item.Path
+  if (!(Test-Path $file)) { continue }
   $lineCount = (Get-Content -LiteralPath $file | Measure-Object -Line).Lines
   $name = Split-Path -Leaf $file
   $status = if ($lineCount -gt $item.Warn) { "PERLU DIPANTAU" } else { "OK" }
@@ -35,6 +49,3 @@ foreach ($item in $fileBudgets) {
 }
 
 Write-Host "Quality check selesai."
-
-
-

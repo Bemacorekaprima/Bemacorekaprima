@@ -17,7 +17,8 @@ Dokumen ini menjadi pegangan teknis untuk update berikutnya pada web Dashboard.
 4. Event interaktif memakai `addEventListener` dan `data-*`, bukan inline `onclick`.
 5. File di atas 2.000 baris boleh berjalan, tetapi wajib dipantau. Perubahan besar sebaiknya dipisah bertahap agar risiko regresi kecil.
 6. `firebase-config.js` berisi konfigurasi publik Firebase. Jangan memasukkan password, private key, atau token rahasia server di file ini.
-7. Setiap update wajib menjalankan:
+7. Modul fitur baru mengikuti pola `createXFeature(options)` dan menerima dependency dari `app.js`.
+8. Setiap update wajib menjalankan:
 
 ```powershell
 npm.cmd run check
@@ -26,7 +27,7 @@ npm.cmd run check
 Jika `npm` belum tersedia, minimal jalankan:
 
 ```powershell
-node --check web/app.js
+node --check app.js
 ```
 
 ## Catatan Ukuran File
@@ -37,6 +38,12 @@ Saat audit, `app.js`, `styles.css`, dan `index.html` masih besar. Ini masih aman
 - Pisahkan modul data: Firebase, Spreadsheet Bridge, Tender Bridge.
 - Pisahkan renderer per halaman: Dashboard, Portfolio, Tender, Personil, Tugas, Pengaturan.
 - Setelah modul stabil, baru kecilkan `app.js` utama menjadi router dan pengikat event.
+
+Progress refactor:
+
+- `core/router.js` dan `core/scroll.js` sudah aktif.
+- `components/inventory.js`, `components/dashboard.js`, dan `components/portfolio.js` sudah aktif.
+- Modul berikutnya sebaiknya dipilih satu per tahap agar dependency data tetap mudah dicek.
 
 
 ## Struktur CSS

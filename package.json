@@ -5,6 +5,6 @@
   "description": "Dashboard tugas, portfolio, tender, dan personil berbasis GitHub Pages, Firebase, dan Apps Script.",
   "scripts": {
     "check": "powershell -ExecutionPolicy Bypass -File tools/quality-check.ps1",
-    "check:js": "node --check web/app.js"
+    "check:js": "node --check app.js"
   }
 }

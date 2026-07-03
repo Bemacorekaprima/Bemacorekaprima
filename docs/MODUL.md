@@ -1,122 +1,62 @@
 # Modul Aplikasi
 
-## 1. Modul Login
+Dokumen ini mencatat struktur modul aktif agar perubahan berikutnya tidak perlu membaca seluruh `app.js`.
 
-Lokasi: `web/app.js`
+## Struktur Saat Ini
 
-Fungsi utama:
+- `app.js`: bootstrap aplikasi, Firebase/Auth, data lintas fitur, adapter modul, render utama, dan fitur yang belum dipisah.
+- `core/router.js`: perpindahan view dan kebijakan scroll per navigasi.
+- `core/scroll.js`: helper scroll `preserve`, `top`, dan `none`.
+- `components/inventory.js`: UI dan logic Inventaris Kantor.
+- `components/dashboard.js`: KPI dashboard, paket prioritas, tender aktif, personil, posisi penugasan, inventaris dashboard, dan progress.
+- `components/portfolio.js`: UI Portfolio, ringkasan, kartu pekerjaan, aktivitas, agenda, tabel pekerjaan, mobile cards, pagination, dan klik detail.
 
-- daftar akun email/password
-- login
-- logout
-- membaca user aktif
+## Pola Komponen
 
-Menggunakan Firebase Authentication.
+Setiap modul fitur memakai pola:
 
-## 2. Modul Database Tugas
+```js
+export function createFeatureName(options = {}) {
+  const { state, dependencyA, dependencyB } = options;
 
-Lokasi: `web/app.js`
+  function bindControls() {}
+  function render() {}
 
-Collection Firestore:
-
-```text
-tasks
+  return { bindControls, render };
+}
 ```
 
-Field utama:
+Aturan:
 
-```text
-ownerUid
-tanggal
-namaTugas
-prioritas
-status
-deadline
-penanggungJawab
-emailPenanggungJawab
-catatan
-createdAt
-updatedAt
+- Modul menerima dependency dari `app.js`, tidak mengambil data global diam-diam selain DOM dan `window.lucide`.
+- Helper data lintas fitur tetap di `app.js` sampai modul tujuan dipisah penuh.
+- `app.js` menyediakan wrapper pendek agar pemanggil lama tetap stabil.
+- Event handler fitur ditempatkan di modul fiturnya melalui `bindControls()`.
+- Semua tombol non-submit harus memakai `type="button"`.
+
+## Modul Yang Belum Dipisah
+
+- `components/tender.js`
+- `components/personnel.js`
+- `components/finance.js`
+- `components/reports.js`
+- `components/settings.js`
+- modul auth/role/backend bridge
+
+## Catatan Akses
+
+Kontrol menu di UI hanya membantu pengalaman pengguna. Hak penting tetap harus diamankan di Firestore Rules atau backend/Apps Script Bridge.
+
+## Validasi
+
+Gunakan:
+
+```powershell
+npm.cmd run check
 ```
 
-## 3. Modul Dashboard
+Jika `npm.cmd` tidak ada di PATH terminal, gunakan Node yang tersedia lalu jalankan `tools/quality-check.ps1`, atau minimal:
 
-Lokasi: `web/index.html`, `web/app.js`, `web/styles.css`
-
-Fitur:
-
-- statistik total tugas
-- kanban board
-- filter hari ini / terlambat
-- agenda aktif
-- laporan sesi
-
-## 4. Modul Email
-
-Ada 2 mode:
-
-### Mode Gratis Tanpa Bridge
-
-Menggunakan `mailto`. Browser membuka aplikasi email, user klik kirim manual.
-
-### Mode Apps Script Email Bridge
-
-Frontend mengirim request ke Apps Script Web App.
-Apps Script mengirim email melalui Gmail akun pemilik script.
-
-File:
-
-```text
-apps-script-email-bridge/Code.gs
+```powershell
+node --check app.js
 ```
-
-Catatan:
-
-- Pengiriman mengikuti kuota Gmail/Apps Script.
-- Gunakan token rahasia sederhana agar endpoint tidak mudah disalahgunakan.
-
-## 5. Modul Monitoring Tender
-
-Penyimpanan Firestore aktif:
-
-```text
-tasks
-```
-
-Dokumen Tender dibedakan dari tugas menggunakan field:
-
-```text
-entityType: "tender"
-```
-
-Cara ini menggunakan aturan akses koleksi `tasks` yang sudah aktif sehingga modul dapat langsung dipakai. Renderer tugas selalu menyaring `entityType: "tender"`, sehingga paket Tender tidak muncul pada daftar tugas.
-
-Fitur:
-
-- daftar dan status paket tender
-- progres kelengkapan dokumen
-- PIC, deadline, dan tautan dokumen
-- checklist administrasi, kualifikasi, teknis, personel, biaya, dan finalisasi
-- sinkronisasi realtime antar akun
-
-Hak perubahan paket dan checklist diberikan kepada:
-
-```text
-super_admin
-admin
-editor
-```
-
-Semua akun yang telah login dan mendapatkan akses menu Tender dapat membaca data.
-
-## 6. Modul Template Dokumen Tender
-
-Template awal yang tersedia:
-
-- Surat Penawaran
-- Pakta Integritas
-- Daftar Personel
-- Jadwal Penugasan Personel
-- Kerangka Pendekatan dan Metodologi
-
-Template dapat diedit langsung di halaman lalu dicetak atau disimpan sebagai PDF melalui dialog cetak browser. Isi template wajib diperiksa kembali terhadap Dokumen Pemilihan dan adendum paket terkait.

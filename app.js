@@ -27,6 +27,7 @@ import {
 import { createRouter } from "./core/router.js";
 import { createInventoryFeature } from "./components/inventory.js";
 import { createDashboardFeature, DASHBOARD_ASSIGNMENT_CATEGORIES } from "./components/dashboard.js";
+import { createPortfolioFeature } from "./components/portfolio.js";
 
 const firebaseConfig = window.FIREBASE_CONFIG;
 if (!firebaseConfig || firebaseConfig.apiKey === "ISI_API_KEY_ANDA") {
@@ -405,47 +406,14 @@ function bindControls() {
   bindDashboardControls();
   document.getElementById("dashboardAddItemButton").addEventListener("click", () => openJobRecordForm());
   document.getElementById("dashboardOpenPortfolioButton").addEventListener("click", () => setView("jobs", { scroll: "top" }));
-  document.getElementById("dashboardPortfolioSummary").addEventListener("click", handlePortfolioSummaryClick);
   bindInventoryControls();
+  bindPortfolioControls();
   document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
   document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
   document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
   document.getElementById("personnelForm").addEventListener("submit", savePersonnelRecord);
   document.getElementById("closePersonnelFormButton").addEventListener("click", closePersonnelForm);
   document.getElementById("cancelPersonnelFormButton").addEventListener("click", closePersonnelForm);
-  document.getElementById("jobsSearch").addEventListener("input", event => {
-    state.jobsSearch = event.target.value;
-    state.jobsPage = 1;
-    renderJobs();
-  });
-  document.getElementById("jobsYearFilter").addEventListener("change", event => {
-    state.jobsYear = event.target.value;
-    state.jobsPage = 1;
-    renderJobs();
-  });
-  document.getElementById("jobsStatusFilter").addEventListener("change", event => {
-    state.jobsStatus = event.target.value;
-    state.jobsPage = 1;
-    renderJobs();
-  });
-  document.getElementById("jobsPageSize").addEventListener("change", event => {
-    state.jobsPageSize = Number(event.target.value) || 25;
-    state.jobsPage = 1;
-    renderJobs();
-  });
-  document.getElementById("refreshJobsButton").addEventListener("click", refreshJobsData);
-  document.getElementById("jobsToolsButton").addEventListener("click", toggleJobsToolsMenu);
-  document.getElementById("addJobButton").addEventListener("click", () => openJobRecordForm());
-  document.getElementById("exportJobsPdfButton").addEventListener("click", exportJobsPdf);
-  document.getElementById("exportJobsExcelButton").addEventListener("click", exportJobsExcel);
-  document.getElementById("resetJobsFilters").addEventListener("click", resetJobsFilters);
-  document.getElementById("jobsPrevPage").addEventListener("click", () => changeJobsPage(-1));
-  document.getElementById("jobsNextPage").addEventListener("click", () => changeJobsPage(1));
-  document.getElementById("jobsTableBody").addEventListener("click", handleJobsTableClick);
-  document.getElementById("jobsMobileCards")?.addEventListener("click", handleJobsMobileClick);
-  document.getElementById("portfolioFeaturedJobs").addEventListener("click", handlePortfolioCardClick);
-  document.getElementById("portfolioSummary").addEventListener("click", handlePortfolioSummaryClick);
-  document.getElementById("portfolioAddItemButton").addEventListener("click", () => openJobRecordForm());
   document.getElementById("refreshFinanceButton")?.addEventListener("click", loadExternalSheetData);
   document.getElementById("financeSearch")?.addEventListener("input", event => {
     state.financeSearch = event.target.value;
@@ -2422,145 +2390,69 @@ function getPortfolioCardPriority(job) {
   }[getPortfolioStatusKey(job)] ?? 6;
 }
 
+let portfolioFeature = null;
+
+function getPortfolioFeature() {
+  if (!portfolioFeature) {
+    portfolioFeature = createPortfolioFeature({
+      state,
+      setView,
+      escapeHtml,
+      safeClassToken,
+      normalizeSearchText,
+      includesAny,
+      getInitials,
+      getDataUtamaSheet,
+      renderYearFilterOptions,
+      getPortfolioScopeJobs,
+      getFilteredJobs,
+      getPortfolioCounts,
+      getPortfolioCardPriority,
+      getPortfolioStatusKey,
+      getPortfolioStatusLabel,
+      getPortfolioProgress,
+      getPortfolioPeople,
+      getCurrentSummaryYear,
+      getAllIntegratedPersonnelRecords,
+      getPersonnelActiveWork,
+      getFocusTasks,
+      getJobYearLabel,
+      getJobStatus,
+      getRecordValue,
+      openJobDetail,
+      openJobRecordForm,
+      renderTenders,
+      refreshJobsData,
+      toggleJobsToolsMenu,
+      exportJobsPdf,
+      exportJobsExcel
+    });
+  }
+  return portfolioFeature;
+}
+
+function bindPortfolioControls() {
+  getPortfolioFeature().bindControls();
+}
+
 function renderPortfolioOverview(filteredJobs) {
-  const scopeJobs = getPortfolioScopeJobs();
-  const counts = getPortfolioCounts(scopeJobs);
-  document.getElementById("portfolioYearLabel").textContent = state.jobsYear === "all"
-    ? "Seluruh portofolio"
-    : `Portofolio tahun ${state.jobsYear}`;
-  document.getElementById("portfolioTotalCount").textContent = counts.total;
-  document.getElementById("portfolioActiveCount").textContent = counts.active;
-  document.getElementById("portfolioFinishCount").textContent = counts.finish;
-  document.getElementById("portfolioTenderCount").textContent = counts.tender;
-  document.getElementById("portfolioUpcomingCount").textContent = counts.upcoming;
-  document.getElementById("portfolioCollectionCount").textContent = `${filteredJobs.length} item`;
-
-  const featured = [...filteredJobs]
-    .sort((left, right) =>
-      getPortfolioCardPriority(left) - getPortfolioCardPriority(right) ||
-      left.pekerjaan.localeCompare(right.pekerjaan, "id")
-    )
-    .slice(0, 3);
-  state.portfolioFeaturedJobs = featured;
-
-  const container = document.getElementById("portfolioFeaturedJobs");
-  container.innerHTML = featured.length
-    ? featured.map((job, index) => {
-        const statusKey = getPortfolioStatusKey(job);
-        const people = getPortfolioPeople(job);
-        const progress = getPortfolioProgress(job);
-        const personCount = job.personnelCount ?? job.records.length;
-        const footerLabel = statusKey === "tender"
-          ? `${progress}% dokumen`
-          : job.tanggalSelesai || `${personCount} personil`;
-        return `
-          <button class="portfolio-job-card status-${safeClassToken(statusKey)}" type="button" data-portfolio-job-index="${index}">
-            <span class="portfolio-card-accent"></span>
-            <span class="portfolio-card-heading">
-              <strong>${escapeHtml(job.pekerjaan)}</strong>
-              <span class="portfolio-status">${escapeHtml(getPortfolioStatusLabel(job))}</span>
-            </span>
-            <span class="portfolio-card-team">
-              <span class="portfolio-avatars">
-                ${people.map(name => `<i title="${escapeHtml(name)}">${escapeHtml(getInitials(name))}</i>`).join("")}
-                ${people.length ? "" : "<em>Belum ada personil</em>"}
-              </span>
-              <small>${personCount} personil</small>
-            </span>
-            <span class="portfolio-progress-track" aria-label="Indikator tahap ${progress}%">
-              <span style="width:${progress}%"></span>
-            </span>
-            <span class="portfolio-card-footer">
-              <b>${progress}%</b>
-              <small>${escapeHtml(footerLabel)}</small>
-            </span>
-          </button>
-        `;
-      }).join("")
-    : '<div class="portfolio-empty">Tidak ada pekerjaan yang cocok dengan filter.</div>';
-
-  const selectedYear = getCurrentSummaryYear();
-  const personnel = getAllIntegratedPersonnelRecords(selectedYear);
-  const availablePersonnel = personnel.filter(record => getPersonnelActiveWork(record) <= 0).length;
-  const briefParts = [];
-  if (counts.tender) briefParts.push(`${counts.tender} paket Tender perlu dipantau`);
-  if (counts.upcoming) briefParts.push(`${counts.upcoming} pekerjaan Upcoming perlu persiapan`);
-  if (availablePersonnel) briefParts.push(`${availablePersonnel} personil tersedia untuk dialokasikan`);
-  document.getElementById("portfolioAiBrief").textContent = briefParts.length
-    ? `${briefParts.join(". ")}.`
-    : "Portofolio tidak memiliki peringatan utama berdasarkan data yang tersedia.";
-
-  renderPortfolioActivity(scopeJobs);
-  renderPortfolioAgenda();
+  getPortfolioFeature().renderOverview(filteredJobs);
 }
 
 function renderPortfolioActivity(allJobs) {
-  const activities = buildPortfolioActivities(allJobs);
-  document.getElementById("portfolioActivityList").innerHTML = renderPortfolioActivityItems(activities);
+  getPortfolioFeature().renderActivity(allJobs);
 }
 
 function buildPortfolioActivities(allJobs) {
-  const activities = [];
-  state.tenders.slice(0, 2).forEach(tender => {
-    activities.push({
-      initials: getInitials(tender.updatedBy || tender.ownerName || "Tender"),
-      tone: "purple",
-      title: `memperbarui paket ${tender.name || "Tender"}`,
-      meta: `${tender.status || "Persiapan"} - ${tender.ownerName || tender.updatedBy || "Tim Tender"}`
-    });
-  });
-  state.tasks
-    .slice()
-    .sort((left, right) => String(right.deadline || right.tanggal || "").localeCompare(String(left.deadline || left.tanggal || "")))
-    .slice(0, Math.max(0, 3 - activities.length))
-    .forEach(task => {
-      activities.push({
-        initials: getInitials(task.penanggungJawab || task.dibuatOleh || "Tim"),
-        tone: task.status === "Selesai" ? "green" : "blue",
-        title: `${task.status === "Selesai" ? "menyelesaikan" : "menangani"} ${task.namaTugas}`,
-        meta: task.deadline ? `Deadline ${task.deadline}` : task.tanggal || "Agenda aktif"
-      });
-    });
-  if (activities.length < 3) {
-    allJobs.slice(0, 3 - activities.length).forEach(job => {
-      activities.push({
-        initials: getInitials(job.pekerjaan),
-        tone: getPortfolioStatusKey(job) === "upcoming" ? "orange" : "green",
-        title: `${job.pekerjaan} berstatus ${getPortfolioStatusLabel(job)}`,
-        meta: `${job.personnelCount ?? job.records.length} personil terhubung`
-      });
-    });
-  }
-
-  return activities.slice(0, 3);
+  return getPortfolioFeature().buildActivities(allJobs);
 }
 
 function renderPortfolioActivityItems(activities) {
-  return activities.length
-    ? activities.slice(0, 3).map(activity => `
-        <div class="portfolio-activity-item">
-          <span class="portfolio-activity-avatar ${safeClassToken(activity.tone)}">${escapeHtml(activity.initials)}</span>
-          <span>
-            <strong>${escapeHtml(activity.title)}</strong>
-            <small>${escapeHtml(activity.meta)}</small>
-          </span>
-        </div>
-      `).join("")
-    : '<p class="portfolio-empty-note">Belum ada aktivitas yang dapat ditampilkan.</p>';
+  return getPortfolioFeature().renderActivityItems(activities);
 }
 
 function renderPortfolioAgenda() {
-  const agenda = getFocusTasks().slice(0, 2);
-  document.getElementById("portfolioAgendaCount").textContent = `${agenda.length} agenda`;
-  document.getElementById("portfolioAgendaList").innerHTML = agenda.length
-    ? agenda.map(task => `
-        <div class="portfolio-agenda-item">
-          <span>${escapeHtml(task.deadline ? task.deadline.slice(0, 10) : task.tanggal || "-")}</span>
-          <strong>${escapeHtml(task.namaTugas)}</strong>
-          <small>${escapeHtml(task.penanggungJawab || "Penanggung jawab belum diisi")}</small>
-        </div>
-      `).join("")
-    : '<p class="portfolio-empty-note">Belum ada agenda prioritas.</p>';
+  getPortfolioFeature().renderAgenda();
 }
 
 function renderDashboardPortfolioHome() {
@@ -2626,226 +2518,89 @@ function bindDashboardControls() {
 }
 
 function handlePortfolioSummaryClick(event) {
-  const trigger = event.target.closest("[data-portfolio-summary-filter]");
-  if (!trigger) return;
-  const context = trigger.dataset.portfolioSummaryContext;
-  const filter = trigger.dataset.portfolioSummaryFilter || "all";
-
-  if (context === "dashboard") {
-    state.jobsSearch = "";
-    state.jobsYear = "all";
-  }
-  state.jobsStatus = filter;
-  state.jobsPage = 1;
-  setView("jobs", { scroll: "top" });
-
-  const searchInput = document.getElementById("jobsSearch");
-  const yearFilter = document.getElementById("jobsYearFilter");
-  const statusFilter = document.getElementById("jobsStatusFilter");
-  if (searchInput) searchInput.value = state.jobsSearch;
-  if (yearFilter) yearFilter.value = state.jobsYear;
-  if (statusFilter) statusFilter.value = state.jobsStatus;
-  renderJobs();
+  getPortfolioFeature().handleSummaryClick(event);
 }
 
 function renderJobs() {
-  const sheet = getDataUtamaSheet();
-  const syncText = document.getElementById("jobsSyncText");
-  const tableBody = document.getElementById("jobsTableBody");
-  const resultCount = document.getElementById("jobsResultCount");
-  if (!tableBody) return;
-  renderYearFilterOptions();
-
-  if (syncText) {
-    const statusText = sheet?.status === "ready"
-      ? "DATA UTAMA tersinkron"
-      : sheet?.status === "loading"
-        ? "Memuat DATA UTAMA..."
-        : sheet?.status === "error"
-          ? "DATA UTAMA belum dapat dibaca."
-          : "Menunggu sinkronisasi DATA UTAMA...";
-    syncText.textContent = statusText;
-  }
-
-  const jobs = getFilteredJobs();
-  renderPortfolioOverview(jobs);
-  state.jobsVisibleRecords = jobs;
-  const pageSize = Number(state.jobsPageSize) || 25;
-  const pageCount = Math.max(1, Math.ceil(jobs.length / pageSize));
-  state.jobsPage = Math.min(Math.max(1, state.jobsPage), pageCount);
-  const startIndex = (state.jobsPage - 1) * pageSize;
-  const visible = jobs.slice(startIndex, startIndex + pageSize);
-
-  if (resultCount) resultCount.textContent = `${jobs.length} pekerjaan ditemukan`;
-  if (!visible.length) {
-    tableBody.innerHTML = '<tr><td class="personnel-empty" colspan="7">Tidak ada pekerjaan yang cocok.</td></tr>';
-  } else {
-    tableBody.innerHTML = visible.map((job, index) => `
-      <tr class="clickable-row" data-job-index="${startIndex + index}" tabindex="0">
-        <td data-label="No.">${startIndex + index + 1}</td>
-        <td data-label="Pekerjaan"><strong>${escapeHtml(job.pekerjaan)}</strong></td>
-        <td data-label="Tahun">${escapeHtml(getJobYearLabel(job))}</td>
-        <td data-label="Tanggal Mulai">${escapeHtml(job.tanggalMulai || "-")}</td>
-        <td data-label="Tanggal Selesai">${escapeHtml(job.tanggalSelesai || "-")}</td>
-        <td data-label="Jumlah Personil">${job.personnelCount ?? job.records.length}</td>
-        <td data-label="Status Pekerjaan">${escapeHtml(getJobStatus(job))}</td>
-      </tr>
-    `).join("");
-  }
-
-  renderJobsMobileCards(visible, startIndex);
-  setJobsPaginationButtons(pageCount);
-}
-
-function renderJobsMobileCards(visibleJobs, startIndex) {
-  const container = document.getElementById("jobsMobileCards");
-  if (!container) return;
-  if (!visibleJobs.length) {
-    container.innerHTML = '<p class="portfolio-mobile-empty">Tidak ada pekerjaan yang cocok.</p>';
-    return;
-  }
-
-  container.innerHTML = visibleJobs.map((job, index) => {
-    const absoluteIndex = startIndex + index;
-    const members = getPortfolioMobileMembers(job);
-    return `
-      <article class="portfolio-mobile-card" data-mobile-job-index="${absoluteIndex}">
-        <header class="portfolio-mobile-header">
-          <button type="button" class="portfolio-mobile-back" data-mobile-job-open="${absoluteIndex}" aria-label="Buka rincian ${escapeHtml(job.pekerjaan)}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <div>
-            <strong>${escapeHtml(job.pekerjaan || "Pekerjaan")}</strong>
-            <span>${escapeHtml(getPortfolioStatusLabel(job))} · ${job.personnelCount ?? job.records.length} personil</span>
-          </div>
-        </header>
-        <div class="portfolio-mobile-table" role="table" aria-label="Personil ${escapeHtml(job.pekerjaan)}">
-          <div class="portfolio-mobile-head" role="row">
-            <span>Nama</span>
-            <span>Posisi</span>
-            <span>Status</span>
-            <span>Keterlibatan</span>
-            <span>Aksi</span>
-          </div>
-          ${members.length ? members.map((member, memberIndex) => `
-            <div class="portfolio-mobile-row" role="row">
-              <strong>${escapeHtml(member.name)}</strong>
-              <span>${escapeHtml(member.position)}</span>
-              <span><em class="portfolio-mobile-status ${member.statusClass}">${escapeHtml(member.status)}</em></span>
-              <span><b class="portfolio-mobile-check ${member.involved ? "yes" : "no"}">${member.involved ? "âœ“" : "âœ•"}</b></span>
-              <span>
-                <button type="button" data-mobile-job-open="${absoluteIndex}">Detail</button>
-                ${member.rowNumber ? `<button type="button" data-mobile-job-edit="${absoluteIndex}" data-mobile-member-index="${memberIndex}">Edit</button>` : ""}
-              </span>
-            </div>
-          `).join("") : `
-            <div class="portfolio-mobile-row empty" role="row">
-              <strong>-</strong>
-              <span>Belum ada personil</span>
-              <span><em class="portfolio-mobile-status neutral">-</em></span>
-              <span><b class="portfolio-mobile-check no">âœ•</b></span>
-              <span><button type="button" data-mobile-job-open="${absoluteIndex}">Detail</button></span>
-            </div>
-          `}
-        </div>
-      </article>
-    `;
-  }).join("");
-  window.lucide?.createIcons?.();
-}
-
-function getPortfolioMobileMembers(job) {
-  return (job.records || []).map(record => {
-    const rawStatus = getRecordValue(record, ["status kontrak", "status pekerjaan", "status project", "status proyek"]) || getPortfolioStatusLabel(job);
-    const normalizedStatus = normalizeSearchText(rawStatus);
-    const involvedText = getRecordValue(record, ["keterlibatan", "terlibat", "aktif"]);
-    const involved = ["ya", "yes", "true", "1", "aktif"].includes(normalizeSearchText(involvedText));
-    return {
-      name: getRecordValue(record, ["nama personil", "nama lengkap", "nama"]) || "-",
-      position: getRecordValue(record, [
-        "posisi/jabatan (real)",
-        "posisi jabatan real",
-        "posisi/jabatan (kontrak)",
-        "posisi jabatan kontrak",
-        "jabatan",
-        "posisi"
-      ]) || "-",
-      status: rawStatus || "-",
-      statusClass: includesAny(normalizedStatus, ["kontrak", "aktif", "ongoing", "progress"]) ? "contract" :
-        includesAny(normalizedStatus, ["tidak", "non", "selesai", "finish"]) ? "inactive" : "neutral",
-      involved,
-      rowNumber: Number(record["_Sumber Baris"]) || 0,
-      record
-    };
-  });
-}
-
-function setJobsPaginationButtons(pageCount) {
-  const info = document.getElementById("jobsPageInfo");
-  const prev = document.getElementById("jobsPrevPage");
-  const next = document.getElementById("jobsNextPage");
-  if (info) info.textContent = `Halaman ${state.jobsPage} dari ${pageCount}`;
-  if (prev) prev.disabled = state.jobsPage <= 1;
-  if (next) next.disabled = state.jobsPage >= pageCount;
+  getPortfolioFeature().renderJobs();
 }
 
 function resetJobsFilters() {
-  state.jobsSearch = "";
-  state.jobsYear = "all";
-  state.jobsStatus = "all";
-  state.jobsPage = 1;
-  state.jobsPageSize = 25;
-  document.getElementById("jobsSearch").value = "";
-  document.getElementById("jobsYearFilter").value = "all";
-  document.getElementById("jobsStatusFilter").value = state.jobsStatus;
-  document.getElementById("jobsPageSize").value = "25";
-  renderJobs();
+  getPortfolioFeature().resetFilters();
 }
 
 function changeJobsPage(offset) {
-  state.jobsPage += offset;
-  renderJobs();
+  getPortfolioFeature().changePage(offset);
 }
 
 function handleJobsTableClick(event) {
-  const row = event.target.closest("[data-job-index]");
-  if (!row) return;
-  const job = state.jobsVisibleRecords[Number(row.dataset.jobIndex)];
-  openPortfolioJob(job);
+  getPortfolioFeature().handleTableClick(event);
 }
 
 function handleJobsMobileClick(event) {
-  const editButton = event.target.closest("[data-mobile-job-edit]");
-  if (editButton) {
-    const job = state.jobsVisibleRecords[Number(editButton.dataset.mobileJobEdit)];
-    if (!job) return;
-    const member = getPortfolioMobileMembers(job)[Number(editButton.dataset.mobileMemberIndex)];
-    if (job && member?.record) openJobRecordForm(member.record, job);
-    return;
-  }
-
-  const openButton = event.target.closest("[data-mobile-job-open], [data-mobile-job-index]");
-  if (!openButton) return;
-  const index = Number(openButton.dataset.mobileJobOpen || openButton.dataset.mobileJobIndex);
-  const job = state.jobsVisibleRecords[index];
-  openPortfolioJob(job);
+  getPortfolioFeature().handleMobileClick(event);
 }
 
 function handlePortfolioCardClick(event) {
-  const card = event.target.closest("[data-portfolio-job-index]");
-  if (!card) return;
-  openPortfolioJob(state.portfolioFeaturedJobs[Number(card.dataset.portfolioJobIndex)]);
+  getPortfolioFeature().handleCardClick(event);
+}
+
+function getPortfolioMobileMembers(job) {
+  return getPortfolioFeature().getMobileMembers(job);
 }
 
 function openPortfolioJob(job) {
-  if (!job) return;
-  if (job.tenderId) {
-    state.selectedTenderId = job.tenderId;
-    setView("tenders", { scroll: "top" });
-    renderTenders();
-    return;
+  getPortfolioFeature().openJob(job);
+}
+
+let inventoryFeature = null;
+
+function getInventoryFeature() {
+  if (!inventoryFeature) {
+    inventoryFeature = createInventoryFeature({
+      state,
+      cacheKey: INVENTORY_CACHE_KEY,
+      notify,
+      setView,
+      escapeHtml,
+      safeClassToken,
+      normalizeSearchText,
+      setTextContent,
+      getCurrentProfile: () => currentProfile,
+      getCurrentSummaryYear,
+      getAllIntegratedPersonnelRecords,
+      getPersonnelName
+    });
   }
-  openJobDetail(job);
+  return inventoryFeature;
+}
+
+function bindInventoryControls() {
+  getInventoryFeature().bindControls();
+}
+
+function initializeInventoryState() {
+  getInventoryFeature().initializeState();
+}
+
+function resetInventoryState() {
+  getInventoryFeature().resetState();
+}
+
+function handleInventoryAction(action, inventoryId = "") {
+  getInventoryFeature().handleAction(action, inventoryId);
+}
+
+function openInventoryViewWithFilter(filter = "all", options = {}) {
+  getInventoryFeature().openViewWithFilter(filter, options);
+}
+
+function renderDashboardInventory() {
+  getInventoryFeature().renderDashboard();
+}
+
+function renderInventoryWorkspace() {
+  getInventoryFeature().renderWorkspace();
 }
 
 function getJobDetailColumns(records) {
@@ -3298,22 +3053,22 @@ function renderTenderPersonnelReferenceFromForm() {
 
   if (!name.trim()) {
     element.innerHTML = `
-      <strong>Referensi personil DATA UTAMA</strong>
-      <span>Isi nama paket untuk membaca personil terkait dari Sheet DATA UTAMA.</span>
+      <strong>Referensi personil</strong>
+      <span>Isi nama paket untuk membaca personil terkait.</span>
     `;
     return;
   }
 
   if (!personnel.length) {
     element.innerHTML = `
-      <strong>Referensi personil DATA UTAMA</strong>
+      <strong>Referensi personil</strong>
       <span>Belum ditemukan personil terkait untuk paket ini.</span>
     `;
     return;
   }
 
   element.innerHTML = `
-    <strong>Referensi personil DATA UTAMA (${personnel.length} personil)</strong>
+    <strong>Referensi personil (${personnel.length} personil)</strong>
     <div class="tender-personnel-reference-list">
       ${personnel.slice(0, 8).map(record => {
         const personName = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]) || "-";
@@ -6001,12 +5756,12 @@ function renderFinance() {
   setTextContent("financeKpiActiveBills", activeBills);
   setTextContent("financeResultCount", `${entries.length} pekerjaan`);
   setTextContent("financeSyncText", sheet?.status === "ready"
-    ? `Sheet Finance tersinkron, ${sheet.records.length} baris terbaca.`
+    ? `${sheet.records.length} data tersinkron.`
     : sheet?.status === "loading"
-      ? "Memuat Sheet Finance..."
+      ? "Memuat data..."
       : sheet?.status === "idle"
-        ? "Sheet Finance belum tersedia dari Apps Script. Daftar memakai data Portofolio sebagai kerangka."
-        : "Sheet Finance belum dapat dibaca. Daftar memakai data Portofolio sebagai kerangka.");
+        ? "Data belum tersedia. Daftar memakai data Portofolio sebagai kerangka."
+        : "Data belum dapat dibaca. Daftar memakai data Portofolio sebagai kerangka.");
 
   if (!entries.length) {
     tableBody.innerHTML = '<tr><td class="personnel-empty" colspan="8">Tidak ada pekerjaan finance yang cocok.</td></tr>';
@@ -6384,7 +6139,7 @@ function buildFinanceDetailPersonnel(entry) {
       tarifPajak: "",
       pajak: 0,
       netto: 0,
-      keterangan: "Menunggu rincian Sheet Finance",
+      keterangan: "Menunggu rincian finance",
       hasFinance: false,
       record: null,
       seed: person
@@ -6407,7 +6162,7 @@ function buildFinanceDetailPersonnel(entry) {
       tarifPajak: "",
       pajak: 0,
       netto: 0,
-      keterangan: "Menunggu rincian Sheet Finance",
+      keterangan: "Menunggu rincian finance",
       hasFinance: false,
       record: null,
       seed: { nama: name, uraian: "Terhubung dari Portofolio/Personil", bulan: "-" }
