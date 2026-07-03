@@ -1,0 +1,39 @@
+.sidebar-menu-mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #0f2742;
+}
+
+.sidebar-menu-mark:hover,
+.sidebar-menu-mark:focus-visible {
+  background: #e8f6f8;
+  color: #087384;
+}
+
+.sidebar-menu-mark svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sidebar-brand-title {
+  display: none;
+  color: #087384;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.sidebar-brand-logo {
+  width: 150px;
+  height: 46px;
+  object-fit: contain;
+  object-position: left center;
+  filter: none;
+}

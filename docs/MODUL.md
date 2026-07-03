@@ -10,6 +10,8 @@ Dokumen ini mencatat struktur modul aktif agar perubahan berikutnya tidak perlu 
 - `components/inventory.js`: UI dan logic Inventaris Kantor.
 - `components/dashboard.js`: KPI dashboard, paket prioritas, tender aktif, personil, posisi penugasan, inventaris dashboard, dan progress.
 - `components/portfolio.js`: UI Portfolio, ringkasan, kartu pekerjaan, aktivitas, agenda, tabel pekerjaan, mobile cards, pagination, dan klik detail.
+- `styles/`: pecahan CSS awal untuk base, layout, form, sidebar, dan dashboard.
+- `styles.css`: entry CSS utama plus legacy style yang belum dipisah.
 
 ## Pola Komponen
 
@@ -33,6 +35,7 @@ Aturan:
 - `app.js` menyediakan wrapper pendek agar pemanggil lama tetap stabil.
 - Event handler fitur ditempatkan di modul fiturnya melalui `bindControls()`.
 - Semua tombol non-submit harus memakai `type="button"`.
+- CSS baru ditempatkan di file area yang sesuai di folder `styles/`; gunakan `styles.css` hanya untuk legacy style yang belum aman dipindah.
 
 ## Modul Yang Belum Dipisah
 

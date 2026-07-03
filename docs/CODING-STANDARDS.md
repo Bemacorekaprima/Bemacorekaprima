@@ -43,6 +43,7 @@ Progress refactor:
 
 - `core/router.js` dan `core/scroll.js` sudah aktif.
 - `components/inventory.js`, `components/dashboard.js`, dan `components/portfolio.js` sudah aktif.
+- CSS dasar sudah mulai dipisah ke folder `styles/`.
 - Modul berikutnya sebaiknya dipilih satu per tahap agar dependency data tetap mudah dicek.
 
 
@@ -50,8 +51,13 @@ Progress refactor:
 
 Gunakan pemisahan bertahap agar file mudah dirawat:
 
-- `styles.css`: base style, layout dasar, komponen lama yang masih menjadi fondasi aplikasi.
+- `styles/base.css`: token CSS awal, reset, loading screen, dan auth screen.
+- `styles/layout.css`: shell aplikasi, topbar, main area, nav/profile dasar, dan layout utama.
+- `styles/forms.css`: input, select, textarea, tombol dasar, dan state view.
+- `styles/sidebar.css`: kontrol visual kecil sidebar yang masih berdiri sendiri.
+- `styles/dashboard.css`: dashboard utama, KPI, tabel mini, progress, dan area monitoring dashboard.
+- `styles.css`: entry CSS utama. File ini mengimpor modul di atas lalu menyimpan legacy style yang belum aman dipisah.
 - `theme.css`: tema visual, warna, gradasi, polish dashboard, dan override lintas halaman. File ini diload setelah `styles.css`, sehingga perubahan tema tidak perlu mengubah base style.
-- Jika nanti bertambah besar, pecah lagi berdasarkan domain: `base.css`, `layout.css`, `components.css`, `pages/dashboard.css`, dan `pages/finance.css`.
+- Jika nanti bertambah besar, pecah lagi berdasarkan domain: `tables.css`, `modals.css`, `reports.css`, `finance.css`, `personnel.css`, dan `tender.css`.
 
 Prinsipnya: perubahan data dan sinkronisasi tetap di `app.js`; perubahan tampilan cukup di file CSS tema selama tidak membutuhkan markup baru.

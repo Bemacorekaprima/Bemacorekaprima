@@ -1,0 +1,49 @@
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.primary-button, .secondary-button, .ghost-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 700;
+}
+
+.primary-button { background: var(--blue); color: #ffffff; }
+.secondary-button { background: var(--surface-soft); color: var(--text); }
+.secondary-button.is-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: wait;
+}
+.secondary-button.is-loading::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: button-spin 700ms linear infinite;
+}
+.secondary-button:disabled { opacity: 0.72; }
+.ghost-button { margin-top: auto; background: rgba(255, 255, 255, 0.12); color: #ffffff; }
+
+@keyframes button-spin {
+  to { transform: rotate(360deg); }
+}
+
+.view { display: none; }
+.view.active { display: block; }
