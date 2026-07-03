@@ -508,7 +508,7 @@ export function createInventoryFeature(options = {}) {
       ? "Pilih item yang tersedia, isi pengguna dan tujuan. Setelah disimpan, status berubah menjadi Dipakai."
       : mode === "add"
         ? "Tambah jenis/item/barang inventaris baru. Data penggunaan diisi melalui tombol Gunakan."
-        : "Data tersimpan lokal pada web. Nanti dapat diarahkan ke Sheet INVENTARIS.");
+        : "");
     setInputValue("inventoryRecordId", record.id || "");
     setInputValue("inventoryItemName", record.name || "");
     setInputValue("inventoryItemType", record.type || "Kendaraan");
