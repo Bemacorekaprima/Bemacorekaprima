@@ -24,6 +24,7 @@ import {
   query,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { createRouter } from "./core/router.js";
 
 const firebaseConfig = window.FIREBASE_CONFIG;
 if (!firebaseConfig || firebaseConfig.apiKey === "ISI_API_KEY_ANDA") {
@@ -7038,90 +7039,25 @@ function render() {
   document.getElementById("syncStatus").textContent = state.syncMessage;
 }
 
-function captureViewScrollState() {
-  const main = document.querySelector(".main");
-  return {
-    windowX: window.scrollX || 0,
-    windowY: window.scrollY || 0,
-    documentTop: document.scrollingElement?.scrollTop || 0,
-    documentLeft: document.scrollingElement?.scrollLeft || 0,
-    mainTop: main?.scrollTop || 0,
-    mainLeft: main?.scrollLeft || 0
-  };
-}
+let viewRouter = null;
 
-function restoreViewScrollState(snapshot) {
-  if (!snapshot) return;
-  const restore = () => {
-    if (document.scrollingElement) {
-      document.scrollingElement.scrollTop = snapshot.documentTop;
-      document.scrollingElement.scrollLeft = snapshot.documentLeft;
-    }
-    const main = document.querySelector(".main");
-    if (main) {
-      main.scrollTop = snapshot.mainTop || 0;
-      main.scrollLeft = snapshot.mainLeft || 0;
-    }
-    window.scrollTo(snapshot.windowX, snapshot.windowY);
-  };
-  restore();
-  requestAnimationFrame(restore);
-}
-
-function applyViewScrollMode(scroll, snapshot) {
-  if (scroll === "none") return;
-  if (scroll === "top") {
-    const scrollTop = () => {
-      const main = document.querySelector(".main");
-      if (main) {
-        main.scrollTop = 0;
-        main.scrollLeft = 0;
-      }
-      if (document.scrollingElement) {
-        document.scrollingElement.scrollTop = 0;
-        document.scrollingElement.scrollLeft = 0;
-      }
-      window.scrollTo({ left: 0, top: 0, behavior: "auto" });
-    };
-    scrollTop();
-    requestAnimationFrame(scrollTop);
-    return;
+function getViewRouter() {
+  if (!viewRouter) {
+    viewRouter = createRouter({
+      state,
+      canViewMenu,
+      notify
+    });
   }
-  restoreViewScrollState(snapshot);
+  return viewRouter;
 }
 
 function setView(view, options = {}) {
-  const { scroll = "preserve" } = options || {};
-  if (!canViewMenu(view)) {
-    notify("Role Anda tidak memiliki akses untuk membuka menu ini.");
-    return false;
-  }
-  const snapshot = scroll === "preserve" ? captureViewScrollState() : null;
-  state.activeView = view;
-  renderView();
-  applyViewScrollMode(scroll, snapshot);
-  return true;
+  return getViewRouter().setView(view, options);
 }
 
 function renderView() {
-  const titles = {
-    dashboard: "Dashboard",
-    tenders: "Tender",
-    jobs: "Portofolio",
-    personnel: "Personil",
-    finance: "Finance",
-    inventory: "Inventaris",
-    tasks: "Tugas",
-    reports: "Laporan",
-    settings: "Pengaturan"
-  };
-  document.querySelectorAll(".nav-item").forEach(button => {
-    button.classList.toggle("active", button.dataset.view === state.activeView);
-  });
-  document.querySelectorAll(".view").forEach(view => {
-    view.classList.toggle("active", view.id === `${state.activeView}View`);
-  });
-  document.getElementById("pageTitle").textContent = titles[state.activeView] || "Dashboard";
+  getViewRouter().renderView();
 }
 
 function getFinanceSheet() {
