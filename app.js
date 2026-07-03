@@ -402,12 +402,13 @@ function bindControls() {
   document.getElementById("dashboardActivePersonnelBody").addEventListener("click", handleDashboardPersonnelClick);
   document.getElementById("dashboardInactivePersonnelBody").addEventListener("click", handleDashboardPersonnelClick);
   document.getElementById("dashboardAddItemButton").addEventListener("click", () => openJobRecordForm());
-  document.getElementById("dashboardOpenPortfolioButton").addEventListener("click", () => setView("jobs"));
+  document.getElementById("dashboardOpenPortfolioButton").addEventListener("click", () => setView("jobs", { scroll: "top" }));
   document.getElementById("dashboardPortfolioSummary").addEventListener("click", handlePortfolioSummaryClick);
   document.getElementById("dashboardFeaturedJobs").addEventListener("click", handleDashboardPortfolioCardClick);
   document.getElementById("dashboardProjectScope")?.addEventListener("change", renderDashboardPortfolioHome);
   document.getElementById("dashAssignmentTabs")?.addEventListener("click", handleDashboardAssignmentFilter);
   document.getElementById("dashInventorySummary")?.addEventListener("click", handleInventorySummaryClick);
+  document.getElementById("dashInventoryUsageButton")?.remove();
   document.getElementById("dashInventoryAddButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
   document.getElementById("inventoryAddItemButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "add" }));
   document.getElementById("inventoryDetailUsageButton")?.addEventListener("click", () => openInventoryUsageModal({ mode: "usage", record: getSelectedInventoryRecord() }));
@@ -534,7 +535,7 @@ function bindControls() {
   document.getElementById("printTenderTemplateButton").addEventListener("click", printTenderTemplate);
 
   document.querySelectorAll(".nav-item").forEach(button => {
-    button.addEventListener("click", () => setView(button.dataset.view));
+    button.addEventListener("click", () => setView(button.dataset.view, { scroll: "top" }));
   });
 
   document.querySelectorAll(".toolbar .segment").forEach(button => {
@@ -628,35 +629,47 @@ document.addEventListener("visibilitychange", () => {
 });
 
 document.addEventListener("click", event => {
+  if (handleGlobalNavigationClick(event)) return;
+  if (handleGlobalInventoryModalClick(event)) return;
+  closeFloatingMenus(event);
+});
+
+function handleGlobalNavigationClick(event) {
   const dashboardOpen = event.target.closest("[data-dashboard-open]");
   if (dashboardOpen) {
-    setView(dashboardOpen.dataset.dashboardOpen);
-    return;
+    setView(dashboardOpen.dataset.dashboardOpen, { scroll: "top" });
+    return true;
   }
 
   const dashboardTender = event.target.closest("[data-dashboard-open-tender]");
   if (dashboardTender) {
     state.selectedTenderId = dashboardTender.dataset.dashboardOpenTender;
-    setView("tenders");
+    setView("tenders", { scroll: "top" });
     renderTenders();
-    return;
-  }
-
-  const inventoryAction = event.target.closest("[data-inventory-action]");
-  if (inventoryAction) {
-    event.preventDefault();
-    const scrollState = captureInventoryScrollState();
-    handleInventoryAction(inventoryAction.dataset.inventoryAction, inventoryAction.dataset.inventoryId);
-    restoreInventoryScrollState(scrollState);
-    return;
+    return true;
   }
 
   const inventoryOpen = event.target.closest("[data-inventory-open-filter]");
   if (inventoryOpen) {
+    event.preventDefault();
     openInventoryViewWithFilter(inventoryOpen.dataset.inventoryOpenFilter || "all");
-    return;
+    return true;
   }
 
+  return false;
+}
+
+function handleGlobalInventoryModalClick(event) {
+  const inventoryAction = event.target.closest("[data-inventory-action]");
+  if (!inventoryAction) return false;
+  event.preventDefault();
+  const scrollState = captureInventoryScrollState();
+  handleInventoryAction(inventoryAction.dataset.inventoryAction, inventoryAction.dataset.inventoryId);
+  restoreInventoryScrollState(scrollState);
+  return true;
+}
+
+function closeFloatingMenus(event) {
   const profileWrap = event.target.closest(".sidebar-profile-wrap");
   if (!profileWrap) closeProfileMenu();
   const actionDropdown = event.target.closest(".action-dropdown");
@@ -667,7 +680,7 @@ document.addEventListener("click", event => {
   if (!jobsDropdown) closeJobsMenus();
   const recipientCombobox = event.target.closest(".recipient-combobox");
   if (!recipientCombobox) closeRecipientCombobox();
-});
+}
 
 function applySidebarPreference() {
   const collapsed = localStorage.getItem("portfolio-workspace.sidebarCollapsed") === "true";
@@ -2985,7 +2998,8 @@ function getInventoryStatusByDashboardFilter(filter = "all") {
   }[filter] || "all";
 }
 
-function openInventoryViewWithFilter(filter = "all") {
+function openInventoryViewWithFilter(filter = "all", options = {}) {
+  const { scroll = "top" } = options || {};
   const statusFilter = getInventoryStatusByDashboardFilter(filter);
   const records = getInventoryRecords();
   state.inventorySearch = "";
@@ -2994,7 +3008,7 @@ function openInventoryViewWithFilter(filter = "all") {
     ? records[0]
     : records.find(item => (item.status || "Tersedia") === statusFilter);
   state.selectedInventoryId = selected?.id || "";
-  setView("inventory");
+  if (!setView("inventory", { scroll })) return;
   renderInventoryWorkspace();
 }
 
@@ -3266,23 +3280,35 @@ function renderInventoryDetail(record) {
 
 function handleInventoryTableClick(event) {
   const actionButton = event.target.closest("[data-inventory-row-action]");
-  const rowTarget = event.target.closest("[data-inventory-id]");
-  const id = actionButton?.dataset.inventoryId || rowTarget?.dataset.inventoryId || "";
-  if (!id) return;
-  const scrollState = captureInventoryScrollState();
-  const record = getInventoryRecords().find(item => item.id === id);
-  if (!record) return;
-  state.selectedInventoryId = id;
   if (actionButton) {
-    const action = actionButton.dataset.inventoryRowAction;
-    if (action === "usage") openInventoryUsageModal({ mode: "usage", record });
-    else if (action === "history") openInventoryUsageModal({ mode: "history", record });
-    else if (action === "edit") openInventoryUsageModal({ mode: "edit", record });
-    else openInventoryUsageModal({ mode: "detail", record });
-    renderInventoryWorkspace();
-    restoreInventoryScrollState(scrollState);
+    event.preventDefault();
+    handleInventoryTableAction(actionButton);
     return;
   }
+
+  const rowTarget = event.target.closest(".inventory-row-title[data-inventory-id], tr[data-inventory-id]");
+  const id = rowTarget?.dataset.inventoryId || "";
+  if (!id) return;
+  const record = getInventoryRecords().find(item => item.id === id);
+  if (!record) return;
+  const scrollState = captureInventoryScrollState();
+  state.selectedInventoryId = id;
+  renderInventoryWorkspace();
+  restoreInventoryScrollState(scrollState);
+}
+
+function handleInventoryTableAction(actionButton) {
+  const id = actionButton.dataset.inventoryId || "";
+  if (!id) return;
+  const record = getInventoryRecords().find(item => item.id === id);
+  if (!record) return;
+  const scrollState = captureInventoryScrollState();
+  state.selectedInventoryId = id;
+  const action = actionButton.dataset.inventoryRowAction;
+  if (action === "usage") openInventoryUsageModal({ mode: "usage", record });
+  else if (action === "history") openInventoryUsageModal({ mode: "history", record });
+  else if (action === "edit") openInventoryUsageModal({ mode: "edit", record });
+  else openInventoryUsageModal({ mode: "detail", record });
   renderInventoryWorkspace();
   restoreInventoryScrollState(scrollState);
 }
@@ -3310,6 +3336,7 @@ function handleInventoryAction(action, inventoryId = "") {
 function handleInventorySummaryClick(event) {
   const button = event.target.closest("[data-inventory-status-filter]");
   if (!button) return;
+  event.preventDefault();
   const filter = button.dataset.inventoryStatusFilter || "all";
   openInventoryViewWithFilter(filter);
 }
@@ -3859,7 +3886,7 @@ function handlePortfolioSummaryClick(event) {
   }
   state.jobsStatus = filter;
   state.jobsPage = 1;
-  setView("jobs");
+  setView("jobs", { scroll: "top" });
 
   const searchInput = document.getElementById("jobsSearch");
   const yearFilter = document.getElementById("jobsYearFilter");
@@ -3868,13 +3895,6 @@ function handlePortfolioSummaryClick(event) {
   if (yearFilter) yearFilter.value = state.jobsYear;
   if (statusFilter) statusFilter.value = state.jobsStatus;
   renderJobs();
-
-  window.requestAnimationFrame(() => {
-    document.querySelector(".portfolio-list-panel")?.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-  });
 }
 
 function renderJobs() {
@@ -4070,7 +4090,7 @@ function openPortfolioJob(job) {
   if (!job) return;
   if (job.tenderId) {
     state.selectedTenderId = job.tenderId;
-    setView("tenders");
+    setView("tenders", { scroll: "top" });
     renderTenders();
     return;
   }
@@ -4180,8 +4200,7 @@ function openJobDetail(job) {
               `).join("")}
               ${canManagePersonnel() ? `
                 <td class="job-detail-row-actions" data-label="Aksi">
-                  <button
-                    type="button"
+                  <button type="button"
                     class="job-detail-action-button"
                     data-job-record-menu
                     popovertarget="jobRecordActions${recordIndex}"
@@ -7019,13 +7038,69 @@ function render() {
   document.getElementById("syncStatus").textContent = state.syncMessage;
 }
 
-function setView(view) {
-  if (!canViewMenu(view)) {
-    notify("Role Anda tidak memiliki akses untuk membuka menu ini.");
+function captureViewScrollState() {
+  const main = document.querySelector(".main");
+  return {
+    windowX: window.scrollX || 0,
+    windowY: window.scrollY || 0,
+    documentTop: document.scrollingElement?.scrollTop || 0,
+    documentLeft: document.scrollingElement?.scrollLeft || 0,
+    mainTop: main?.scrollTop || 0,
+    mainLeft: main?.scrollLeft || 0
+  };
+}
+
+function restoreViewScrollState(snapshot) {
+  if (!snapshot) return;
+  const restore = () => {
+    if (document.scrollingElement) {
+      document.scrollingElement.scrollTop = snapshot.documentTop;
+      document.scrollingElement.scrollLeft = snapshot.documentLeft;
+    }
+    const main = document.querySelector(".main");
+    if (main) {
+      main.scrollTop = snapshot.mainTop || 0;
+      main.scrollLeft = snapshot.mainLeft || 0;
+    }
+    window.scrollTo(snapshot.windowX, snapshot.windowY);
+  };
+  restore();
+  requestAnimationFrame(restore);
+}
+
+function applyViewScrollMode(scroll, snapshot) {
+  if (scroll === "none") return;
+  if (scroll === "top") {
+    const scrollTop = () => {
+      const main = document.querySelector(".main");
+      if (main) {
+        main.scrollTop = 0;
+        main.scrollLeft = 0;
+      }
+      if (document.scrollingElement) {
+        document.scrollingElement.scrollTop = 0;
+        document.scrollingElement.scrollLeft = 0;
+      }
+      window.scrollTo({ left: 0, top: 0, behavior: "auto" });
+    };
+    scrollTop();
+    requestAnimationFrame(scrollTop);
     return;
   }
+  restoreViewScrollState(snapshot);
+}
+
+function setView(view, options = {}) {
+  const { scroll = "preserve" } = options || {};
+  if (!canViewMenu(view)) {
+    notify("Role Anda tidak memiliki akses untuk membuka menu ini.");
+    return false;
+  }
+  const snapshot = scroll === "preserve" ? captureViewScrollState() : null;
   state.activeView = view;
   renderView();
+  applyViewScrollMode(scroll, snapshot);
+  return true;
 }
 
 function renderView() {
@@ -7378,7 +7453,6 @@ function openFinanceDetail(key) {
   if (!entry) return notify("Rincian Finance tidak ditemukan.");
   state.selectedFinanceJobKey = key;
   renderFinanceDetail(entry);
-  document.getElementById("financeDetailPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function getFinanceEntryIdentifier(entry) {
@@ -8295,12 +8369,12 @@ function renderTasksTable() {
           <td>${escapeHtml(task.deadline || "-")}</td>
           <td>${escapeHtml(task.penanggungJawab || "-")}<small>${escapeHtml(task.emailPenanggungJawab || "")}</small></td>
           <td class="table-actions">
-            ${canChange && task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
-            ${canChange && task.status !== "Selesai" ? `<button class="link-button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
-            <button class="link-button" data-action="preview" data-id="${task.id}">Preview</button>
-            ${canSendReminders() ? `<button class="link-button" data-action="email" data-id="${task.id}">Email</button>` : ""}
-            ${canEdit ? `<button class="link-button" data-action="edit" data-id="${task.id}">Edit</button>` : ""}
-            ${canDelete ? `<button class="link-button" data-action="delete" data-id="${task.id}">Hapus</button>` : ""}
+            ${canChange && task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" type="button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
+            ${canChange && task.status !== "Selesai" ? `<button class="link-button" type="button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
+            <button class="link-button" type="button" data-action="preview" data-id="${task.id}">Preview</button>
+            ${canSendReminders() ? `<button class="link-button" type="button" data-action="email" data-id="${task.id}">Email</button>` : ""}
+            ${canEdit ? `<button class="link-button" type="button" data-action="edit" data-id="${task.id}">Edit</button>` : ""}
+            ${canDelete ? `<button class="link-button" type="button" data-action="delete" data-id="${task.id}">Hapus</button>` : ""}
           </td>
         </tr>
       `;
@@ -8710,8 +8784,7 @@ function renderRecipientOptions() {
 
   list.innerHTML = options.length
     ? options.map(item => `
-        <button class="recipient-option ${item.email === state.selectedRecipientEmail ? "active" : ""}"
-                type="button"
+        <button class="recipient-option ${item.email === state.selectedRecipientEmail ? "active" : ""}" type="button"
                 role="option"
                 aria-selected="${item.email === state.selectedRecipientEmail}"
                 data-recipient-email="${escapeHtml(item.email)}">
@@ -8934,7 +9007,7 @@ function renderAttentionBanner() {
       <strong>Perhatian hari ini</strong>
       <p>${late} terlambat, ${today} dijadwalkan hari ini, ${high} prioritas tinggi.</p>
     </div>
-    <button class="secondary-button" data-filter-shortcut="late">Lihat Terlambat</button>
+    <button class="secondary-button" type="button" data-filter-shortcut="late">Lihat Terlambat</button>
   `;
 }
 
@@ -8990,12 +9063,12 @@ function taskCard(task) {
         </span>
       </div>
       <div class="card-actions">
-        ${canChange && task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
-        ${canChange && task.status !== "Selesai" ? `<button class="link-button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
-        <button class="link-button" data-action="preview" data-id="${task.id}">Preview</button>
-        ${canSendReminders() ? `<button class="link-button" data-action="email" data-id="${task.id}">Email</button>` : ""}
-        ${canEdit ? `<button class="link-button" data-action="edit" data-id="${task.id}">Edit</button>` : ""}
-        ${canDelete ? `<button class="link-button" data-action="delete" data-id="${task.id}">Hapus</button>` : ""}
+        ${canChange && task.status !== "Proses" && task.status !== "Selesai" ? `<button class="link-button" type="button" data-action="start" data-id="${task.id}">Mulai</button>` : ""}
+        ${canChange && task.status !== "Selesai" ? `<button class="link-button" type="button" data-action="done" data-id="${task.id}">Selesai</button>` : ""}
+        <button class="link-button" type="button" data-action="preview" data-id="${task.id}">Preview</button>
+        ${canSendReminders() ? `<button class="link-button" type="button" data-action="email" data-id="${task.id}">Email</button>` : ""}
+        ${canEdit ? `<button class="link-button" type="button" data-action="edit" data-id="${task.id}">Edit</button>` : ""}
+        ${canDelete ? `<button class="link-button" type="button" data-action="delete" data-id="${task.id}">Hapus</button>` : ""}
       </div>
     </article>
   `;

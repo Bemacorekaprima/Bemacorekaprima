@@ -33,7 +33,7 @@
       showAppBootError("Koneksi memerlukan waktu terlalu lama. Silakan refresh halaman.");
     }, 15000);
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260702234500">
+  <link rel="stylesheet" href="styles.css?v=20260703094500">
   <link rel="stylesheet" href="theme.css?v=20260701090000">
 </head>
 <body class="auth-pending">
@@ -115,43 +115,43 @@
         <button class="sidebar-menu-mark" id="sidebarToggleButton" type="button" aria-label="Sembunyikan menu" aria-expanded="true"><i data-lucide="menu" aria-hidden="true"></i></button>
       </div>
       <nav class="nav">
-        <button class="nav-item active" data-view="dashboard">
+        <button class="nav-item active" type="button" data-view="dashboard">
           <span>Dashboard</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="layout-dashboard"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="tasks">
+        <button class="nav-item" type="button" data-view="tasks">
           <span>Tugas Harian</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="calendar-check"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="tenders">
+        <button class="nav-item" type="button" data-view="tenders">
           <span>Tender</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="clipboard-check"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="jobs">
+        <button class="nav-item" type="button" data-view="jobs">
           <span>Portofolio</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="briefcase-business"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="personnel">
+        <button class="nav-item" type="button" data-view="personnel">
           <span>Personil</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="users"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="finance">
+        <button class="nav-item" type="button" data-view="finance">
           <span>Finance</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="wallet-cards"></i><span class="nav-icon-fallback">Rp</span></span>
         </button>
-        <button class="nav-item" data-view="inventory">
+        <button class="nav-item" type="button" data-view="inventory">
           <span>Inventaris</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="truck"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="settings">
+        <button class="nav-item" type="button" data-view="settings">
           <span>Google Drive</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="hard-drive"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" data-view="reports">
+        <button class="nav-item" type="button" data-view="reports">
           <span>Laporan</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="chart-no-axes-combined"></i><span class="nav-icon-fallback">?</span></span>
         </button>
-        <button class="nav-item" id="settingsNavButton" data-view="settings">
+        <button class="nav-item" id="settingsNavButton" type="button" data-view="settings">
           <span>Pengaturan</span>
           <span class="nav-icon" aria-hidden="true"><i data-lucide="settings"></i><span class="nav-icon-fallback">?</span></span>
         </button>
@@ -812,7 +812,7 @@
               <h2>Daftar Tugas</h2>
               <p>Kelola semua tugas dalam format tabel.</p>
             </div>
-            <button class="primary-button" id="newTaskButtonTable">+ Tugas Baru</button>
+            <button class="primary-button" id="newTaskButtonTable" type="button">+ Tugas Baru</button>
           </div>
           <div class="table-wrap">
             <table>
@@ -841,7 +841,7 @@
               <h2>Laporan Workspace</h2>
               <p>Membuat, memfilter, mem-preview, dan mengekspor laporan dari tugas, tender, portofolio, personil, dan pekerjaan.</p>
             </div>
-            <button class="primary-button" id="createReportButtonReports">Buat Laporan Hari Ini</button>
+            <button class="primary-button" id="createReportButtonReports" type="button">Buat Laporan Hari Ini</button>
           </div>
           <div class="reports-summary-grid" aria-label="Ringkasan laporan">
             <article class="reports-stat-card">
@@ -921,8 +921,8 @@
               </label>
             </div>
             <div class="reports-actions">
-              <button class="primary-button" id="reportsGenerateButton">Generate Preview</button>
-              <button class="secondary-button" id="reportsResetButton">Reset Filter</button>
+              <button class="primary-button" id="reportsGenerateButton" type="button">Generate Preview</button>
+              <button class="secondary-button" id="reportsResetButton" type="button">Reset Filter</button>
             </div>
           </article>
 
@@ -942,9 +942,9 @@
               <h2>Export</h2>
               <p>Preview laporan dapat dikirim ke format dokumen.</p>
               <div class="reports-export-actions">
-                <button class="secondary-button" id="reportsExportPdf">PDF</button>
-                <button class="secondary-button" id="reportsExportExcel">Excel</button>
-                <button class="secondary-button" id="reportsPrint">Print</button>
+                <button class="secondary-button" id="reportsExportPdf" type="button">PDF</button>
+                <button class="secondary-button" id="reportsExportExcel" type="button">Excel</button>
+                <button class="secondary-button" id="reportsPrint" type="button">Print</button>
               </div>
             </article>
           </aside>
@@ -1221,7 +1221,7 @@
               <div id="recipientList" class="recipient-list hidden" role="listbox"></div>
               <p id="recipientSelectionHint" class="recipient-selection-hint">Belum ada penerima dipilih.</p>
             </div>
-            <button class="primary-button" id="sendSelectedButton">Kirim ke Penerima</button>
+            <button class="primary-button" id="sendSelectedButton" type="button">Kirim ke Penerima</button>
           </article>
           <article class="panel storage-panel">
             <h2>Database</h2>
@@ -1783,6 +1783,6 @@
       if (window.lucide) window.lucide.createIcons();
     });
   </script>
-  <script type="module" src="app.js?v=20260702234500"></script>
+  <script type="module" src="app.js?v=20260703094500"></script>
 </body>
 </html>
