@@ -4,6 +4,7 @@ export const DEFAULT_VIEW_TITLES = {
   dashboard: "Dashboard",
   tenders: "Tender",
   jobs: "Portofolio",
+  portfolioDetail: "Detail Portofolio",
   personnel: "Personil",
   finance: "Finance",
   inventory: "Inventaris",

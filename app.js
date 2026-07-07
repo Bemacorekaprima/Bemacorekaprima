@@ -204,6 +204,8 @@ const TENDER_DOCUMENT_STATUSES = [
 ];
 const TENDER_STORAGE_COLLECTION = "tasks";
 const TENDER_SHEET_SOURCE_ID = "bar-tender";
+const PORTFOLIO_DETAIL_HASH_PREFIX = "#/portfolio/detail/";
+const PORTFOLIO_COMMENTS_KEY = "bemaco.portfolio.comments.v1";
 
 function createDefaultAppConfig() {
   return {
@@ -291,6 +293,7 @@ let state = {
   selectedFinanceJobKey: "",
   jobsVisibleRecords: [],
   portfolioFeaturedJobs: [],
+  selectedPortfolioJobId: "",
   dashboardFeaturedJobs: [],
   dashboardActivePersonnelRecords: [],
   dashboardInactivePersonnelRecords: [],
@@ -361,6 +364,11 @@ function bindControls() {
   document.getElementById("menuVisibilityForm").addEventListener("submit", saveMenuVisibilityConfig);
   bindPersonnelControls();
   bindFinanceControls();
+  window.addEventListener("hashchange", handlePortfolioRouteChange);
+  document.getElementById("portfolioDetailBackButton")?.addEventListener("click", closePortfolioDetailRoute);
+  document.getElementById("portfolioDetailEditButton")?.addEventListener("click", editCurrentPortfolioDetail);
+  document.getElementById("portfolioDetailReportButton")?.addEventListener("click", exportCurrentJobDetailPdf);
+  document.getElementById("portfolioDetailContent")?.addEventListener("click", handlePortfolioDetailClick);
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
   document.getElementById("closeJobDetailFooter").addEventListener("click", closeJobDetail);
   document.getElementById("addJobDetailRowButton").addEventListener("click", () => openJobRecordForm(null, currentJobDetail));
@@ -377,7 +385,10 @@ function bindControls() {
   bindTenderControls();
 
   document.querySelectorAll(".nav-item").forEach(button => {
-    button.addEventListener("click", () => setView(button.dataset.view, { scroll: "top" }));
+    button.addEventListener("click", () => {
+      clearPortfolioDetailHash();
+      setView(button.dataset.view, { scroll: "top" });
+    });
   });
 
   document.querySelectorAll(".toolbar .segment").forEach(button => {
@@ -477,12 +488,14 @@ document.addEventListener("click", event => {
 function handleGlobalNavigationClick(event) {
   const dashboardOpen = event.target.closest("[data-dashboard-open]");
   if (dashboardOpen) {
+    clearPortfolioDetailHash();
     setView(dashboardOpen.dataset.dashboardOpen, { scroll: "top" });
     return true;
   }
 
   const dashboardTender = event.target.closest("[data-dashboard-open-tender]");
   if (dashboardTender) {
+    clearPortfolioDetailHash();
     state.selectedTenderId = dashboardTender.dataset.dashboardOpenTender;
     setView("tenders", { scroll: "top" });
     renderTenders();
@@ -492,6 +505,7 @@ function handleGlobalNavigationClick(event) {
   const inventoryOpen = event.target.closest("[data-inventory-open-filter]");
   if (inventoryOpen) {
     event.preventDefault();
+    clearPortfolioDetailHash();
     openInventoryViewWithFilter(inventoryOpen.dataset.inventoryOpenFilter || "all");
     return true;
   }
@@ -776,6 +790,7 @@ function hasAccessRole(...roles) {
 }
 
 function canViewMenu(view, role = state.accessRole) {
+  if (view === "portfolioDetail") return canViewMenu("jobs", role);
   if (role === "super_admin") return true;
   const allowedRoles = state.appConfig?.menuRoles?.[view] || DEFAULT_MENU_ROLES[view] || [];
   return allowedRoles.includes(role);
@@ -1291,6 +1306,17 @@ function normalizeSearchText(value) {
     .replace(/[^a-z0-9@._\s-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function createPortfolioJobId(value, fallback = "pekerjaan") {
+  const slug = normalizeSearchText(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
+
+function getPortfolioJobId(job) {
+  return createPortfolioJobId(job?.pekerjaan || job?.id || "");
 }
 
 function findTasksFromQuestion(question, tasks) {
@@ -1885,6 +1911,7 @@ async function loadExternalSheetData() {
   renderLocalAI();
   renderPersonnel();
   renderJobs();
+  refreshPortfolioDetailRoute();
   renderFinance();
   renderTenders();
   renderDashboardPortfolioHome();
@@ -2090,7 +2117,7 @@ function buildJobsFromDataUtama() {
     const startDate = getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]);
     const finishDate = getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"]);
     const existing = groups.get(key) || {
-      id: key || `pekerjaan-${index}`,
+      id: createPortfolioJobId(jobName, `pekerjaan-${index + 1}`),
       pekerjaan: jobName,
       tanggalMulai: startDate,
       tanggalSelesai: finishDate,
@@ -2115,7 +2142,7 @@ function buildJobsFromAllSources() {
     if (!name || knownKeys.has(key)) return;
     const personnel = getTenderPersonnel(tender);
     jobs.push({
-      id: `tender:${tender.id}`,
+      id: createPortfolioJobId(name, `tender-${tender.id}`),
       pekerjaan: name,
       tanggalMulai: tender.startDate || "",
       tanggalSelesai: tender.deadline ? formatTenderDateTime(tender.deadline) : "",
@@ -2559,7 +2586,554 @@ function getRecordDisplayValue(record, column) {
   return String(record?.[column] || "-");
 }
 
+function encodePortfolioDetailId(id) {
+  return encodeURIComponent(String(id || ""));
+}
+
+function decodePortfolioDetailId(id) {
+  try {
+    return decodeURIComponent(String(id || ""));
+  } catch (error) {
+    return String(id || "");
+  }
+}
+
+function isPortfolioDetailHash(hash = window.location.hash) {
+  return String(hash || "").startsWith(PORTFOLIO_DETAIL_HASH_PREFIX);
+}
+
+function getPortfolioRouteJobId(hash = window.location.hash) {
+  if (!isPortfolioDetailHash(hash)) return "";
+  return decodePortfolioDetailId(String(hash).slice(PORTFOLIO_DETAIL_HASH_PREFIX.length));
+}
+
+function clearPortfolioDetailHash() {
+  if (!isPortfolioDetailHash()) return;
+  history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+}
+
+function openPortfolioDetailRoute(job) {
+  if (!job) return;
+  const id = getPortfolioJobId(job);
+  state.selectedPortfolioJobId = id;
+  currentJobDetail = job;
+  const hash = `${PORTFOLIO_DETAIL_HASH_PREFIX}${encodePortfolioDetailId(id)}`;
+  if (window.location.hash !== hash) {
+    window.location.hash = hash;
+    return;
+  }
+  showPortfolioDetailRoute(id, job);
+}
+
+function closePortfolioDetailRoute() {
+  clearPortfolioDetailHash();
+  state.selectedPortfolioJobId = "";
+  setView("jobs", { scroll: "top" });
+  renderJobs();
+}
+
+function handlePortfolioRouteChange() {
+  if (!isPortfolioDetailHash()) {
+    if (state.activeView === "portfolioDetail") {
+      state.selectedPortfolioJobId = "";
+      setView("jobs", { scroll: "top" });
+    }
+    return;
+  }
+  showPortfolioDetailRoute(getPortfolioRouteJobId());
+}
+
+function refreshPortfolioDetailRoute() {
+  if (isPortfolioDetailHash()) showPortfolioDetailRoute(getPortfolioRouteJobId());
+}
+
+function showPortfolioDetailRoute(id, knownJob = null) {
+  state.selectedPortfolioJobId = id;
+  const job = knownJob || findPortfolioJobById(id);
+  setView("portfolioDetail", { scroll: "top" });
+  renderPortfolioDetail(job, id);
+}
+
+function findPortfolioJobById(id) {
+  const target = String(id || "");
+  const normalizedTarget = normalizeSearchText(target);
+  if (!target) return null;
+  return buildJobsFromAllSources().find(job =>
+    getPortfolioJobId(job) === target ||
+    String(job.id || "") === target ||
+    normalizeSearchText(job.pekerjaan) === normalizedTarget
+  ) || null;
+}
+
+function getPortfolioField(record, keywords, fallback = "-") {
+  const value = getRecordValue(record, keywords);
+  return value || fallback;
+}
+
+function getInclusiveMonthCount(startValue, finishValue) {
+  const start = getComparableDate(startValue);
+  const finish = getComparableDate(finishValue);
+  if (!start || !finish || finish < start) return 1;
+  const startDate = new Date(start);
+  const finishDate = new Date(finish);
+  return Math.max(1,
+    (finishDate.getFullYear() - startDate.getFullYear()) * 12 +
+    finishDate.getMonth() - startDate.getMonth() + 1
+  );
+}
+
+function getTimelineMonthOffset(projectStartValue, value) {
+  const projectStart = getComparableDate(projectStartValue);
+  const current = getComparableDate(value);
+  if (!projectStart || !current || current < projectStart) return 1;
+  const projectDate = new Date(projectStart);
+  const currentDate = new Date(current);
+  return Math.max(1,
+    (currentDate.getFullYear() - projectDate.getFullYear()) * 12 +
+    currentDate.getMonth() - projectDate.getMonth() + 1
+  );
+}
+
+function getProjectTotalMonths(job, personnelRows) {
+  const fromDates = getInclusiveMonthCount(job?.tanggalMulai, job?.tanggalSelesai);
+  const fromRecords = Math.max(0, ...personnelRows.map(person =>
+    Number(person.blok_status_keterlibatan.jumlah_bulan || 0) +
+    Number(person.blok_status_keterlibatan.jumlah_bulan_overtime || 0)
+  ));
+  const fromTimeline = Math.max(0, ...personnelRows.map(person => person.timeline_jadwal.end_month || 0));
+  return Math.max(1, fromDates, fromRecords, fromTimeline);
+}
+
+function buildPortfolioPersonnelDetail(record, job) {
+  const startDate = getPortfolioField(record, ["tanggal mulai", "tgl mulai", "mulai"], job?.tanggalMulai || "-");
+  const finishDate = getPortfolioField(record, ["tanggal selesai", "tgl selesai", "selesai"], job?.tanggalSelesai || "-");
+  const jumlahBulan = parseIndonesianNumber(getRecordValue(record, ["jumlah bulan", "bulan"])) ||
+    getInclusiveMonthCount(startDate, finishDate);
+  const jumlahBulanOvertime = parseIndonesianNumber(getRecordValue(record, ["jumlah bulan overtime", "bulan overtime"])) || 0;
+  const startMonth = getTimelineMonthOffset(job?.tanggalMulai, startDate);
+  const finishMonth = Math.max(startMonth, getTimelineMonthOffset(job?.tanggalMulai, finishDate));
+
+  return {
+    id_personil: getPortfolioField(record, ["id personil", "id_personil", "id"], "-"),
+    nama_personil: getPortfolioField(record, ["nama personil", "nama lengkap", "nama"], "-"),
+    ska_bidang_keahlian: getPortfolioField(record, ["ska/bidang keahlian", "ska", "bidang keahlian", "keahlian"], "-"),
+    posisi_jabatan_kontrak: getPortfolioField(record, [
+      "posisi/jabatan (kontrak)",
+      "posisi jabatan kontrak",
+      "jabatan kontrak",
+      "posisi kontrak"
+    ], "-"),
+    posisi_jabatan_real: getPortfolioField(record, [
+      "posisi/jabatan (real)",
+      "posisi jabatan real",
+      "jabatan real",
+      "posisi real",
+      "jabatan"
+    ], "-"),
+    pekerjaan: getPortfolioField(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"], job?.pekerjaan || "-"),
+    blok_waktu_bobot: {
+      tanggal_mulai: startDate,
+      tanggal_selesai: finishDate,
+      masa_overtime: getPortfolioField(record, ["masa overtime", "overtime"], jumlahBulanOvertime || "0"),
+      bobot: getPortfolioField(record, ["bobot", "bobot pekerjaan"], "-"),
+      beban: getPortfolioField(record, ["beban", "beban kerja"], "-")
+    },
+    blok_status_keterlibatan: {
+      status_kontrak: getPortfolioField(record, ["status kontrak", "kontrak"], "-"),
+      jenis_pekerjaan: getPortfolioField(record, ["jenis pekerjaan", "jenis project", "jenis proyek"], "-"),
+      keterlibatan: getPortfolioField(record, ["keterlibatan", "terlibat"], "-"),
+      posisi_penugasan: getPortfolioField(record, ["posisi penugasan", "penugasan"], "-"),
+      status_pekerjaan: getPortfolioField(record, ["status pekerjaan", "status project", "status proyek"], getJobStatus(job)),
+      jumlah_bulan: jumlahBulan,
+      jumlah_bulan_overtime: jumlahBulanOvertime
+    },
+    blok_finansial_billing: {
+      bobot_individual: normalizeSearchText(getRecordValue(record, ["keterlibatan"])) === "ya" ? "1" : "0",
+      remunerasi_billing_rate_kontrak: getPortfolioField(record, [
+        "remunerasi/billing rate (kontrak)",
+        "remunerasi billing rate kontrak",
+        "billing rate kontrak",
+        "remunerasi kontrak"
+      ], "-"),
+      remunerasi_billing_rate_realisasi: getPortfolioField(record, [
+        "remunerasi/billing rate (realisasi)",
+        "remunerasi billing rate realisasi",
+        "billing rate realisasi",
+        "remunerasi realisasi"
+      ], "-")
+    },
+    timeline_jadwal: {
+      start_month: startMonth,
+      end_month: finishMonth
+    },
+    source_record: record
+  };
+}
+
+function getPortfolioComments(projectId) {
+  try {
+    const comments = JSON.parse(localStorage.getItem(PORTFOLIO_COMMENTS_KEY) || "{}");
+    return Array.isArray(comments[projectId]) ? comments[projectId] : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function savePortfolioComment(projectId, text) {
+  const value = String(text || "").trim();
+  if (!projectId || !value) return;
+  let comments = {};
+  try {
+    comments = JSON.parse(localStorage.getItem(PORTFOLIO_COMMENTS_KEY) || "{}");
+  } catch (error) {
+    comments = {};
+  }
+  const user = currentProfile?.nickname || currentProfile?.displayName || currentUser?.email || "Pengguna";
+  comments[projectId] = [
+    {
+      user,
+      text: value,
+      time: new Date().toISOString()
+    },
+    ...(Array.isArray(comments[projectId]) ? comments[projectId] : [])
+  ].slice(0, 30);
+  localStorage.setItem(PORTFOLIO_COMMENTS_KEY, JSON.stringify(comments));
+}
+
+function buildPortfolioDetailModel(job) {
+  const records = Array.isArray(job?.records) ? job.records : [];
+  const personnel = records.map(record => buildPortfolioPersonnelDetail(record, job));
+  const projectId = getPortfolioJobId(job);
+  return {
+    project_id: projectId,
+    project_name: job?.pekerjaan || "Pekerjaan",
+    status_keseluruhan: getPortfolioStatusLabel(job),
+    total_bulan_proyek: getProjectTotalMonths(job, personnel),
+    rincian_personil: personnel,
+    dokumen_terkait: getPortfolioDocuments(job),
+    aktivitas_komentar: getPortfolioActivities(job, projectId)
+  };
+}
+
+function getPortfolioDocuments(job) {
+  if (job?.tenderId) {
+    const tender = state.tenders.find(item => item.id === job.tenderId);
+    if (tender) {
+      return [{
+        nama_file: `Dokumen Tender - ${tender.name || job.pekerjaan}`,
+        version: tender.updatedAt ? formatTenderDateTime(tender.updatedAt) : "Draft",
+        url: "#",
+        label: tender.status || "Tender"
+      }];
+    }
+  }
+  return [];
+}
+
+function getPortfolioActivities(job, projectId) {
+  const jobKey = normalizeSearchText(job?.pekerjaan);
+  const relatedTasks = state.tasks
+    .filter(task => normalizeSearchText(objectSearchText(task)).includes(jobKey))
+    .slice(0, 5)
+    .map(task => ({
+      user: task.penanggungJawab || task.dibuatOleh || "Tim",
+      text: `${task.namaTugas || "Tugas"} - ${task.status || "Status belum diisi"}`,
+      time: task.deadline || task.tanggal || ""
+    }));
+  return [...getPortfolioComments(projectId), ...relatedTasks].slice(0, 8);
+}
+
+function renderPortfolioDetail(job, requestedId = "") {
+  const title = document.getElementById("portfolioDetailTitle");
+  const meta = document.getElementById("portfolioDetailMeta");
+  const routeLabel = document.getElementById("portfolioDetailRouteLabel");
+  const content = document.getElementById("portfolioDetailContent");
+  const editButton = document.getElementById("portfolioDetailEditButton");
+  const reportButton = document.getElementById("portfolioDetailReportButton");
+  if (!content) return;
+
+  if (!job) {
+    currentJobDetail = null;
+    if (title) title.textContent = "Detail Pekerjaan";
+    if (routeLabel) routeLabel.textContent = requestedId ? `ID: ${requestedId}` : "Portfolio Detail";
+    if (meta) {
+      const sheet = getDataUtamaSheet();
+      meta.textContent = sheet?.status === "loading"
+        ? "Menunggu data portofolio selesai dimuat..."
+        : "Pekerjaan tidak ditemukan dari data yang tersedia.";
+    }
+    if (editButton) editButton.disabled = true;
+    if (reportButton) reportButton.disabled = true;
+    content.innerHTML = `
+      <p class="portfolio-detail-empty">
+        ${escapeHtml(getDataUtamaSheet()?.status === "loading"
+          ? "Data portofolio sedang dimuat. Halaman ini akan terisi otomatis setelah sinkronisasi selesai."
+          : "Rincian pekerjaan tidak ditemukan. Kembali ke daftar portofolio lalu pilih pekerjaan lain.")}
+      </p>
+    `;
+    return;
+  }
+
+  currentJobDetail = job;
+  const model = buildPortfolioDetailModel(job);
+  if (title) title.textContent = model.project_name;
+  if (routeLabel) routeLabel.textContent = `ID: ${model.project_id}`;
+  if (meta) {
+    meta.textContent = `${model.status_keseluruhan} - ${model.rincian_personil.length} personil - ${model.total_bulan_proyek} bulan proyek`;
+  }
+  if (editButton) editButton.disabled = !canManagePersonnel();
+  if (reportButton) reportButton.disabled = !model.rincian_personil.length;
+
+  content.innerHTML = `
+    <section class="portfolio-detail-summary-grid">
+      <article>
+        <span>Status Keseluruhan</span>
+        <strong>${escapeHtml(model.status_keseluruhan)}</strong>
+      </article>
+      <article>
+        <span>Total Bulan Proyek</span>
+        <strong>${model.total_bulan_proyek}</strong>
+      </article>
+      <article>
+        <span>Jumlah Personil</span>
+        <strong>${model.rincian_personil.length}</strong>
+      </article>
+      <article>
+        <span>Tanggal</span>
+        <strong>${escapeHtml(job.tanggalMulai || "-")} - ${escapeHtml(job.tanggalSelesai || "-")}</strong>
+      </article>
+    </section>
+
+    <section class="portfolio-detail-block">
+      <header>
+        <div>
+          <span class="portfolio-eyebrow">Blok 1</span>
+          <h3>List Rincian Personil</h3>
+        </div>
+        <span>${model.rincian_personil.length} data</span>
+      </header>
+      ${renderPortfolioPersonnelTable(model.rincian_personil)}
+    </section>
+
+    <section class="portfolio-detail-block">
+      <header>
+        <div>
+          <span class="portfolio-eyebrow">Blok 2</span>
+          <h3>Lini Masa Jadwal Penugasan</h3>
+        </div>
+        <span>${model.total_bulan_proyek} bulan</span>
+      </header>
+      ${renderPortfolioTimeline(model.rincian_personil, model.total_bulan_proyek)}
+    </section>
+
+    <section class="portfolio-detail-side-grid">
+      <section class="portfolio-detail-block">
+        <header>
+          <div>
+            <span class="portfolio-eyebrow">Blok 3</span>
+            <h3>Dokumen Terkait Proyek</h3>
+          </div>
+          <span>${model.dokumen_terkait.length} file</span>
+        </header>
+        ${renderPortfolioDocuments(model.dokumen_terkait)}
+      </section>
+
+      <section class="portfolio-detail-block">
+        <header>
+          <div>
+            <span class="portfolio-eyebrow">Blok 4</span>
+            <h3>Aktivitas Tim & Komentar</h3>
+          </div>
+          <span>${model.aktivitas_komentar.length} item</span>
+        </header>
+        ${renderPortfolioActivities(model)}
+      </section>
+    </section>
+  `;
+  window.lucide?.createIcons?.();
+}
+
+function renderPortfolioPersonnelTable(personnel) {
+  if (!personnel.length) {
+    return '<p class="portfolio-detail-empty">Belum ada rincian personil untuk pekerjaan ini.</p>';
+  }
+  return `
+    <div class="portfolio-detail-table-wrap">
+      <table class="portfolio-detail-table">
+        <thead>
+          <tr>
+            <th>ID Personil</th>
+            <th>Nama Personil</th>
+            <th>SKA/Bidang Keahlian</th>
+            <th>Jabatan Kontrak</th>
+            <th>Jabatan Real</th>
+            <th>Tanggal Mulai</th>
+            <th>Tanggal Selesai</th>
+            <th>Overtime</th>
+            <th>Bobot</th>
+            <th>Beban</th>
+            <th>Status Kontrak</th>
+            <th>Jenis Pekerjaan</th>
+            <th>Keterlibatan</th>
+            <th>Posisi Penugasan</th>
+            <th>Status Pekerjaan</th>
+            <th>Jumlah Bulan</th>
+            <th>Bulan Overtime</th>
+            <th>Bobot Individual</th>
+            <th>Remunerasi Kontrak</th>
+            <th>Remunerasi Realisasi</th>
+            ${canManagePersonnel() ? "<th>Aksi</th>" : ""}
+          </tr>
+        </thead>
+        <tbody>
+          ${personnel.map((person, index) => `
+            <tr>
+              <td>${escapeHtml(person.id_personil)}</td>
+              <td><strong>${escapeHtml(person.nama_personil)}</strong></td>
+              <td>${escapeHtml(person.ska_bidang_keahlian)}</td>
+              <td>${escapeHtml(person.posisi_jabatan_kontrak)}</td>
+              <td>${escapeHtml(person.posisi_jabatan_real)}</td>
+              <td>${escapeHtml(person.blok_waktu_bobot.tanggal_mulai)}</td>
+              <td>${escapeHtml(person.blok_waktu_bobot.tanggal_selesai)}</td>
+              <td>${escapeHtml(person.blok_waktu_bobot.masa_overtime)}</td>
+              <td>${escapeHtml(person.blok_waktu_bobot.bobot)}</td>
+              <td>${escapeHtml(person.blok_waktu_bobot.beban)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.status_kontrak)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.jenis_pekerjaan)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.keterlibatan)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.posisi_penugasan)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.status_pekerjaan)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.jumlah_bulan)}</td>
+              <td>${escapeHtml(person.blok_status_keterlibatan.jumlah_bulan_overtime)}</td>
+              <td>${escapeHtml(person.blok_finansial_billing.bobot_individual)}</td>
+              <td>${escapeHtml(formatRupiah(person.blok_finansial_billing.remunerasi_billing_rate_kontrak))}</td>
+              <td>${escapeHtml(formatRupiah(person.blok_finansial_billing.remunerasi_billing_rate_realisasi))}</td>
+              ${canManagePersonnel() ? `
+                <td>
+                  <button class="text-button" type="button" data-portfolio-record-edit="${index}">Edit</button>
+                </td>
+              ` : ""}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderPortfolioTimeline(personnel, totalMonths) {
+  if (!personnel.length) {
+    return '<p class="portfolio-detail-empty">Timeline belum dapat dibuat karena belum ada personil.</p>';
+  }
+  const months = Array.from({ length: Math.max(1, totalMonths) }, (_, index) => index + 1);
+  return `
+    <div class="portfolio-timeline">
+      <div class="portfolio-timeline-head">
+        <span>Personil</span>
+        <div>${months.map(month => `<b>B${month}</b>`).join("")}</div>
+      </div>
+      ${personnel.map(person => {
+        const widthPerMonth = 100 / Math.max(1, totalMonths);
+        const start = Math.min(Math.max(1, person.timeline_jadwal.start_month), totalMonths);
+        const end = Math.min(Math.max(start, person.timeline_jadwal.end_month), totalMonths);
+        const left = (start - 1) * widthPerMonth;
+        const width = Math.max(widthPerMonth, (end - start + 1) * widthPerMonth);
+        return `
+          <div class="portfolio-timeline-row">
+            <strong>${escapeHtml(person.nama_personil)}</strong>
+            <div class="portfolio-timeline-track">
+              <span class="portfolio-timeline-bar" style="left:${left}%;width:${width}%">
+                B${start}-B${end}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderPortfolioDocuments(documents) {
+  if (!documents.length) {
+    return '<p class="portfolio-detail-empty">Belum ada dokumen terkait yang terbaca dari data proyek.</p>';
+  }
+  return `
+    <div class="portfolio-document-list">
+      ${documents.map(documentItem => `
+        <article>
+          <span><i data-lucide="file-text" aria-hidden="true"></i></span>
+          <div>
+            <strong>${escapeHtml(documentItem.nama_file)}</strong>
+            <small>${escapeHtml(documentItem.label || "Dokumen")} - ${escapeHtml(documentItem.version || "-")}</small>
+          </div>
+          <button class="text-button" type="button" data-portfolio-document-preview="${escapeHtml(documentItem.url || "#")}">Preview</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderPortfolioActivities(model) {
+  return `
+    <div class="portfolio-comment-box">
+      <textarea id="portfolioCommentInput" rows="3" placeholder="Tulis komentar proyek..."></textarea>
+      <button class="secondary-button" type="button" data-portfolio-comment-send="${escapeHtml(model.project_id)}">Kirim</button>
+    </div>
+    <div class="portfolio-activity-thread">
+      ${model.aktivitas_komentar.length
+        ? model.aktivitas_komentar.map(item => `
+            <article>
+              <strong>${escapeHtml(item.user || "Tim")}</strong>
+              <p>${escapeHtml(item.text || "-")}</p>
+              <small>${escapeHtml(formatPortfolioActivityTime(item.time))}</small>
+            </article>
+          `).join("")
+        : '<p class="portfolio-detail-empty">Belum ada aktivitas atau komentar untuk pekerjaan ini.</p>'}
+    </div>
+  `;
+}
+
+function formatPortfolioActivityTime(value) {
+  if (!value) return "Baru saja";
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) return date.toLocaleString("id-ID");
+  return String(value);
+}
+
+function editCurrentPortfolioDetail() {
+  if (!currentJobDetail) return notify("Rincian pekerjaan belum dipilih.");
+  const firstRecord = currentJobDetail.records?.[0] || null;
+  openJobRecordForm(firstRecord, currentJobDetail);
+}
+
+function handlePortfolioDetailClick(event) {
+  const editButton = event.target.closest("[data-portfolio-record-edit]");
+  if (editButton && currentJobDetail) {
+    const record = currentJobDetail.records?.[Number(editButton.dataset.portfolioRecordEdit)];
+    if (record) openJobRecordForm(record, currentJobDetail);
+    return;
+  }
+
+  const commentButton = event.target.closest("[data-portfolio-comment-send]");
+  if (commentButton) {
+    const input = document.getElementById("portfolioCommentInput");
+    savePortfolioComment(commentButton.dataset.portfolioCommentSend, input?.value || "");
+    if (input) input.value = "";
+    renderPortfolioDetail(currentJobDetail, state.selectedPortfolioJobId);
+    return;
+  }
+
+  const previewButton = event.target.closest("[data-portfolio-document-preview]");
+  if (previewButton) {
+    notify("Preview dokumen akan aktif setelah URL dokumen terhubung ke storage.");
+  }
+}
+
 function openJobDetail(job) {
+  openPortfolioDetailRoute(job);
+}
+
+function showJobDetailModal(job) {
   const modal = document.getElementById("jobDetailModal");
   const title = document.getElementById("jobDetailTitle");
   const source = document.getElementById("jobDetailSource");
@@ -3318,7 +3892,7 @@ async function sendJobMutation(action, payload) {
       const updatedJob = buildJobsFromDataUtama().find(job =>
         normalizeSearchText(job.pekerjaan) === normalizeSearchText(selectedJobName)
       );
-      if (updatedJob) openJobDetail(updatedJob);
+      if (updatedJob) showJobDetailModal(updatedJob);
       else closeJobDetail();
     }
   } catch (error) {
@@ -4466,6 +5040,7 @@ function render() {
   renderExternalSheetStatus();
   renderPersonnel();
   renderJobs();
+  refreshPortfolioDetailRoute();
   renderFinance();
   renderTenders();
   renderInventoryWorkspace();

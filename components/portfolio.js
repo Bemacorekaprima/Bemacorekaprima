@@ -438,12 +438,6 @@ export function createPortfolioFeature(options = {}) {
 
   function openJob(job) {
     if (!job) return;
-    if (job.tenderId) {
-      state.selectedTenderId = job.tenderId;
-      setView("tenders", { scroll: "top" });
-      renderTenders();
-      return;
-    }
     openJobDetail(job);
   }
 

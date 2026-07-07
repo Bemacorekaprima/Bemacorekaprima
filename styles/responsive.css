@@ -76,6 +76,16 @@
   .settings-grid { grid-template-columns: 1fr; }
   .portfolio-overview { grid-template-columns: 1fr; }
   .portfolio-bento-top { grid-template-columns: 1fr; }
+  .portfolio-detail-header,
+  .portfolio-detail-side-grid {
+    grid-template-columns: 1fr;
+  }
+  .portfolio-detail-actions {
+    justify-content: flex-start;
+  }
+  .portfolio-detail-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .portfolio-featured-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
   .portfolio-featured-grid .portfolio-job-card:last-child:nth-child(odd) { grid-column: auto; }
   .dashboard-kpi-grid {
@@ -120,6 +130,16 @@
     display: grid;
     gap: 16px;
     margin-top: 16px;
+  }
+
+  .portfolio-detail-summary-grid,
+  .portfolio-comment-box {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-timeline-head,
+  .portfolio-timeline-row {
+    grid-template-columns: 150px minmax(360px, 1fr);
   }
 
   .portfolio-mobile-card {
