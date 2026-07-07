@@ -5,6 +5,7 @@ export const DEFAULT_VIEW_TITLES = {
   tenders: "Tender",
   jobs: "Portofolio",
   portfolioDetail: "Detail Portofolio",
+  financeDetail: "Rincian Finance",
   personnel: "Personil",
   finance: "Finance",
   inventory: "Inventaris",
@@ -25,9 +26,17 @@ export function createRouter(options = {}) {
   if (!state) throw new Error("Router membutuhkan state aplikasi.");
   if (typeof canViewMenu !== "function") throw new Error("Router membutuhkan canViewMenu().");
 
+  function getNavigationView(view) {
+    return {
+      portfolioDetail: "jobs",
+      financeDetail: "finance"
+    }[view] || view;
+  }
+
   function renderView() {
+    const navigationView = getNavigationView(state.activeView);
     document.querySelectorAll(".nav-item").forEach(button => {
-      button.classList.toggle("active", button.dataset.view === state.activeView);
+      button.classList.toggle("active", button.dataset.view === navigationView);
     });
     document.querySelectorAll(".view").forEach(view => {
       view.classList.toggle("active", view.id === `${state.activeView}View`);

@@ -28,7 +28,7 @@ import { createRouter } from "./core/router.js";
 import { createInventoryFeature } from "./components/inventory.js";
 import { createDashboardFeature, DASHBOARD_ASSIGNMENT_CATEGORIES } from "./components/dashboard.js";
 import { createPortfolioFeature } from "./components/portfolio.js?v=20260707181500";
-import { createFinanceFeature } from "./components/finance.js?v=20260707183500";
+import { createFinanceFeature } from "./components/finance.js?v=20260707214500";
 import { createReportsFeature } from "./components/reports.js";
 import { createPersonnelFeature } from "./components/personnel.js";
 import { createTenderFeature } from "./components/tender.js";
@@ -371,6 +371,7 @@ function bindControls() {
   document.getElementById("portfolioDetailEditButton")?.addEventListener("click", editCurrentPortfolioDetail);
   document.getElementById("portfolioDetailReportButton")?.addEventListener("click", exportCurrentJobDetailPdf);
   document.getElementById("portfolioDetailContent")?.addEventListener("click", handlePortfolioDetailClick);
+  document.getElementById("financeDetailBackButton")?.addEventListener("click", closeFinanceDetailRoute);
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
   document.getElementById("closeJobDetailFooter").addEventListener("click", closeJobDetail);
   document.getElementById("addJobDetailRowButton").addEventListener("click", () => openJobRecordForm(null, currentJobDetail));
@@ -388,7 +389,7 @@ function bindControls() {
 
   document.querySelectorAll(".nav-item").forEach(button => {
     button.addEventListener("click", () => {
-      clearPortfolioDetailHash();
+      clearDetailHashes();
       setView(button.dataset.view, { scroll: "top" });
     });
   });
@@ -490,14 +491,14 @@ document.addEventListener("click", event => {
 function handleGlobalNavigationClick(event) {
   const dashboardOpen = event.target.closest("[data-dashboard-open]");
   if (dashboardOpen) {
-    clearPortfolioDetailHash();
+    clearDetailHashes();
     setView(dashboardOpen.dataset.dashboardOpen, { scroll: "top" });
     return true;
   }
 
   const dashboardTender = event.target.closest("[data-dashboard-open-tender]");
   if (dashboardTender) {
-    clearPortfolioDetailHash();
+    clearDetailHashes();
     state.selectedTenderId = dashboardTender.dataset.dashboardOpenTender;
     setView("tenders", { scroll: "top" });
     renderTenders();
@@ -507,7 +508,7 @@ function handleGlobalNavigationClick(event) {
   const inventoryOpen = event.target.closest("[data-inventory-open-filter]");
   if (inventoryOpen) {
     event.preventDefault();
-    clearPortfolioDetailHash();
+    clearDetailHashes();
     openInventoryViewWithFilter(inventoryOpen.dataset.inventoryOpenFilter || "all");
     return true;
   }
@@ -793,6 +794,7 @@ function hasAccessRole(...roles) {
 
 function canViewMenu(view, role = state.accessRole) {
   if (view === "portfolioDetail") return canViewMenu("jobs", role);
+  if (view === "financeDetail") return canViewMenu("finance", role);
   if (role === "super_admin") return true;
   const allowedRoles = state.appConfig?.menuRoles?.[view] || DEFAULT_MENU_ROLES[view] || [];
   return allowedRoles.includes(role);
@@ -2624,6 +2626,16 @@ function clearPortfolioDetailHash() {
   history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
 }
 
+function clearFinanceDetailHash() {
+  if (!isFinanceDetailHash()) return;
+  history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+}
+
+function clearDetailHashes() {
+  clearPortfolioDetailHash();
+  clearFinanceDetailHash();
+}
+
 function openPortfolioDetailRoute(job) {
   if (!job) return;
   const id = getPortfolioJobId(job);
@@ -2644,6 +2656,13 @@ function closePortfolioDetailRoute() {
   renderJobs();
 }
 
+function closeFinanceDetailRoute() {
+  clearFinanceDetailHash();
+  state.selectedFinanceJobKey = "";
+  setView("finance", { scroll: "top" });
+  renderFinance();
+}
+
 function handleDetailRouteChange() {
   if (isFinanceDetailHash()) {
     showFinanceDetailRoute(getFinanceRouteJobId());
@@ -2651,6 +2670,10 @@ function handleDetailRouteChange() {
   }
 
   if (!isPortfolioDetailHash()) {
+    if (state.activeView === "financeDetail") {
+      state.selectedFinanceJobKey = "";
+      setView("finance", { scroll: "top" });
+    }
     if (state.activeView === "portfolioDetail") {
       state.selectedPortfolioJobId = "";
       setView("jobs", { scroll: "top" });
@@ -2689,8 +2712,7 @@ function openFinanceDetailRoute(entry) {
 
 function showFinanceDetailRoute(id, knownEntry = null) {
   const entry = knownEntry || findFinanceEntryByRouteId(id);
-  setView("finance", { scroll: "top" });
-  renderFinance();
+  setView("financeDetail", { scroll: "top" });
   if (!entry) return;
   state.selectedFinanceJobKey = entry.key;
   getFinanceFeature().openDetail(entry.key, { route: false });
