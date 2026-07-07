@@ -70,6 +70,7 @@ export function createPortfolioFeature(options = {}) {
     document.getElementById("jobsPrevPage")?.addEventListener("click", () => changePage(-1));
     document.getElementById("jobsNextPage")?.addEventListener("click", () => changePage(1));
     document.getElementById("jobsTableBody")?.addEventListener("click", handleTableClick);
+    document.getElementById("jobsTableBody")?.addEventListener("keydown", handleTableKeydown);
     document.getElementById("jobsMobileCards")?.addEventListener("click", handleMobileClick);
     document.getElementById("portfolioFeaturedJobs")?.addEventListener("click", handleCardClick);
     document.getElementById("portfolioSummary")?.addEventListener("click", handleSummaryClick);
@@ -414,6 +415,14 @@ export function createPortfolioFeature(options = {}) {
     openJob(state.jobsVisibleRecords[Number(row.dataset.jobIndex)]);
   }
 
+  function handleTableKeydown(event) {
+    if (!["Enter", " "].includes(event.key)) return;
+    const row = event.target.closest("[data-job-index]");
+    if (!row) return;
+    event.preventDefault();
+    openJob(state.jobsVisibleRecords[Number(row.dataset.jobIndex)]);
+  }
+
   function handleMobileClick(event) {
     const editButton = event.target.closest("[data-mobile-job-edit]");
     if (editButton) {
@@ -463,6 +472,7 @@ export function createPortfolioFeature(options = {}) {
     resetFilters,
     changePage,
     handleTableClick,
+    handleTableKeydown,
     handleMobileClick,
     handleCardClick,
     openJob,

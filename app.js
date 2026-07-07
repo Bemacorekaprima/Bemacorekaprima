@@ -27,7 +27,7 @@ import {
 import { createRouter } from "./core/router.js";
 import { createInventoryFeature } from "./components/inventory.js";
 import { createDashboardFeature, DASHBOARD_ASSIGNMENT_CATEGORIES } from "./components/dashboard.js";
-import { createPortfolioFeature } from "./components/portfolio.js";
+import { createPortfolioFeature } from "./components/portfolio.js?v=20260707181500";
 import { createFinanceFeature } from "./components/finance.js";
 import { createReportsFeature } from "./components/reports.js";
 import { createPersonnelFeature } from "./components/personnel.js";
@@ -364,6 +364,7 @@ function bindControls() {
   document.getElementById("menuVisibilityForm").addEventListener("submit", saveMenuVisibilityConfig);
   bindPersonnelControls();
   bindFinanceControls();
+  bindPortfolioControls();
   window.addEventListener("hashchange", handlePortfolioRouteChange);
   document.getElementById("portfolioDetailBackButton")?.addEventListener("click", closePortfolioDetailRoute);
   document.getElementById("portfolioDetailEditButton")?.addEventListener("click", editCurrentPortfolioDetail);
