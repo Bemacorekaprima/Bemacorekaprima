@@ -20,7 +20,8 @@ export function createFinanceFeature(options = {}) {
     humanizeFieldName,
     includesAny,
     requirePermission,
-    canManagePersonnel
+    canManagePersonnel,
+    openFinanceDetailRoute
   } = options;
 
   function bindControls() {
@@ -39,6 +40,7 @@ export function createFinanceFeature(options = {}) {
     });
     document.getElementById("resetFinanceFilters")?.addEventListener("click", resetFinanceFilters);
     document.getElementById("financeTableBody")?.addEventListener("click", handleFinanceTableClick);
+    document.getElementById("financeTableBody")?.addEventListener("keydown", handleFinanceTableKeydown);
     document.getElementById("financeMobileList")?.addEventListener("click", handleFinanceMobileClick);
     document.getElementById("financeToolsButton")?.addEventListener("click", toggleFinanceToolsMenu);
     document.getElementById("financeAddRecordButton")?.addEventListener("click", () => handleFinanceAction("add"));
@@ -369,19 +371,33 @@ function renderFinanceMobile(entries) {
 function handleFinanceTableClick(event) {
   const key = event.target.closest("[data-finance-open]")?.dataset.financeOpen || event.target.closest("tr[data-finance-key]")?.dataset.financeKey;
   if (!key) return;
+  event.preventDefault();
   openFinanceDetail(key);
+}
+
+function handleFinanceTableKeydown(event) {
+  if (!["Enter", " "].includes(event.key)) return;
+  const row = event.target.closest("tr[data-finance-key]");
+  if (!row) return;
+  event.preventDefault();
+  openFinanceDetail(row.dataset.financeKey);
 }
 
 function handleFinanceMobileClick(event) {
   const key = event.target.closest("[data-finance-open], [data-finance-key]")?.dataset.financeOpen || event.target.closest("[data-finance-key]")?.dataset.financeKey;
   if (!key) return;
+  event.preventDefault();
   openFinanceDetail(key);
 }
 
-function openFinanceDetail(key) {
+function openFinanceDetail(key, options = {}) {
   const entry = buildFinanceEntries().find(item => item.key === key);
   if (!entry) return notify("Rincian Finance tidak ditemukan.");
   state.selectedFinanceJobKey = key;
+  if (options.route !== false && typeof openFinanceDetailRoute === "function") {
+    openFinanceDetailRoute(entry);
+    return;
+  }
   renderFinanceDetail(entry);
 }
 

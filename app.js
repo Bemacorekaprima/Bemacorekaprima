@@ -28,7 +28,7 @@ import { createRouter } from "./core/router.js";
 import { createInventoryFeature } from "./components/inventory.js";
 import { createDashboardFeature, DASHBOARD_ASSIGNMENT_CATEGORIES } from "./components/dashboard.js";
 import { createPortfolioFeature } from "./components/portfolio.js?v=20260707181500";
-import { createFinanceFeature } from "./components/finance.js";
+import { createFinanceFeature } from "./components/finance.js?v=20260707183500";
 import { createReportsFeature } from "./components/reports.js";
 import { createPersonnelFeature } from "./components/personnel.js";
 import { createTenderFeature } from "./components/tender.js";
@@ -205,6 +205,7 @@ const TENDER_DOCUMENT_STATUSES = [
 const TENDER_STORAGE_COLLECTION = "tasks";
 const TENDER_SHEET_SOURCE_ID = "bar-tender";
 const PORTFOLIO_DETAIL_HASH_PREFIX = "#/portfolio/detail/";
+const FINANCE_DETAIL_HASH_PREFIX = "#/Finance/detail/";
 const PORTFOLIO_COMMENTS_KEY = "bemaco.portfolio.comments.v1";
 
 function createDefaultAppConfig() {
@@ -365,7 +366,7 @@ function bindControls() {
   bindPersonnelControls();
   bindFinanceControls();
   bindPortfolioControls();
-  window.addEventListener("hashchange", handlePortfolioRouteChange);
+  window.addEventListener("hashchange", handleDetailRouteChange);
   document.getElementById("portfolioDetailBackButton")?.addEventListener("click", closePortfolioDetailRoute);
   document.getElementById("portfolioDetailEditButton")?.addEventListener("click", editCurrentPortfolioDetail);
   document.getElementById("portfolioDetailReportButton")?.addEventListener("click", exportCurrentJobDetailPdf);
@@ -1914,6 +1915,7 @@ async function loadExternalSheetData() {
   renderJobs();
   refreshPortfolioDetailRoute();
   renderFinance();
+  refreshFinanceDetailRoute();
   renderTenders();
   renderDashboardPortfolioHome();
   renderDashboardWorkSummary();
@@ -2603,9 +2605,18 @@ function isPortfolioDetailHash(hash = window.location.hash) {
   return String(hash || "").startsWith(PORTFOLIO_DETAIL_HASH_PREFIX);
 }
 
+function isFinanceDetailHash(hash = window.location.hash) {
+  return String(hash || "").toLowerCase().startsWith(FINANCE_DETAIL_HASH_PREFIX.toLowerCase());
+}
+
 function getPortfolioRouteJobId(hash = window.location.hash) {
   if (!isPortfolioDetailHash(hash)) return "";
   return decodePortfolioDetailId(String(hash).slice(PORTFOLIO_DETAIL_HASH_PREFIX.length));
+}
+
+function getFinanceRouteJobId(hash = window.location.hash) {
+  if (!isFinanceDetailHash(hash)) return "";
+  return decodePortfolioDetailId(String(hash).slice(FINANCE_DETAIL_HASH_PREFIX.length));
 }
 
 function clearPortfolioDetailHash() {
@@ -2633,7 +2644,12 @@ function closePortfolioDetailRoute() {
   renderJobs();
 }
 
-function handlePortfolioRouteChange() {
+function handleDetailRouteChange() {
+  if (isFinanceDetailHash()) {
+    showFinanceDetailRoute(getFinanceRouteJobId());
+    return;
+  }
+
   if (!isPortfolioDetailHash()) {
     if (state.activeView === "portfolioDetail") {
       state.selectedPortfolioJobId = "";
@@ -2648,11 +2664,48 @@ function refreshPortfolioDetailRoute() {
   if (isPortfolioDetailHash()) showPortfolioDetailRoute(getPortfolioRouteJobId());
 }
 
+function refreshFinanceDetailRoute() {
+  if (isFinanceDetailHash()) showFinanceDetailRoute(getFinanceRouteJobId());
+}
+
 function showPortfolioDetailRoute(id, knownJob = null) {
   state.selectedPortfolioJobId = id;
   const job = knownJob || findPortfolioJobById(id);
   setView("portfolioDetail", { scroll: "top" });
   renderPortfolioDetail(job, id);
+}
+
+function openFinanceDetailRoute(entry) {
+  if (!entry) return;
+  state.selectedFinanceJobKey = entry.key;
+  const id = createPortfolioJobId(entry.pekerjaan || entry.key || "");
+  const hash = `${FINANCE_DETAIL_HASH_PREFIX}${encodePortfolioDetailId(id)}`;
+  if (window.location.hash !== hash) {
+    window.location.hash = hash;
+    return;
+  }
+  showFinanceDetailRoute(id, entry);
+}
+
+function showFinanceDetailRoute(id, knownEntry = null) {
+  const entry = knownEntry || findFinanceEntryByRouteId(id);
+  setView("finance", { scroll: "top" });
+  renderFinance();
+  if (!entry) return;
+  state.selectedFinanceJobKey = entry.key;
+  getFinanceFeature().openDetail(entry.key, { route: false });
+}
+
+function findFinanceEntryByRouteId(id) {
+  const target = String(id || "");
+  const normalizedTarget = normalizeSearchText(target).replace(/-/g, " ");
+  if (!target) return null;
+  return getFinanceFeature().buildEntries().find(entry =>
+    entry.key === target ||
+    normalizeSearchText(entry.key) === normalizedTarget ||
+    createPortfolioJobId(entry.key) === target ||
+    createPortfolioJobId(entry.pekerjaan) === target
+  ) || null;
 }
 
 function findPortfolioJobById(id) {
@@ -5043,6 +5096,7 @@ function render() {
   renderJobs();
   refreshPortfolioDetailRoute();
   renderFinance();
+  refreshFinanceDetailRoute();
   renderTenders();
   renderInventoryWorkspace();
   renderDashboardPortfolioHome();
@@ -5098,7 +5152,8 @@ function getFinanceFeature() {
       humanizeFieldName,
       includesAny,
       requirePermission,
-      canManagePersonnel
+      canManagePersonnel,
+      openFinanceDetailRoute
     });
   }
   return financeFeature;
