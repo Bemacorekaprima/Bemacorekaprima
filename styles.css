@@ -10,12 +10,12 @@
 @import url("./styles/tasks.css");
 @import url("./styles/tables.css");
 @import url("./styles/personnel-source.css");
-@import url("./styles/portfolio.css");
+@import url("./styles/portfolio.css?v=20260707175500");
 @import url("./styles/personnel.css");
 @import url("./styles/settings.css");
 @import url("./styles/recipients.css");
 @import url("./styles/modals.css");
-@import url("./styles/responsive.css");
+@import url("./styles/responsive.css?v=20260707175500");
 @import url("./styles/toasts.css");
 @import url("./styles/reports.css");
 @import url("./styles/finance.css");
