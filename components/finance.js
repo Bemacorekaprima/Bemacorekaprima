@@ -21,6 +21,7 @@ export function createFinanceFeature(options = {}) {
     includesAny,
     requirePermission,
     canManagePersonnel,
+    canonicalPersonnelName,
     openFinanceDetailRoute
   } = options;
 
@@ -100,6 +101,96 @@ function getFinanceJobMatchKey(value) {
     .trim();
 }
 
+function findFinanceColumn(record, aliases, excludedKeywords = []) {
+  const normalizedAliases = aliases.map(normalizeSearchText).filter(Boolean);
+  const normalizedExcluded = excludedKeywords.map(normalizeSearchText).filter(Boolean);
+  const keys = Object.keys(record || {});
+  const exactKey = keys.find(key => normalizedAliases.includes(normalizeSearchText(key)));
+  if (exactKey) return exactKey;
+  return keys.find(key => {
+    const normalized = normalizeSearchText(key);
+    return normalizedAliases.some(alias => normalized.includes(alias)) &&
+      !normalizedExcluded.some(keyword => normalized.includes(keyword));
+  }) || "";
+}
+
+function getFinanceColumnValue(record, aliases, excludedKeywords = []) {
+  const key = findFinanceColumn(record, aliases, excludedKeywords);
+  return key ? String(record?.[key] || "").trim() : "";
+}
+
+const FINANCE_PERSON_NAME_ALIASES = [
+  "nama personil",
+  "nama personel",
+  "nama lengkap",
+  "nama tenaga ahli",
+  "tenaga ahli",
+  "personil",
+  "personel",
+  "nama staff",
+  "nama staf",
+  "staff",
+  "staf"
+];
+
+const FINANCE_PERSON_NAME_EXCLUDED_KEYWORDS = [
+  "pekerjaan",
+  "project",
+  "proyek",
+  "paket",
+  "tender",
+  "instansi",
+  "satker",
+  "pemberi kerja",
+  "owner",
+  "pic",
+  "penanggung jawab",
+  "jumlah",
+  "total"
+];
+
+const FINANCE_POSITION_ALIASES = [
+  "uraian",
+  "jabatan",
+  "posisi",
+  "posisi jabatan",
+  "posisi/jabatan",
+  "posisi jabatan kontrak",
+  "posisi/jabatan (kontrak)",
+  "posisi jabatan real",
+  "posisi/jabatan (real)",
+  "keahlian"
+];
+
+const FINANCE_DURATION_ALIASES = [
+  "jumlah bulan",
+  "bulan",
+  "durasi kontrak",
+  "masa kontrak",
+  "durasi",
+  "lama penugasan"
+];
+
+const FINANCE_RATE_ALIASES = [
+  "harga satuan",
+  "remunerasi/billing rate (kontrak)",
+  "remunerasi billing rate kontrak",
+  "billing rate kontrak",
+  "remunerasi kontrak",
+  "remunerasi",
+  "billing rate",
+  "rate"
+];
+
+const FINANCE_TOTAL_COST_ALIASES = [
+  "total biaya personil",
+  "total harga",
+  "harga total",
+  "total biaya",
+  "nilai personil",
+  "biaya personil"
+];
+
 function getFinanceGroupForJob(grouped, jobName) {
   const key = getFinanceJobMatchKey(jobName);
   if (!key) return null;
@@ -117,22 +208,19 @@ function getFinanceGroupForJob(grouped, jobName) {
 }
 
 function getFinanceRecordPersonName(record) {
-  return getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
+  return getFinanceColumnValue(record, FINANCE_PERSON_NAME_ALIASES, FINANCE_PERSON_NAME_EXCLUDED_KEYWORDS);
 }
 
 function isFinancePersonnelRecord(record) {
   if (getFinanceRecordPersonName(record)) return true;
-  return Boolean(getRecordValue(record, [
-    "uraian",
-    "jabatan",
-    "posisi",
-    "jumlah bulan",
-    "harga satuan",
-    "total biaya personil",
-    "total harga",
-    "pajak pph 21",
-    "netto"
-  ]));
+  return Boolean(
+    getFinanceColumnValue(record, FINANCE_POSITION_ALIASES) ||
+    getFinanceColumnValue(record, FINANCE_DURATION_ALIASES) ||
+    getFinanceColumnValue(record, FINANCE_RATE_ALIASES) ||
+    getFinanceColumnValue(record, FINANCE_TOTAL_COST_ALIASES) ||
+    getFinancePphTaxValue(record) ||
+    getFinanceColumnValue(record, ["netto", "nett", "net"])
+  );
 }
 
 function getFinancePphTaxValue(record) {
@@ -185,16 +273,7 @@ const FINANCE_CONTRACT_EXCLUDED_KEYWORDS = [
 ];
 
 function findFinanceValueColumn(record, aliases, excludedKeywords = []) {
-  const normalizedAliases = aliases.map(normalizeSearchText).filter(Boolean);
-  const normalizedExcluded = excludedKeywords.map(normalizeSearchText).filter(Boolean);
-  const keys = Object.keys(record || {});
-  const exactKey = keys.find(key => normalizedAliases.includes(normalizeSearchText(key)));
-  if (exactKey) return exactKey;
-  return keys.find(key => {
-    const normalized = normalizeSearchText(key);
-    return normalizedAliases.some(alias => normalized.includes(alias)) &&
-      !normalizedExcluded.some(keyword => normalized.includes(keyword));
-  }) || "";
+  return findFinanceColumn(record, aliases, excludedKeywords);
 }
 
 function getFinanceContractValue(record) {
@@ -207,6 +286,30 @@ function getPortfolioContractValue(job) {
     const value = getFinanceContractValue(record);
     return Math.max(maxValue, value || 0);
   }, 0);
+}
+
+function getFinancePersonKey(value) {
+  const name = String(value || "").trim();
+  if (!name) return "";
+  const canonical = typeof canonicalPersonnelName === "function" ? canonicalPersonnelName(name) : "";
+  return canonical || normalizeSearchText(name);
+}
+
+function getPortfolioPersonName(record) {
+  return getFinanceColumnValue(record, FINANCE_PERSON_NAME_ALIASES, FINANCE_PERSON_NAME_EXCLUDED_KEYWORDS);
+}
+
+function getFinancePortfolioPeople(job, limit = Infinity) {
+  const names = [];
+  const seen = new Set();
+  (job?.records || []).forEach(record => {
+    const name = getPortfolioPersonName(record);
+    const key = getFinancePersonKey(name);
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    names.push(name);
+  });
+  return names.slice(0, limit);
 }
 
 function getFinanceStatusKey(entry) {
@@ -264,7 +367,7 @@ function buildFinanceEntries() {
     const key = getFinanceJobMatchKey(job.pekerjaan);
     const finance = getFinanceGroupForJob(grouped, job.pekerjaan);
     const progress = getPortfolioProgress(job);
-    const people = getPortfolioPeople(job, Infinity);
+    const people = getFinancePortfolioPeople(job, Infinity);
     const portfolioContractValue = getPortfolioContractValue(job);
     const totalBiayaPersonil = finance?.totalBiayaPersonil || finance?.totalHarga || 0;
     entries.push({
@@ -615,7 +718,12 @@ function renderFinanceDetail(entry) {
   setTextContent("financeDetailTitle", entry.pekerjaan);
   setTextContent("financeDetailMeta", `${entry.source} - ${getFinanceStatusLabel(entry)} - ${entry.progress}% progress`);
   const relatedPersonnel = buildFinanceDetailPersonnel(entry);
-  const totalBiayaPersonil = entry.totalBiayaPersonil || entry.totalHarga || 0;
+  const personnelTotal = relatedPersonnel.reduce((total, row) => total + Number(row.total || 0), 0);
+  const personnelTax = relatedPersonnel.reduce((total, row) => total + Number(row.pajak || 0), 0);
+  const personnelNetto = relatedPersonnel.reduce((total, row) => total + Number(row.netto || 0), 0);
+  const totalBiayaPersonil = entry.totalBiayaPersonil || entry.totalHarga || personnelTotal || 0;
+  const totalPajakPersonil = entry.pajak || personnelTax || 0;
+  const totalNettoPersonil = entry.netto || personnelNetto || 0;
   const nilaiKontrak = getResolvedFinanceContractValue(entry);
   const terminPlan = getFinanceTerminPlan(entry);
   const terminPercentTotal = getFinanceTerminPercentTotal(terminPlan);
@@ -650,8 +758,8 @@ function renderFinanceDetail(entry) {
         </header>
         <div class="finance-detail-kpis finance-personnel-kpis">
           <article><span>Total Biaya Personil</span><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong><small>Dari rincian personil</small></article>
-          <article><span>PPH 21</span><strong>${formatFinanceMoney(entry.pajak)}</strong><small>Akumulasi pajak personil</small></article>
-          <article><span>Netto</span><strong>${formatFinanceMoney(entry.netto)}</strong><small>Total biaya - PPH 21</small></article>
+          <article><span>PPH 21</span><strong>${formatFinanceMoney(totalPajakPersonil)}</strong><small>Akumulasi pajak personil</small></article>
+          <article><span>Netto</span><strong>${formatFinanceMoney(totalNettoPersonil)}</strong><small>Total biaya - PPH 21</small></article>
           <article><span>Personil</span><strong>${relatedPersonnel.length}</strong><small>Baris personil terkait</small></article>
         </div>
       </article>
@@ -677,25 +785,28 @@ function renderFinanceDetail(entry) {
       </header>
       <div class="finance-personnel-cost-strip" aria-label="Ringkasan biaya personil">
         <span><small>Total Biaya Personil</small><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong></span>
-        <span><small>PPH 21</small><strong>${formatFinanceMoney(entry.pajak)}</strong></span>
-        <span><small>Netto</small><strong>${formatFinanceMoney(entry.netto)}</strong></span>
+        <span><small>PPH 21</small><strong>${formatFinanceMoney(totalPajakPersonil)}</strong></span>
+        <span><small>Netto</small><strong>${formatFinanceMoney(totalNettoPersonil)}</strong></span>
       </div>
       <div class="table-wrap finance-detail-table-wrap">
         <table class="finance-detail-table">
           <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total Biaya</th><th>Pajak PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
-          <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => `
+          <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => {
+            const hasMoney = row.hasFinance || row.hasPortfolioValue;
+            return `
             <tr>
               <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
               <td data-label="Uraian/Jabatan">${escapeHtml(row.uraian)}</td>
               <td data-label="Bulan">${escapeHtml(row.bulan)}</td>
-              <td data-label="Harga Satuan">${row.hasFinance ? formatFinanceMoney(row.hargaSatuan) : "-"}</td>
-              <td data-label="Total Biaya">${row.hasFinance ? formatFinanceMoney(row.total) : "-"}</td>
-              <td data-label="Pajak PPH 21">${row.hasFinance ? formatFinanceMoney(row.pajak) : "-"}</td>
-              <td data-label="Netto">${row.hasFinance ? formatFinanceMoney(row.netto) : "-"}</td>
+              <td data-label="Harga Satuan">${hasMoney ? formatFinanceMoney(row.hargaSatuan) : "-"}</td>
+              <td data-label="Total Biaya">${hasMoney ? formatFinanceMoney(row.total) : "-"}</td>
+              <td data-label="Pajak PPH 21">${hasMoney ? formatFinanceMoney(row.pajak) : "-"}</td>
+              <td data-label="Netto">${hasMoney ? formatFinanceMoney(row.netto) : "-"}</td>
               <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
               <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit Nilai</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : `<button class="text-button" type="button" data-finance-record-action="complete" data-finance-record-index="${rowIndex}">Tambah Nilai</button>`}</td>
             </tr>
-          `).join("") : '<tr><td class="personnel-empty" colspan="9">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
+          `;
+          }).join("") : '<tr><td class="personnel-empty" colspan="9">Belum ada personil Portofolio atau rincian Finance untuk pekerjaan ini.</td></tr>'}</tbody>
         </table>
       </div>
     </section>
@@ -704,29 +815,69 @@ function renderFinanceDetail(entry) {
 
 function getFinanceRecordKey(record) {
   const name = getFinanceRecordPersonName(record);
-  return canonicalPersonnelName(name) || normalizeSearchText(name);
+  return getFinancePersonKey(name);
+}
+
+function getFinanceEntryJobNames(entry) {
+  return [
+    entry?.pekerjaan,
+    entry?.key,
+    ...(entry?.financeRecords || []).map(getFinanceRecordJobName)
+  ].map(getFinanceJobMatchKey).filter(Boolean);
+}
+
+function scoreFinancePortfolioJob(job, entry) {
+  const jobKey = getFinanceJobMatchKey(job?.pekerjaan);
+  if (!jobKey) return 0;
+  const names = getFinanceEntryJobNames(entry);
+  let score = 0;
+  names.forEach(name => {
+    if (name === jobKey) score = Math.max(score, 100);
+    const longEnough = name.length >= 12 && jobKey.length >= 12;
+    if (longEnough && (name.includes(jobKey) || jobKey.includes(name))) score = Math.max(score, 70);
+    const nameTokens = getMeaningfulTokens(name);
+    const jobTokens = new Set(getMeaningfulTokens(jobKey));
+    const shared = nameTokens.filter(token => jobTokens.has(token)).length;
+    if (shared) score = Math.max(score, shared * 12 + (job.records?.length ? 4 : 0));
+  });
+  return score;
+}
+
+function findPortfolioJobForFinanceEntry(entry) {
+  if (entry?.job?.records?.length) return entry.job;
+  const candidates = buildJobsFromAllSources()
+    .filter(job => job.records?.length)
+    .map(job => ({ job, score: scoreFinancePortfolioJob(job, entry) }))
+    .sort((left, right) => right.score - left.score);
+  return candidates[0]?.score >= 24 ? candidates[0].job : entry?.job || null;
 }
 
 function getPortfolioFinancePersonRows(entry) {
-  const records = entry?.job?.records || [];
+  const portfolioJob = findPortfolioJobForFinanceEntry(entry);
+  const records = portfolioJob?.records || [];
   const rows = [];
   const seen = new Set();
   records.forEach(record => {
-    const nama = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
-    const key = canonicalPersonnelName(nama) || normalizeSearchText(nama);
+    const nama = getPortfolioPersonName(record);
+    const key = getFinancePersonKey(nama);
     if (!nama || seen.has(key)) return;
+    const bulan = getFinanceColumnValue(record, FINANCE_DURATION_ALIASES) || "-";
+    const hargaSatuan = parseFinanceNumber(getFinanceColumnValue(record, FINANCE_RATE_ALIASES)) || 0;
+    const total = parseFinanceNumber(getFinanceColumnValue(record, FINANCE_TOTAL_COST_ALIASES)) ||
+      (hargaSatuan && parseFinanceNumber(bulan) ? hargaSatuan * parseFinanceNumber(bulan) : 0);
+    const pajak = parseFinanceNumber(getFinancePphTaxValue(record));
+    const netto = parseFinanceNumber(getFinanceColumnValue(record, ["netto", "nett", "net"])) || Math.max(0, total - pajak);
     seen.add(key);
     rows.push({
       key,
       nama,
-      uraian: getRecordValue(record, [
-        "uraian",
-        "jabatan",
-        "posisi",
-        "posisi/jabatan (kontrak)",
-        "posisi/jabatan"
-      ]) || "Terhubung dari Portofolio/Personil",
-      bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || "-",
+      uraian: getFinanceColumnValue(record, FINANCE_POSITION_ALIASES) || "Terhubung dari Portofolio/Personil",
+      bulan,
+      hargaSatuan,
+      total,
+      pajak,
+      netto,
+      hasPortfolioValue: Boolean(hargaSatuan || total || pajak || netto),
       record
     });
   });
@@ -734,17 +885,22 @@ function getPortfolioFinancePersonRows(entry) {
 }
 
 function buildFinanceDetailRowFromRecord(record, fallback = {}) {
+  const hargaSatuan = parseFinanceNumber(getFinanceColumnValue(record, FINANCE_RATE_ALIASES)) || fallback.hargaSatuan || 0;
+  const total = parseFinanceNumber(getFinanceColumnValue(record, FINANCE_TOTAL_COST_ALIASES)) || fallback.total || 0;
+  const pajak = parseFinanceNumber(getFinancePphTaxValue(record)) || fallback.pajak || 0;
+  const netto = parseFinanceNumber(getFinanceColumnValue(record, ["netto", "nett", "net"])) || fallback.netto || Math.max(0, total - pajak);
   return {
     nama: getFinanceRecordPersonName(record) || fallback.nama || "Tanpa nama",
-    uraian: getRecordValue(record, ["uraian", "jabatan", "posisi"]) || fallback.uraian || "-",
-    bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || fallback.bulan || "-",
-    hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
-    total: parseFinanceNumber(getRecordValue(record, ["total biaya personil", "total harga", "harga total"])),
+    uraian: getFinanceColumnValue(record, FINANCE_POSITION_ALIASES) || fallback.uraian || "-",
+    bulan: getFinanceColumnValue(record, FINANCE_DURATION_ALIASES) || fallback.bulan || "-",
+    hargaSatuan,
+    total,
     tarifPajak: getRecordValue(record, ["tarif pajak", "tarif pph 21", "tarif pph", "pph"]),
-    pajak: parseFinanceNumber(getFinancePphTaxValue(record)),
-    netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
+    pajak,
+    netto,
     keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-",
     hasFinance: true,
+    hasPortfolioValue: fallback.hasPortfolioValue,
     record
   };
 }
@@ -770,13 +926,14 @@ function buildFinanceDetailPersonnel(entry) {
       nama: person.nama,
       uraian: person.uraian,
       bulan: person.bulan,
-      hargaSatuan: 0,
-      total: 0,
+      hargaSatuan: person.hargaSatuan || 0,
+      total: person.total || 0,
       tarifPajak: "",
-      pajak: 0,
-      netto: 0,
-      keterangan: "Menunggu rincian finance",
+      pajak: person.pajak || 0,
+      netto: person.netto || 0,
+      keterangan: person.hasPortfolioValue ? "Terhubung dari Portofolio" : "Menunggu rincian finance",
       hasFinance: false,
+      hasPortfolioValue: person.hasPortfolioValue,
       record: null,
       seed: person
     });
@@ -800,6 +957,7 @@ function buildFinanceDetailPersonnel(entry) {
       netto: 0,
       keterangan: "Menunggu rincian finance",
       hasFinance: false,
+      hasPortfolioValue: false,
       record: null,
       seed: { nama: name, uraian: "Terhubung dari Portofolio/Personil", bulan: "-" }
     }));
@@ -940,6 +1098,10 @@ function applyFinanceSeedToRecord(target, columns, seed) {
   setFinanceSeedValue(target, columns, ["nama"], seed.nama);
   setFinanceSeedValue(target, columns, ["uraian", "jabatan", "posisi"], seed.uraian);
   setFinanceSeedValue(target, columns, ["jumlah bulan", "bulan", "durasi kontrak"], seed.bulan);
+  setFinanceSeedValue(target, columns, ["harga satuan", "remunerasi", "billing rate", "rate"], seed.hargaSatuan);
+  setFinanceSeedValue(target, columns, ["total biaya personil", "total harga", "harga total", "total biaya"], seed.total);
+  setFinanceSeedValue(target, columns, ["pajak pph 21", "pph 21", "pajak"], seed.pajak);
+  setFinanceSeedValue(target, columns, ["netto", "nett", "net"], seed.netto);
 }
 
 function makeFinanceLocalId(prefix) {

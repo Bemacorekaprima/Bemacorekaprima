@@ -28,7 +28,7 @@ import { createRouter } from "./core/router.js";
 import { createInventoryFeature } from "./components/inventory.js";
 import { createDashboardFeature, DASHBOARD_ASSIGNMENT_CATEGORIES } from "./components/dashboard.js";
 import { createPortfolioFeature } from "./components/portfolio.js?v=20260707181500";
-import { createFinanceFeature } from "./components/finance.js?v=20260707214500";
+import { createFinanceFeature } from "./components/finance.js?v=20260707220500";
 import { createReportsFeature } from "./components/reports.js";
 import { createPersonnelFeature } from "./components/personnel.js";
 import { createTenderFeature } from "./components/tender.js";
@@ -5175,6 +5175,7 @@ function getFinanceFeature() {
       includesAny,
       requirePermission,
       canManagePersonnel,
+      canonicalPersonnelName,
       openFinanceDetailRoute
     });
   }
