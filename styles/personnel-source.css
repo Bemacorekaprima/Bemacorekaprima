@@ -1,0 +1,50 @@
+.personnel-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.personnel-source-card {
+  display: grid;
+  min-height: 132px;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+  text-align: center;
+  box-shadow: var(--shadow);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.personnel-source-card:hover {
+  transform: translateY(-3px);
+  border-color: #93c5fd;
+  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.14);
+}
+
+.personnel-source-card.active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.13), var(--shadow);
+}
+
+.personnel-source-card span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.personnel-source-card strong {
+  color: var(--blue);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.personnel-source-card small { color: var(--muted); }
+.personnel-panel { min-width: 0; }
+.personnel-heading { align-items: flex-end; }
+.personnel-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.personnel-tools-menu { width: 210px; }

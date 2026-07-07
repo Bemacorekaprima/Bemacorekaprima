@@ -10,8 +10,13 @@ Dokumen ini mencatat struktur modul aktif agar perubahan berikutnya tidak perlu 
 - `components/inventory.js`: UI dan logic Inventaris Kantor.
 - `components/dashboard.js`: KPI dashboard, paket prioritas, tender aktif, personil, posisi penugasan, inventaris dashboard, dan progress.
 - `components/portfolio.js`: UI Portfolio, ringkasan, kartu pekerjaan, aktivitas, agenda, tabel pekerjaan, mobile cards, pagination, dan klik detail.
-- `styles/`: pecahan CSS awal untuk base, layout, form, sidebar, dan dashboard.
-- `styles.css`: entry CSS utama plus legacy style yang belum dipisah.
+- `components/finance.js`: UI Finance, ringkasan kontrak, termin, addendum, form record, dan aksi detail.
+- `components/reports.js`: workspace laporan, filter, preview, export Excel/PDF, print, dan template cepat.
+- `components/personnel.js`: UI Personil, filter, pagination, detail histori, form, mutasi spreadsheet, dan export.
+- `components/tender.js`: UI Tender, filter, detail, form paket, checklist dokumen, template tender, dan sinkronisasi sheet tender.
+- `styles/`: pecahan CSS per area, termasuk base, layout, dashboard, tender, inventory, portfolio, personnel, reports, finance, modal, responsive, dan theme.
+- `styles.css`: entry CSS utama yang hanya mengimpor file area.
+- `theme.css`: entry theme yang hanya mengimpor file theme modular.
 
 ## Pola Komponen
 
@@ -37,14 +42,12 @@ Aturan:
 - Semua tombol non-submit harus memakai `type="button"`.
 - CSS baru ditempatkan di file area yang sesuai di folder `styles/`; gunakan `styles.css` hanya untuk legacy style yang belum aman dipindah.
 
-## Modul Yang Belum Dipisah
+## Modul Yang Belum Dipisah Penuh
 
-- `components/tender.js`
-- `components/personnel.js`
-- `components/finance.js`
-- `components/reports.js`
 - `components/settings.js`
-- modul auth/role/backend bridge
+- modul task harian
+- modul auth/profile/role/backend bridge
+- helper data lintas fitur yang masih dipakai bersama
 
 ## Catatan Akses
 

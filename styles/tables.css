@@ -1,0 +1,5 @@
+.table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; min-width: 860px; background: #ffffff; }
+th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { color: var(--muted); background: var(--surface-soft); font-size: 12px; text-transform: uppercase; }
+td small { display: block; margin-top: 4px; color: var(--muted); }

@@ -42,9 +42,9 @@ Saat audit, `app.js`, `styles.css`, dan `index.html` masih besar. Ini masih aman
 Progress refactor:
 
 - `core/router.js` dan `core/scroll.js` sudah aktif.
-- `components/inventory.js`, `components/dashboard.js`, dan `components/portfolio.js` sudah aktif.
-- CSS dasar sudah mulai dipisah ke folder `styles/`.
-- Modul berikutnya sebaiknya dipilih satu per tahap agar dependency data tetap mudah dicek.
+- `components/inventory.js`, `components/dashboard.js`, `components/portfolio.js`, `components/finance.js`, `components/reports.js`, `components/personnel.js`, dan `components/tender.js` sudah aktif.
+- CSS dan theme sudah dipisah ke folder `styles/`.
+- Modul berikutnya sebaiknya memindahkan `settings`, task harian, auth/profile, role, dan helper data bersama secara bertahap.
 
 
 ## Struktur CSS
@@ -56,8 +56,8 @@ Gunakan pemisahan bertahap agar file mudah dirawat:
 - `styles/forms.css`: input, select, textarea, tombol dasar, dan state view.
 - `styles/sidebar.css`: kontrol visual kecil sidebar yang masih berdiri sendiri.
 - `styles/dashboard.css`: dashboard utama, KPI, tabel mini, progress, dan area monitoring dashboard.
-- `styles.css`: entry CSS utama. File ini mengimpor modul di atas lalu menyimpan legacy style yang belum aman dipisah.
-- `theme.css`: tema visual, warna, gradasi, polish dashboard, dan override lintas halaman. File ini diload setelah `styles.css`, sehingga perubahan tema tidak perlu mengubah base style.
-- Jika nanti bertambah besar, pecah lagi berdasarkan domain: `tables.css`, `modals.css`, `reports.css`, `finance.css`, `personnel.css`, dan `tender.css`.
+- File area tambahan di `styles/`: `tender-list.css`, `tender-detail.css`, `inventory.css`, `tasks.css`, `tables.css`, `portfolio.css`, `personnel.css`, `settings.css`, `recipients.css`, `modals.css`, `responsive.css`, `toasts.css`, `reports.css`, dan `finance.css`.
+- File theme modular di `styles/`: `theme-base.css`, `theme-layout.css`, `theme-workspaces.css`, `theme-dashboard.css`, `theme-wide.css`, dan `theme-inventory.css`.
+- `styles.css` dan `theme.css` adalah entry import. Jangan menambah rule baru langsung di sana kecuali hanya menambah `@import`.
 
 Prinsipnya: perubahan data dan sinkronisasi tetap di `app.js`; perubahan tampilan cukup di file CSS tema selama tidak membutuhkan markup baru.

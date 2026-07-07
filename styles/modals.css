@@ -1,0 +1,81 @@
+dialog { width: min(640px, calc(100vw - 28px)); border: 0; border-radius: 8px; padding: 0; box-shadow: var(--shadow); }
+#profileModal { width: min(800px, calc(100vw - 28px)); }
+dialog::backdrop { background: rgba(15, 23, 42, 0.5); }
+.modal-card { display: grid; gap: 14px; padding: 20px; }
+.modal-card header, .modal-card footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.modal-card label { display: grid; gap: 6px; color: var(--muted); font-weight: 700; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.icon-button { width: 36px; height: 36px; border: 0; border-radius: 8px; background: var(--surface-soft); }
+
+.inventory-form-card {
+  width: min(520px, calc(100vw - 28px));
+}
+
+.inventory-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.inventory-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.inventory-form-grid input,
+.inventory-form-grid select {
+  min-width: 0;
+  width: 100%;
+}
+
+.inventory-form-grid label small {
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.preview-card { min-width: min(680px, calc(100vw - 28px)); }
+.preview-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.preview-list div { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #ffffff; }
+.preview-list .full { grid-column: 1 / -1; }
+.preview-list dt { margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.preview-list dd { margin: 0; color: var(--text); }
+
+.profile-modal-card { width: min(760px, calc(100vw - 28px)); }
+.profile-modal-card header > div { display: grid; gap: 4px; }
+
+.profile-form-layout {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.profile-avatar-editor {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  text-align: center;
+}
+
+.profile-avatar-editor small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.profile-preview-avatar {
+  width: 82px;
+  height: 82px;
+  font-size: 25px;
+}
+
+.profile-fields { display: grid; gap: 14px; }
+.profile-privacy-note { font-size: 12px; }

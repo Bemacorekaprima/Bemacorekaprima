@@ -28,6 +28,10 @@ import { createRouter } from "./core/router.js";
 import { createInventoryFeature } from "./components/inventory.js";
 import { createDashboardFeature, DASHBOARD_ASSIGNMENT_CATEGORIES } from "./components/dashboard.js";
 import { createPortfolioFeature } from "./components/portfolio.js";
+import { createFinanceFeature } from "./components/finance.js";
+import { createReportsFeature } from "./components/reports.js";
+import { createPersonnelFeature } from "./components/personnel.js";
+import { createTenderFeature } from "./components/tender.js";
 
 const firebaseConfig = window.FIREBASE_CONFIG;
 if (!firebaseConfig || firebaseConfig.apiKey === "ISI_API_KEY_ANDA") {
@@ -103,9 +107,7 @@ let externalSheetLastLoadedAt = 0;
 let currentJobDetail = null;
 let jobDetailResizeObserver = null;
 let tenderJobSyncInProgress = false;
-let tenderSheetSyncInProgress = false;
 let lastTenderJobSignature = "";
-let lastTenderSheetSignature = "";
 const EXTERNAL_SHEET_CACHE_KEY = "asisten-harian.externalSheets.cache.v3";
 const INVENTORY_CACHE_KEY = "bemaco.dashboard.inventory.v1";
 const DEFAULT_EXTERNAL_SHEET_SOURCES = [
@@ -342,17 +344,7 @@ function bindControls() {
   document.getElementById("closeTaskModalButton").addEventListener("click", closeTaskModal);
   document.getElementById("createReportButton").addEventListener("click", createReport);
   document.getElementById("createReportButtonReports").addEventListener("click", createReport);
-  document.getElementById("reportsGenerateButton").addEventListener("click", () => generateReportPreview(false));
-  document.getElementById("reportsResetButton").addEventListener("click", resetReportFilters);
-  document.getElementById("reportsExportPdf").addEventListener("click", exportReportPdf);
-  document.getElementById("reportsExportExcel").addEventListener("click", exportReportExcel);
-  document.getElementById("reportsPrint").addEventListener("click", printReportPreview);
-  ["reportsType", "reportsStartDate", "reportsEndDate", "reportsSource", "reportsStatus", "reportsPerson"].forEach(id => {
-    document.getElementById(id).addEventListener("change", renderReportsWorkspace);
-  });
-  document.querySelectorAll("[data-report-template]").forEach(button => {
-    button.addEventListener("click", () => applyReportTemplate(button.dataset.reportTemplate));
-  });
+  bindReportsControls();
   document.getElementById("sendAllButton").addEventListener("click", sendAllReminders);
   document.getElementById("sendSelectedButton").addEventListener("click", sendSelectedReminders);
   document.getElementById("recipientSearch").addEventListener("focus", openRecipientCombobox);
@@ -367,81 +359,8 @@ function bindControls() {
   document.getElementById("roleAssignmentsBody").addEventListener("click", handleRoleAssignmentAction);
   document.getElementById("dataSourceConfigForm").addEventListener("submit", saveDataSourceConfig);
   document.getElementById("menuVisibilityForm").addEventListener("submit", saveMenuVisibilityConfig);
-  document.querySelectorAll("[data-personnel-source]").forEach(button => {
-    button.addEventListener("click", () => selectPersonnelSource(button.dataset.personnelSource));
-  });
-  document.getElementById("personnelSearch").addEventListener("input", event => {
-    state.personnelSearch = event.target.value;
-    state.personnelPage = 1;
-    renderPersonnel();
-  });
-  document.getElementById("personnelYearFilter").addEventListener("change", event => {
-    state.personnelYear = event.target.value;
-    state.personnelPage = 1;
-    renderPersonnel();
-  });
-  document.getElementById("personnelWorkFilter").addEventListener("change", event => {
-    state.personnelWorkFilter = event.target.value;
-    state.personnelPage = 1;
-    renderPersonnel();
-  });
-  document.getElementById("personnelSort").addEventListener("change", event => {
-    state.personnelSort = event.target.value;
-    state.personnelPage = 1;
-    renderPersonnel();
-  });
-  document.getElementById("personnelPageSize").addEventListener("change", event => {
-    state.personnelPageSize = Number(event.target.value) || 25;
-    state.personnelPage = 1;
-    renderPersonnel();
-  });
-  document.getElementById("resetPersonnelFilters").addEventListener("click", resetPersonnelFilters);
-  document.getElementById("refreshPersonnelButton").addEventListener("click", loadExternalSheetData);
-  document.getElementById("exportPersonnelExcelButton").addEventListener("click", exportPersonnelExcel);
-  document.getElementById("exportPersonnelPdfButton").addEventListener("click", exportPersonnelPdf);
-  document.getElementById("personnelToolsButton").addEventListener("click", togglePersonnelToolsMenu);
-  document.getElementById("personnelPrevPage").addEventListener("click", () => changePersonnelPage(-1));
-  document.getElementById("personnelNextPage").addEventListener("click", () => changePersonnelPage(1));
-  document.getElementById("personnelTableBody").addEventListener("click", handlePersonnelTableClick);
-  bindDashboardControls();
-  document.getElementById("dashboardAddItemButton").addEventListener("click", () => openJobRecordForm());
-  document.getElementById("dashboardOpenPortfolioButton").addEventListener("click", () => setView("jobs", { scroll: "top" }));
-  bindInventoryControls();
-  bindPortfolioControls();
-  document.getElementById("addPersonnelButton").addEventListener("click", () => openPersonnelForm());
-  document.getElementById("closePersonnelDetailButton").addEventListener("click", closePersonnelDetail);
-  document.getElementById("closePersonnelDetailFooter").addEventListener("click", closePersonnelDetail);
-  document.getElementById("personnelForm").addEventListener("submit", savePersonnelRecord);
-  document.getElementById("closePersonnelFormButton").addEventListener("click", closePersonnelForm);
-  document.getElementById("cancelPersonnelFormButton").addEventListener("click", closePersonnelForm);
-  document.getElementById("refreshFinanceButton")?.addEventListener("click", loadExternalSheetData);
-  document.getElementById("financeSearch")?.addEventListener("input", event => {
-    state.financeSearch = event.target.value;
-    renderFinance();
-  });
-  document.getElementById("financeStatusFilter")?.addEventListener("change", event => {
-    state.financeStatusFilter = event.target.value;
-    renderFinance();
-  });
-  document.getElementById("financeYearFilter")?.addEventListener("change", event => {
-    state.financeYear = event.target.value;
-    renderFinance();
-  });
-  document.getElementById("resetFinanceFilters")?.addEventListener("click", resetFinanceFilters);
-  document.getElementById("financeTableBody")?.addEventListener("click", handleFinanceTableClick);
-  document.getElementById("financeMobileList")?.addEventListener("click", handleFinanceMobileClick);
-  document.getElementById("financeToolsButton")?.addEventListener("click", toggleFinanceToolsMenu);
-  document.getElementById("financeAddRecordButton")?.addEventListener("click", () => handleFinanceAction("add"));
-  document.getElementById("financeEditRecordButton")?.addEventListener("click", () => handleFinanceAction("edit"));
-  document.getElementById("financeDeleteRecordButton")?.addEventListener("click", () => handleFinanceAction("delete"));
-  document.getElementById("financeDetailAddButton")?.addEventListener("click", () => handleFinanceAction("add"));
-  document.getElementById("financeDetailEditButton")?.addEventListener("click", () => handleFinanceAction("edit"));
-  document.getElementById("financeDetailDeleteButton")?.addEventListener("click", () => handleFinanceAction("delete"));
-  document.getElementById("financeDetailBody")?.addEventListener("click", handleFinanceDetailAction);
-  document.getElementById("financeRecordForm")?.addEventListener("submit", saveFinanceRecord);
-  document.getElementById("financeRecordForm")?.addEventListener("input", handleFinanceRecordFormInput);
-  document.getElementById("closeFinanceRecordFormButton")?.addEventListener("click", closeFinanceRecordForm);
-  document.getElementById("cancelFinanceRecordFormButton")?.addEventListener("click", closeFinanceRecordForm);
+  bindPersonnelControls();
+  bindFinanceControls();
   document.getElementById("closeJobDetailButton").addEventListener("click", closeJobDetail);
   document.getElementById("closeJobDetailFooter").addEventListener("click", closeJobDetail);
   document.getElementById("addJobDetailRowButton").addEventListener("click", () => openJobRecordForm(null, currentJobDetail));
@@ -455,31 +374,7 @@ function bindControls() {
   document.getElementById("taskDate").addEventListener("change", event => closeDatePicker(event.target));
   document.getElementById("taskDeadline").addEventListener("input", event => closeDatePicker(event.target));
   document.getElementById("taskDeadline").addEventListener("change", event => closeDatePicker(event.target));
-  document.getElementById("newTenderButton").addEventListener("click", () => openTenderForm());
-  document.getElementById("tenderForm").addEventListener("submit", saveTender);
-  document.getElementById("closeTenderFormButton").addEventListener("click", closeTenderForm);
-  document.getElementById("cancelTenderFormButton").addEventListener("click", closeTenderForm);
-  document.getElementById("tenderName").addEventListener("input", () => {
-    renderTenderPersonnelReferenceFromForm();
-    renderTenderPersonnelMembersFromForm();
-  });
-  document.getElementById("addTenderPersonnelButton").addEventListener("click", addTenderPersonnelFromForm);
-  document.getElementById("tenderPersonnelMembersList").addEventListener("click", handleTenderPersonnelMemberAction);
-  document.getElementById("tenderSearch").addEventListener("input", event => {
-    state.tenderSearch = event.target.value;
-    renderTenders();
-  });
-  document.getElementById("tenderStatusFilter").addEventListener("change", event => {
-    state.tenderStatusFilter = event.target.value;
-    renderTenders();
-  });
-  document.getElementById("tenderTableBody").addEventListener("click", handleTenderTableClick);
-  document.getElementById("editTenderButton").addEventListener("click", editSelectedTender);
-  document.getElementById("deleteTenderButton").addEventListener("click", deleteSelectedTender);
-  document.getElementById("saveTenderChecklistButton").addEventListener("click", saveTenderChecklist);
-  document.getElementById("generateTenderTemplateButton").addEventListener("click", generateTenderTemplate);
-  document.getElementById("saveTenderTemplateButton").addEventListener("click", saveTenderTemplateDraft);
-  document.getElementById("printTenderTemplateButton").addEventListener("click", printTenderTemplate);
+  bindTenderControls();
 
   document.querySelectorAll(".nav-item").forEach(button => {
     button.addEventListener("click", () => setView(button.dataset.view, { scroll: "top" }));
@@ -3766,544 +3661,105 @@ function getFilteredPersonnelRecords() {
   });
 }
 
-function renderPersonnel() {
-  const tableHead = document.getElementById("personnelTableHead");
-  const tableBody = document.getElementById("personnelTableBody");
-  if (!tableHead || !tableBody) return;
-  renderYearFilterOptions();
+let personnelFeature = null;
 
-  document.querySelectorAll("[data-personnel-source]").forEach(button => {
-    button.classList.toggle("active", button.dataset.personnelSource === state.personnelSource);
-  });
-
-  const bemacoSheet = getPersonnelSheet("personil-bmc");
-  const outsourcingSheet = getPersonnelSheet("outsourcing");
-  updatePersonnelSourceSummary("personnelBemacoCount", "personnelBemacoActive", bemacoSheet);
-  updatePersonnelSourceSummary("personnelOutsourcingCount", "personnelOutsourcingActive", outsourcingSheet);
-
-  const sheet = getPersonnelSheet();
-  const sourceName = state.personnelSource === "outsourcing" ? "Personil Outsourcing" : "Personil Bemaco";
-  document.getElementById("personnelTableTitle").textContent = sourceName;
-
-  if (!sheet || sheet.status !== "ready") {
-    const message = sheet?.status === "loading"
-      ? "Sedang memuat data spreadsheet..."
-      : sheet?.status === "error"
-        ? "Spreadsheet belum dapat dibaca. Periksa Apps Script Bridge lalu klik Refresh."
-        : "Menunggu sinkronisasi spreadsheet...";
-    document.getElementById("personnelSyncText").textContent = message;
-    document.getElementById("personnelResultCount").textContent = "0 data ditemukan";
-    document.getElementById("personnelPageInfo").textContent = "Halaman 1 dari 1";
-    tableHead.innerHTML = "";
-    tableBody.innerHTML = `<tr><td class="personnel-empty">${escapeHtml(message)}</td></tr>`;
-    setPersonnelPaginationButtons(1);
-    return;
+function getPersonnelFeature() {
+  if (!personnelFeature) {
+    personnelFeature = createPersonnelFeature({
+      state,
+      notify,
+      getCurrentUser: () => currentUser,
+      getExternalSheetLastLoadedAt: () => externalSheetLastLoadedAt,
+      loadExternalSheetData,
+      renderYearFilterOptions,
+      getPersonnelSheet,
+      getIntegratedPersonnelRecords,
+      getFilteredPersonnelRecords,
+      getPersonnelActiveWork,
+      getPersonnelName,
+      getPersonnelStatus,
+      getPersonnelPosition,
+      getDataUtamaSheet,
+      getRecordValue,
+      isSamePersonnelName,
+      isFinishedWorkRecord,
+      isActiveWorkRecord,
+      getRecordYears,
+      getComparableDate,
+      getRecordDisplayValue,
+      includesAny,
+      normalizeSearchText,
+      escapeHtml,
+      humanizeFieldName,
+      canManagePersonnel,
+      requirePermission,
+      togglePersonnelRowMenu,
+      closePersonnelMenus,
+      renderAssignmentMultiSelect,
+      renderPersonnelNameSuggestions,
+      bindAssignmentMultiSelects,
+      formatHumanDate,
+      formatSyncTime,
+      printHtmlDocument
+    });
   }
+  return personnelFeature;
+}
 
-  const integratedRecords = getIntegratedPersonnelRecords(sheet.records);
-  const filteredRecords = getFilteredPersonnelRecords();
-  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / state.personnelPageSize));
-  state.personnelPage = Math.min(Math.max(1, state.personnelPage), pageCount);
-  const pageStart = (state.personnelPage - 1) * state.personnelPageSize;
-  const pageRecords = filteredRecords.slice(pageStart, pageStart + state.personnelPageSize);
-  const columns = getPersonnelColumns(integratedRecords);
-  state.personnelVisibleRecords = pageRecords;
+function bindPersonnelControls() {
+  getPersonnelFeature().bindControls();
+}
 
-  document.getElementById("personnelSyncText").textContent =
-    `${sheet.records.length} data tersinkron · kategori ${state.personnelYear === "all" ? "semua tahun" : state.personnelYear} · diperbarui ${formatSyncTime(externalSheetLastLoadedAt)}`;
-  document.getElementById("personnelResultCount").textContent =
-    `${filteredRecords.length} data ditemukan`;
-  document.getElementById("personnelPageInfo").textContent =
-    `Halaman ${state.personnelPage} dari ${pageCount}`;
-  setPersonnelPaginationButtons(pageCount);
-
-  tableHead.innerHTML = `<tr>${columns.map(column =>
-    `<th>${escapeHtml(humanizeFieldName(column))}</th>`
-  ).join("")}<th>Aksi</th></tr>`;
-
-  tableBody.innerHTML = pageRecords.length
-    ? pageRecords.map((record, index) => `
-      <tr>
-        ${columns.map(column => {
-          const value = escapeHtml(getRecordDisplayValue(record, column));
-          const isName = includesAny(normalizeSearchText(column), ["nama personil", "nama lengkap"]);
-          return `<td data-label="${escapeHtml(humanizeFieldName(column))}">${isName
-            ? `<button class="personnel-history-link" type="button" data-personnel-history-index="${index}">${value}</button>`
-            : value}</td>`;
-        }).join("")}
-        <td data-label="Aksi" class="personnel-row-actions">
-          <div class="personnel-row-dropdown">
-            <button class="secondary-button action-dropdown-button" type="button" data-personnel-menu="${index}" aria-expanded="false">
-              Options <span class="dropdown-chevron" aria-hidden="true"></span>
-            </button>
-            <div class="personnel-row-menu hidden">
-              <button type="button" data-personnel-action="detail" data-personnel-index="${index}">View</button>
-              ${canManagePersonnel() ? `
-                <button type="button" data-personnel-action="edit" data-personnel-index="${index}">Edit</button>
-                <button class="danger-text" type="button" data-personnel-action="delete" data-personnel-index="${index}">Delete</button>
-              ` : ""}
-            </div>
-          </div>
-        </td>
-      </tr>
-    `).join("")
-    : '<tr><td class="personnel-empty">Tidak ada data yang sesuai dengan filter.</td></tr>';
+function renderPersonnel() {
+  getPersonnelFeature().render();
 }
 
 function getPersonnelColumns(records) {
-  const columns = [];
-  records.forEach(record => {
-    Object.keys(record || {}).forEach(key => {
-      if (key !== "_Sumber Baris" && !columns.includes(key)) columns.push(key);
-    });
-  });
-  return columns;
-}
-
-function updatePersonnelSourceSummary(countId, activeId, sheet) {
-  const records = sheet?.status === "ready" ? sheet.records : [];
-  const integratedRecords = getIntegratedPersonnelRecords(records);
-  document.getElementById(countId).textContent = records.length;
-  document.getElementById(activeId).textContent =
-    `${integratedRecords.filter(record => getPersonnelActiveWork(record) > 0).length} memiliki pekerjaan aktif`;
-}
-
-function selectPersonnelSource(sourceId) {
-  state.personnelSource = sourceId;
-  state.personnelPage = 1;
-  renderPersonnel();
-}
-
-function resetPersonnelFilters() {
-  state.personnelSearch = "";
-  state.personnelYear = "all";
-  state.personnelWorkFilter = "all";
-  state.personnelSort = "name-asc";
-  state.personnelPage = 1;
-  document.getElementById("personnelSearch").value = "";
-  document.getElementById("personnelYearFilter").value = "all";
-  document.getElementById("personnelWorkFilter").value = "all";
-  document.getElementById("personnelSort").value = "name-asc";
-  renderPersonnel();
-}
-
-function changePersonnelPage(offset) {
-  const records = getFilteredPersonnelRecords();
-  const pageCount = Math.max(1, Math.ceil(records.length / state.personnelPageSize));
-  state.personnelPage = Math.min(pageCount, Math.max(1, state.personnelPage + offset));
-  renderPersonnel();
-}
-
-function setPersonnelPaginationButtons(pageCount) {
-  document.getElementById("personnelPrevPage").disabled = state.personnelPage <= 1;
-  document.getElementById("personnelNextPage").disabled = state.personnelPage >= pageCount;
-}
-
-function handlePersonnelTableClick(event) {
-  const historyButton = event.target.closest("[data-personnel-history-index]");
-  if (historyButton) {
-    const record = state.personnelVisibleRecords?.[Number(historyButton.dataset.personnelHistoryIndex)];
-    if (record) openPersonnelDetail(record);
-    return;
-  }
-
-  const menuButton = event.target.closest("[data-personnel-menu]");
-  if (menuButton) {
-    togglePersonnelRowMenu(menuButton);
-    return;
-  }
-
-  const button = event.target.closest("[data-personnel-index]");
-  if (!button) return;
-  const record = state.personnelVisibleRecords?.[Number(button.dataset.personnelIndex)];
-  if (!record) return;
-  const action = button.dataset.personnelAction || "detail";
-  closePersonnelMenus();
-  if (action === "edit") openPersonnelForm(record);
-  else if (action === "delete") deletePersonnelRecord(record);
-  else openPersonnelDetail(record);
-}
-
-function openPersonnelDetail(record) {
-  const sourceId = record?._PersonSource || state.personnelSource;
-  const sheet = getPersonnelSheet(sourceId);
-  const personnelName = getPersonnelName(record);
-  const history = getPersonnelWorkHistory(personnelName);
-  const activeCount = history.filter(item => item.category === "active").length;
-  const finishedCount = history.filter(item => item.category === "finished").length;
-
-  document.getElementById("personnelDetailTitle").textContent = personnelName;
-  document.getElementById("personnelDetailSource").textContent =
-    `${sheet?.label || "Data Personil"} - histori pekerjaan aktif dan selesai`;
-  document.getElementById("personnelDetailBody").innerHTML = `
-    <section class="personnel-history-profile">
-      <div>
-        <span>Status</span>
-        <strong>${escapeHtml(getPersonnelStatus({ ...record, _PersonSource: sourceId }))}</strong>
-      </div>
-      <div>
-        <span>Jabatan atau Posisi</span>
-        <strong>${escapeHtml(getPersonnelPosition(record))}</strong>
-      </div>
-      <div>
-        <span>Pekerjaan Aktif</span>
-        <strong>${activeCount}</strong>
-      </div>
-      <div>
-        <span>Histori Selesai</span>
-        <strong>${finishedCount}</strong>
-      </div>
-      <div>
-        <span>Total Histori</span>
-        <strong>${history.length}</strong>
-      </div>
-    </section>
-    <section class="personnel-history-section">
-      <div class="personnel-history-section-header">
-        <div>
-          <h3>Histori Pekerjaan</h3>
-          <p>Pekerjaan aktif ditampilkan lebih dahulu, diikuti pekerjaan yang telah selesai.</p>
-        </div>
-      </div>
-      <div class="personnel-history-table-wrap">
-        <table class="personnel-history-table">
-          <thead>
-            <tr>
-              <th>Pekerjaan</th>
-              <th>Tahun</th>
-              <th>Tanggal Mulai</th>
-              <th>Tanggal Selesai</th>
-              <th>Status</th>
-              <th>Keterlibatan</th>
-              <th>Bobot Individual</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${history.length ? history.map(item => `
-              <tr>
-                <td><strong>${escapeHtml(item.pekerjaan)}</strong></td>
-                <td>${escapeHtml(item.tahun)}</td>
-                <td>${escapeHtml(item.tanggalMulai)}</td>
-                <td>${escapeHtml(item.tanggalSelesai)}</td>
-                <td><span class="work-status-badge ${item.category}">${escapeHtml(item.status)}</span></td>
-                <td>${escapeHtml(item.keterlibatan)}</td>
-                <td>${escapeHtml(item.bobot)}</td>
-              </tr>
-            `).join("") : '<tr><td class="dashboard-summary-empty" colspan="7">Belum ada histori pekerjaan yang cocok pada DATA UTAMA.</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
-  document.getElementById("personnelDetailModal").showModal();
+  return getPersonnelFeature().getColumns(records);
 }
 
 function getPersonnelWorkHistory(personnelName) {
-  const sheet = getDataUtamaSheet();
-  if (!sheet || sheet.status !== "ready") return [];
+  return getPersonnelFeature().getWorkHistory(personnelName);
+}
 
-  return sheet.records
-    .filter(record => {
-      const assignmentName = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
-      return isSamePersonnelName(personnelName, assignmentName);
-    })
-    .map(record => {
-      const isFinished = isFinishedWorkRecord(record);
-      const isActive = isActiveWorkRecord(record);
-      const statusValue = getRecordValue(record, ["status pekerjaan", "status project", "status proyek"]);
-      const years = getRecordYears(record).sort((left, right) => left - right);
-      return {
-        pekerjaan: getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"]) || "-",
-        tahun: years.length
-          ? (years.length === 1 ? String(years[0]) : `${years[0]}-${years[years.length - 1]}`)
-          : "-",
-        tanggalMulai: getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]) || "-",
-        tanggalSelesai: getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"]) || "-",
-        status: statusValue || (isFinished ? "Selesai" : isActive ? "Aktif" : "Belum ditentukan"),
-        keterlibatan: getRecordValue(record, ["keterlibatan"]) || "-",
-        bobot: normalizeSearchText(getRecordValue(record, ["keterlibatan"])) === "ya" ? "1" : "0",
-        category: isFinished ? "finished" : isActive ? "active" : "neutral",
-        sortTime: Math.max(
-          getComparableDate(getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"])),
-          getComparableDate(getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]))
-        )
-      };
-    })
-    .sort((left, right) => {
-      const rank = { active: 0, neutral: 1, finished: 2 };
-      return rank[left.category] - rank[right.category] || right.sortTime - left.sortTime;
-    });
+function resetPersonnelFilters() {
+  getPersonnelFeature().resetFilters();
+}
+
+function changePersonnelPage(offset) {
+  getPersonnelFeature().changePage(offset);
+}
+
+function handlePersonnelTableClick(event) {
+  getPersonnelFeature().handleTableClick(event);
+}
+
+function openPersonnelDetail(record) {
+  getPersonnelFeature().openDetail(record);
 }
 
 function closePersonnelDetail() {
-  document.getElementById("personnelDetailModal").close();
-}
-
-function isComputedPersonnelColumn(column) {
-  return includesAny(normalizeSearchText(column), [
-    "tahun",
-    "pekerjaan aktif",
-    "tugas aktif",
-    "project aktif",
-    "keterlibatan pekerjaan",
-    "status selesai",
-    "akumulasi"
-  ]);
-}
-
-function getEditablePersonnelColumns(records) {
-  const columns = getPersonnelColumns(records).filter(column => !isComputedPersonnelColumn(column));
-  if (!columns.some(column => normalizeSearchText(column).includes("posisi penugasan"))) {
-    columns.push("POSISI PENUGASAN");
-  }
-  return columns;
-}
-
-function getPersonnelStatusColumn(columns) {
-  return columns.find(column => includesAny(normalizeSearchText(column), ["status"])) || "";
-}
-
-function normalizePersonnelSourceFromStatus(value, fallbackSource = state.personnelSource) {
-  const text = normalizeSearchText(value);
-  if (includesAny(text, ["outsourcing", "out sour", "outsourching", "outsorcing"])) return "outsourcing";
-  if (includesAny(text, ["bemaco", "bmc", "rekaprima"])) return "personil-bmc";
-  return fallbackSource;
-}
-
-function normalizePersonnelStatusLabel(sourceId) {
-  return sourceId === "outsourcing" ? "Outsourcing" : "Bemaco";
-}
-
-function renderPersonnelInput(column, value, required) {
-  const normalized = normalizeSearchText(column);
-  const escapedColumn = escapeHtml(column);
-  const escapedValue = escapeHtml(value);
-  if (includesAny(normalized, ["nama personil", "nama lengkap"])) {
-    return `<input name="${escapedColumn}" value="${escapedValue}" list="personnelNameSuggestions" autocomplete="off" placeholder="Pilih atau ketik nama personil" ${required ? "required" : ""}>`;
-  }
-  if (normalized.includes("posisi penugasan")) {
-    return renderAssignmentMultiSelect(column, value);
-  }
-  const statusColumn = includesAny(normalized, ["status"]);
-  if (statusColumn) {
-    const selectedSource = normalizePersonnelSourceFromStatus(value, state.personnelSource);
-    return `
-      <select name="${escapedColumn}" ${required ? "required" : ""}>
-        <option value="Bemaco" ${selectedSource === "personil-bmc" ? "selected" : ""}>Bemaco</option>
-        <option value="Outsourcing" ${selectedSource === "outsourcing" ? "selected" : ""}>Outsourcing</option>
-      </select>
-    `;
-  }
-  return `
-    <input
-      name="${escapedColumn}"
-      value="${escapedValue}"
-      autocomplete="off"
-      ${required ? "required" : ""}
-    >
-  `;
+  getPersonnelFeature().closeDetail();
 }
 
 function openPersonnelForm(record = null) {
-  if (!requirePermission(
-    canManagePersonnel(),
-    "Hanya Super Admin, Editor, atau Author yang dapat mengubah data personil."
-  )) return;
-
-  const sheet = getPersonnelSheet();
-  if (!sheet || sheet.status !== "ready") {
-    notify("Data personil belum selesai dimuat.");
-    return;
-  }
-
-  const columns = getEditablePersonnelColumns(sheet.records);
-  if (!columns.length) {
-    notify("Kolom personil belum dapat dikenali.");
-    return;
-  }
-
-  document.getElementById("personnelFormTitle").textContent =
-    record ? "Edit Personil" : "Tambah Personil";
-  document.getElementById("personnelFormSource").textContent = sheet.label;
-  document.getElementById("personnelFormRow").value = record?.["_Sumber Baris"] || "";
-  const personnelFormFields = document.getElementById("personnelFormFields");
-  personnelFormFields.innerHTML = `
-    <datalist id="personnelNameSuggestions"></datalist>
-    ${columns.map((column, index) => `
-      <label class="${columns.length % 2 && index === columns.length - 1 ? "full" : ""}">
-        <span>${escapeHtml(humanizeFieldName(column))}</span>
-        ${renderPersonnelInput(column, record?.[column] || "", index === 0)}
-      </label>
-    `).join("")}
-  `;
-  renderPersonnelNameSuggestions();
-  bindAssignmentMultiSelects(personnelFormFields);
-  document.getElementById("personnelFormModal").showModal();
+  getPersonnelFeature().openForm(record);
 }
 
 function closePersonnelForm() {
-  document.getElementById("personnelFormModal").close();
+  getPersonnelFeature().closeForm();
 }
 
 async function savePersonnelRecord(event) {
-  event.preventDefault();
-  if (!requirePermission(
-    canManagePersonnel(),
-    "Hanya Super Admin, Editor, atau Author yang dapat menyimpan data personil."
-  )) return;
-
-  const form = event.currentTarget;
-  const rowNumber = Number(document.getElementById("personnelFormRow").value) || 0;
-  const data = Object.fromEntries(
-    Array.from(new FormData(form).entries()).map(([key, value]) => [key, String(value).trim()])
-  );
-  const columns = Object.keys(data);
-  const statusColumn = getPersonnelStatusColumn(columns);
-  const targetSourceId = normalizePersonnelSourceFromStatus(data[statusColumn], state.personnelSource);
-  if (statusColumn) data[statusColumn] = normalizePersonnelStatusLabel(targetSourceId);
-  await sendPersonnelMutation(rowNumber ? "update" : "add", {
-    rowNumber,
-    data,
-    targetSourceId
-  });
-}
-
-async function deletePersonnelRecord(record) {
-  if (!requirePermission(
-    canManagePersonnel(),
-    "Hanya Super Admin, Editor, atau Author yang dapat menghapus data personil."
-  )) return;
-  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
-  if (!rowNumber) return notify("Nomor baris personil tidak ditemukan.");
-  if (!confirm(`Hapus data personil "${getPersonnelName(record)}" dari Google Spreadsheet?`)) return;
-  await sendPersonnelMutation("delete", { rowNumber, data: {} });
-}
-
-async function sendPersonnelMutation(action, payload) {
-  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) {
-    notify("Apps Script Bridge belum dikonfigurasi. Ikuti panduan BEMACO-SPREADSHEET-BRIDGE.md.");
-    return;
-  }
-  if (!currentUser) return notify("Silakan login kembali.");
-
-  const submitButton = document.querySelector("#personnelForm button[type='submit']");
-  if (submitButton) submitButton.disabled = true;
-
-  try {
-    const firebaseIdToken = await currentUser.getIdToken(true);
-    await fetch(window.PERSONNEL_BRIDGE_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        token: window.PERSONNEL_BRIDGE_TOKEN,
-        firebaseIdToken,
-        action,
-        sourceId: state.personnelSource,
-        targetSourceId: payload.targetSourceId || state.personnelSource,
-        rowNumber: payload.rowNumber || 0,
-        data: payload.data || {}
-      })
-    });
-
-    closePersonnelForm();
-    notify(action === "delete"
-      ? "Permintaan hapus dikirim ke Google Spreadsheet."
-      : "Data personil dikirim ke Google Spreadsheet.");
-    await new Promise(resolve => window.setTimeout(resolve, 1400));
-    await loadExternalSheetData();
-  } catch (error) {
-    notify(`Data personil gagal dikirim: ${error.message}`);
-  } finally {
-    if (submitButton) submitButton.disabled = false;
-  }
-}
-
-function getPersonnelExportData() {
-  const records = getFilteredPersonnelRecords();
-  if (!records.length) {
-    notify("Tidak ada data personil untuk diekspor.");
-    return null;
-  }
-  return {
-    records,
-    columns: getPersonnelColumns(records),
-    title: document.getElementById("personnelTableTitle").textContent || "Personil"
-  };
-}
-
-function buildPersonnelExportTable(data) {
-  const header = data.columns.map(column =>
-    `<th>${escapeHtml(humanizeFieldName(column))}</th>`
-  ).join("");
-  const rows = data.records.map(record => `
-    <tr>
-      ${data.columns.map(column => `<td>${escapeHtml(getRecordDisplayValue(record, column))}</td>`).join("")}
-    </tr>
-  `).join("");
-  return `
-    <table>
-      <thead><tr>${header}</tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
+  await getPersonnelFeature().saveRecord(event);
 }
 
 function exportPersonnelExcel() {
-  const data = getPersonnelExportData();
-  if (!data) return;
-  const html = `
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
-          th { background: #e8eef7; color: #111827; font-weight: 700; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px; vertical-align: top; }
-          h1 { font-family: Arial, sans-serif; font-size: 18px; }
-        </style>
-      </head>
-      <body>
-        <h1>${escapeHtml(data.title)}</h1>
-        ${buildPersonnelExportTable(data)}
-      </body>
-    </html>
-  `;
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${state.personnelSource}-${state.today}.xls`;
-  link.click();
-  URL.revokeObjectURL(url);
+  getPersonnelFeature().exportExcel();
 }
 
 function exportPersonnelPdf() {
-  const data = getPersonnelExportData();
-  if (!data) return;
-  const html = `
-    <html>
-      <head>
-        <title>${escapeHtml(data.title)}</title>
-        <style>
-          @page { size: A4 landscape; margin: 12mm; }
-          body { font-family: Arial, sans-serif; color: #111827; }
-          h1 { margin: 0 0 6px; font-size: 20px; }
-          p { margin: 0 0 14px; color: #64748b; }
-          table { border-collapse: collapse; width: 100%; font-size: 10px; }
-          th { background: #e8eef7; color: #111827; font-weight: 700; }
-          th, td { border: 1px solid #cbd5e1; padding: 6px; vertical-align: top; word-break: break-word; }
-          tr { break-inside: avoid; }
-        </style>
-      </head>
-      <body>
-        <h1>${escapeHtml(data.title)}</h1>
-        <p>Diekspor ${formatHumanDate(state.today)} - ${data.records.length} data</p>
-        ${buildPersonnelExportTable(data)}
-      </body>
-    </html>
-  `;
-  printHtmlDocument(html);
+  getPersonnelFeature().exportPdf();
 }
 
 function formatSyncTime(timestamp) {
@@ -4759,579 +4215,128 @@ function createTenderChecklist(existing = []) {
   });
 }
 
+let tenderFeature = null;
+
+function getTenderFeature() {
+  if (!tenderFeature) {
+    tenderFeature = createTenderFeature({
+      state,
+      db,
+      doc,
+      collection,
+      setDoc,
+      deleteDoc,
+      serverTimestamp,
+      notify,
+      getCurrentUser: () => currentUser,
+      normalizeSearchText,
+      normalizeEmail,
+      escapeHtml,
+      formatRupiah,
+      getRecordValue,
+      requirePermission,
+      canManageTenders,
+      createTenderChecklist,
+      setTenderSyncStatus,
+      renderTenderPersonnelSuggestions,
+      renderTenderPersonnelReferenceFromForm,
+      renderTenderPersonnelMembersFromForm,
+      normalizeTenderPersonnelMembers,
+      setTenderPersonnelMembersToForm,
+      getTenderManualPersonnelFromLegacyFields,
+      collectTenderPersonnelMembersForSave,
+      getTenderReferencePersonnelMembers,
+      createTenderPersonnelRecord,
+      TENDER_STORAGE_COLLECTION,
+      TENDER_SHEET_SOURCE_ID,
+      TENDER_DOCUMENT_STATUSES
+    });
+  }
+  return tenderFeature;
+}
+
+function bindTenderControls() {
+  getTenderFeature().bindControls();
+}
+
 function getSelectedTender() {
-  return state.tenders.find(item => item.id === state.selectedTenderId) || null;
+  return getTenderFeature().getSelected();
 }
 
 function getTenderProgress(tender) {
-  const documents = createTenderChecklist(tender?.documents);
-  const finalCount = documents.filter(item => item.status === "Final").length;
-  return {
-    documents,
-    finalCount,
-    total: documents.length,
-    percent: documents.length ? Math.round((finalCount / documents.length) * 100) : 0
-  };
+  return getTenderFeature().getProgress(tender);
 }
 
 function getFilteredTenders() {
-  const keyword = normalizeSearchText(state.tenderSearch);
-  return state.tenders.filter(tender => {
-    const matchesStatus = state.tenderStatusFilter === "all" ||
-      tender.status === state.tenderStatusFilter;
-    const searchable = normalizeSearchText([
-      tender.name,
-      tender.agency,
-      tender.location,
-      tender.owner,
-      tender.ownerEmail,
-      tender.status,
-      tender.budgetYear
-    ].join(" "));
-    return matchesStatus && (!keyword || searchable.includes(keyword));
-  });
+  return getTenderFeature().getFiltered();
 }
 
 function isTenderDeadlineUrgent(tender) {
-  if (!tender?.deadline || ["Kontrak", "Arsip", "Siap/Final"].includes(tender.status)) return false;
-  const deadline = new Date(tender.deadline).getTime();
-  if (!Number.isFinite(deadline)) return false;
-  const remainingDays = (deadline - Date.now()) / 86400000;
-  return remainingDays >= 0 && remainingDays <= 7;
+  return getTenderFeature().isDeadlineUrgent(tender);
 }
 
 function renderTenders() {
-  const body = document.getElementById("tenderTableBody");
-  if (!body) return;
-  const filtered = getFilteredTenders();
-  const selected = getSelectedTender();
-
-  document.getElementById("tenderStatTotal").textContent = state.tenders.length;
-  document.getElementById("tenderStatPreparation").textContent =
-    state.tenders.filter(item => item.status === "Persiapan").length;
-  document.getElementById("tenderStatReady").textContent =
-    state.tenders.filter(item => ["Siap/Final", "Kontrak", "Arsip"].includes(item.status)).length;
-  document.getElementById("tenderStatUrgent").textContent =
-    state.tenders.filter(isTenderDeadlineUrgent).length;
-
-  body.innerHTML = filtered.length
-    ? filtered.map(tender => {
-      const progress = getTenderProgress(tender);
-      return `
-        <tr class="clickable-row ${tender.id === state.selectedTenderId ? "selected" : ""}" data-tender-id="${escapeHtml(tender.id)}">
-          <td>
-            <strong>${escapeHtml(tender.name || "Tanpa nama")}</strong>
-            <small>${escapeHtml(tender.location || tender.budgetYear || "")}</small>
-          </td>
-          <td>${escapeHtml(tender.agency || "-")}</td>
-          <td>${escapeHtml(formatTenderDateTime(tender.deadline))}</td>
-          <td>
-            <div class="tender-table-progress">
-              <span style="width:${progress.percent}%"></span>
-            </div>
-            <small>${progress.percent}%</small>
-          </td>
-          <td><span class="tender-status-badge">${escapeHtml(tender.status || "Persiapan")}</span></td>
-        </tr>
-      `;
-    }).join("")
-    : '<tr><td colspan="5" class="personnel-empty">Belum ada paket tender yang cocok.</td></tr>';
-
-  document.getElementById("tenderEmptyState").classList.toggle("hidden", Boolean(selected));
-  document.getElementById("tenderDetailContent").classList.toggle("hidden", !selected);
-  if (selected) renderTenderDetail(selected);
+  getTenderFeature().render();
 }
 
 function handleTenderTableClick(event) {
-  const row = event.target.closest("[data-tender-id]");
-  if (!row) return;
-  state.selectedTenderId = row.dataset.tenderId;
-  renderTenders();
+  getTenderFeature().handleTableClick(event);
 }
 
 function openTenderForm(tender = null) {
-  if (!requirePermission(canManageTenders(), "Role Anda tidak dapat mengubah paket tender.")) return;
-  document.getElementById("tenderForm").reset();
-  setTenderFormStatus("");
-  document.getElementById("tenderId").value = tender?.id || "";
-  document.getElementById("tenderFormTitle").textContent = tender ? "Edit Paket Tender" : "Paket Tender Baru";
-  document.getElementById("tenderName").value = tender?.name || "";
-  document.getElementById("tenderAgency").value = tender?.agency || "";
-  document.getElementById("tenderLocation").value = tender?.location || "";
-  document.getElementById("tenderFunding").value = tender?.funding || "";
-  document.getElementById("tenderBudgetYear").value = tender?.budgetYear || new Date().getFullYear();
-  document.getElementById("tenderBudgetCeiling").value = tender?.budgetCeiling || "";
-  document.getElementById("tenderHps").value = tender?.hps || "";
-  document.getElementById("tenderMethod").value = tender?.method || "Seleksi kualitas dan biaya";
-  document.getElementById("tenderContractType").value = tender?.contractType || "";
-  document.getElementById("tenderDeadline").value = tender?.deadline || "";
-  document.getElementById("tenderStatus").value = tender?.status || "Persiapan";
-  document.getElementById("tenderOwner").value = tender?.owner || "";
-  document.getElementById("tenderOwnerEmail").value = tender?.ownerEmail || "";
-  document.getElementById("tenderPersonnelName").value = tender?.personnelName || "";
-  document.getElementById("tenderPersonnelPosition").value = tender?.personnelPosition || "";
-  document.getElementById("tenderPersonnelInvolvement").value = tender?.personnelInvolvement || "";
-  setTenderPersonnelMembersToForm([
-    ...normalizeTenderPersonnelMembers(tender?.personnelMembers),
-    ...getTenderManualPersonnelFromLegacyFields(tender)
-  ]);
-  document.getElementById("tenderDriveUrl").value = tender?.driveUrl || state.appConfig?.driveUrl || "";
-  document.getElementById("tenderNotes").value = tender?.notes || "";
-  renderTenderPersonnelSuggestions();
-  renderTenderPersonnelReferenceFromForm();
-  renderTenderPersonnelMembersFromForm();
-  document.getElementById("tenderFormModal").showModal();
+  getTenderFeature().openForm(tender);
 }
 
 function closeTenderForm() {
-  document.getElementById("tenderFormModal").close();
-}
-
-async function saveTender(event) {
-  event.preventDefault();
-  if (!requirePermission(canManageTenders(), "Role Anda tidak dapat menyimpan paket tender.")) return;
-
-  const tenderId = document.getElementById("tenderId").value;
-  const existing = state.tenders.find(item => item.id === tenderId);
-  const personnelMembers = collectTenderPersonnelMembersForSave();
-  const primaryPersonnel = personnelMembers[0] || {
-    name: document.getElementById("tenderPersonnelName").value.trim(),
-    position: document.getElementById("tenderPersonnelPosition").value.trim(),
-    involvement: document.getElementById("tenderPersonnelInvolvement").value
-  };
-  const payload = {
-    entityType: "tender",
-    name: document.getElementById("tenderName").value.trim(),
-    agency: document.getElementById("tenderAgency").value.trim(),
-    location: document.getElementById("tenderLocation").value.trim(),
-    funding: document.getElementById("tenderFunding").value.trim(),
-    budgetYear: document.getElementById("tenderBudgetYear").value,
-    budgetCeiling: Number(document.getElementById("tenderBudgetCeiling").value || 0),
-    hps: Number(document.getElementById("tenderHps").value || 0),
-    method: document.getElementById("tenderMethod").value.trim(),
-    contractType: document.getElementById("tenderContractType").value.trim(),
-    deadline: document.getElementById("tenderDeadline").value,
-    status: document.getElementById("tenderStatus").value,
-    owner: document.getElementById("tenderOwner").value.trim(),
-    ownerEmail: normalizeEmail(document.getElementById("tenderOwnerEmail").value),
-    personnelName: primaryPersonnel.name || "",
-    personnelPosition: primaryPersonnel.position || "",
-    personnelInvolvement: primaryPersonnel.involvement || "",
-    personnelMembers,
-    driveUrl: document.getElementById("tenderDriveUrl").value.trim(),
-    notes: document.getElementById("tenderNotes").value.trim(),
-    documents: createTenderChecklist(existing?.documents),
-    updatedBy: normalizeEmail(currentUser?.email),
-    updatedAt: serverTimestamp()
-  };
-
-  const saveButton = document.getElementById("saveTenderButton");
-  saveButton.disabled = true;
-  saveButton.textContent = "Menyimpan...";
-  setTenderFormStatus("Menyimpan paket ke Firebase...", "loading");
-  try {
-    const reference = tenderId
-      ? doc(db, TENDER_STORAGE_COLLECTION, tenderId)
-      : doc(collection(db, TENDER_STORAGE_COLLECTION));
-    await setDoc(reference, {
-      ...payload,
-      ownerUid: existing?.ownerUid || currentUser?.uid || "",
-      createdBy: existing?.createdBy || normalizeEmail(currentUser?.email),
-      createdAt: existing?.createdAt || serverTimestamp()
-    }, { merge: true });
-    state.selectedTenderId = reference.id;
-    await sendTenderSpreadsheetMutation("upsert", { ...existing, ...payload, id: reference.id }, { silent: true });
-    setTenderFormStatus("Paket berhasil disimpan.", "success");
-    setTenderSyncStatus("ready", "Paket berhasil disimpan dan sedang disinkronkan...");
-    await new Promise(resolve => window.setTimeout(resolve, 450));
-    closeTenderForm();
-  } catch (error) {
-    const message = getTenderFirestoreErrorMessage(error, "Paket tender gagal disimpan.");
-    setTenderFormStatus(message, "error");
-    notify(message);
-  } finally {
-    saveButton.disabled = false;
-    saveButton.textContent = "Simpan Paket";
-  }
+  getTenderFeature().closeForm();
 }
 
 function setTenderFormStatus(message, status = "") {
-  const element = document.getElementById("tenderFormStatus");
-  if (!element) return;
-  element.className = `tender-form-status ${status}`.trim();
-  element.textContent = message;
+  getTenderFeature().setFormStatus(message, status);
+}
+
+async function saveTender(event) {
+  await getTenderFeature().save(event);
 }
 
 function editSelectedTender() {
-  const tender = getSelectedTender();
-  if (tender) openTenderForm(tender);
+  getTenderFeature().editSelected();
 }
 
 async function deleteSelectedTender() {
-  const tender = getSelectedTender();
-  if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat menghapus paket tender.")) return;
-  if (!confirm(`Hapus paket tender "${tender.name}" beserta checklist monitoringnya?`)) return;
-  try {
-    await sendTenderSpreadsheetMutation("deleteByKey", tender, { silent: true });
-    await deleteDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id));
-    state.selectedTenderId = "";
-  } catch (error) {
-    notify(getTenderFirestoreErrorMessage(error, "Paket tender gagal dihapus."));
-  }
+  await getTenderFeature().deleteSelected();
 }
 
 function renderTenderDetail(tender) {
-  const progress = getTenderProgress(tender);
-  const tenderPersonnel = getTenderPersonnel(tender);
-  document.getElementById("tenderDetailStatus").textContent = tender.status || "Persiapan";
-  document.getElementById("tenderDetailTitle").textContent = tender.name || "Paket Tender";
-  document.getElementById("tenderDetailMeta").textContent =
-    [tender.agency, tender.location, tender.budgetYear].filter(Boolean).join(" - ") || "Informasi paket belum lengkap";
-  document.getElementById("tenderProgressLabel").textContent = `${progress.percent}% lengkap`;
-  document.getElementById("tenderDocumentCount").textContent =
-    `${progress.finalCount} dari ${progress.total} dokumen final`;
-  document.getElementById("tenderProgressBar").style.width = `${progress.percent}%`;
-  document.getElementById("tenderInfoGrid").innerHTML = [
-    ["Sumber Dana", escapeHtml(tender.funding || "-")],
-    ["Pagu", escapeHtml(formatRupiah(tender.budgetCeiling))],
-    ["HPS", escapeHtml(formatRupiah(tender.hps))],
-    ["Metode Seleksi", escapeHtml(tender.method || "-")],
-    ["Jenis Kontrak", escapeHtml(tender.contractType || "-")],
-    ["Status DATA UTAMA", escapeHtml(tender.sourceStatus || "-")],
-    ["Jumlah Personil", escapeHtml(String(tenderPersonnel.length || tender.sourcePersonnelCount || "-"))],
-    ["Deadline", escapeHtml(formatTenderDateTime(tender.deadline))],
-    ["Penanggung Jawab", escapeHtml(tender.owner || "-")],
-    ["Nama Personil", escapeHtml(tender.personnelName || "-")],
-    ["POSISI/JABATAN", escapeHtml(tender.personnelPosition || "-")],
-    ["KETERLIBATAN", escapeHtml(tender.personnelInvolvement || "-")],
-    ["Folder Dokumen", tender.driveUrl
-      ? `<a href="${escapeHtml(tender.driveUrl)}" target="_blank" rel="noopener noreferrer">Buka folder</a>`
-      : "-"]
-  ].map(([label, value]) => `
-    <div><span>${escapeHtml(label)}</span><strong>${value}</strong></div>
-  `).join("");
-
-  document.getElementById("tenderChecklistBody").innerHTML = progress.documents.map(item => `
-    <tr data-tender-document-id="${escapeHtml(item.id)}">
-      <td>${escapeHtml(item.group)}</td>
-      <td><strong>${escapeHtml(item.name)}</strong></td>
-      <td>
-        <select data-document-field="status" ${canManageTenders() ? "" : "disabled"}>
-          ${TENDER_DOCUMENT_STATUSES.map(status =>
-            `<option ${status === item.status ? "selected" : ""}>${escapeHtml(status)}</option>`
-          ).join("")}
-        </select>
-      </td>
-      <td><input data-document-field="owner" list="tenderPersonnelNameSuggestions" autocomplete="off" value="${escapeHtml(item.owner)}" ${canManageTenders() ? "" : "disabled"}></td>
-      <td><input data-document-field="deadline" type="date" value="${escapeHtml(item.deadline)}" ${canManageTenders() ? "" : "disabled"}></td>
-      <td class="tender-document-link-cell">
-        <input data-document-field="url" type="url" value="${escapeHtml(item.url)}" placeholder="https://..." ${canManageTenders() ? "" : "disabled"}>
-        ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Buka</a>` : ""}
-      </td>
-    </tr>
-  `).join("");
+  getTenderFeature().renderDetail(tender);
 }
 
 async function saveTenderChecklist() {
-  const tender = getSelectedTender();
-  if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat mengubah monitoring dokumen.")) return;
-  const documents = [...document.querySelectorAll("[data-tender-document-id]")].map(row => ({
-    id: row.dataset.tenderDocumentId,
-    group: createTenderChecklist().find(item => item.id === row.dataset.tenderDocumentId)?.group || "",
-    name: createTenderChecklist().find(item => item.id === row.dataset.tenderDocumentId)?.name || "",
-    status: row.querySelector('[data-document-field="status"]').value,
-    owner: row.querySelector('[data-document-field="owner"]').value.trim(),
-    deadline: row.querySelector('[data-document-field="deadline"]').value,
-    url: row.querySelector('[data-document-field="url"]').value.trim()
-  }));
-  try {
-    await setDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id), {
-      documents,
-      updatedBy: normalizeEmail(currentUser?.email),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    await sendTenderSpreadsheetMutation("upsert", { ...tender, documents }, { silent: true });
-    notify("Monitoring dokumen berhasil disimpan.");
-  } catch (error) {
-    notify(getTenderFirestoreErrorMessage(error, "Monitoring dokumen gagal disimpan."));
-  }
-}
-
-function buildTenderSpreadsheetData(tender) {
-  const progress = getTenderProgress(tender);
-  const personnel = getTenderPersonnel(tender);
-  return {
-    "ID Tender": tender?.id || "",
-    "Paket": tender?.name || "",
-    "Status": tender?.status || "Persiapan",
-    "Instansi/Satker": tender?.agency || "",
-    "Lokasi": tender?.location || "",
-    "Tahun Anggaran": tender?.budgetYear || "",
-    "Sumber Dana": tender?.funding || "",
-    "Pagu": tender?.budgetCeiling || 0,
-    "HPS": tender?.hps || 0,
-    "Metode Seleksi": tender?.method || "",
-    "Jenis Kontrak": tender?.contractType || "",
-    "Deadline": tender?.deadline || "",
-    "Penanggung Jawab": tender?.owner || "",
-    "Email PIC": tender?.ownerEmail || "",
-    "Nama Personil": personnel.map(member => member.name).filter(Boolean).join(", "),
-    "Jumlah Personil": personnel.length || tender?.sourcePersonnelCount || 0,
-    "Progress": progress.percent,
-    "Dokumen Final": progress.finalCount,
-    "Total Dokumen": progress.total,
-    "Folder Dokumen": tender?.driveUrl || "",
-    "Catatan": tender?.notes || "",
-    "Updated By": normalizeEmail(currentUser?.email || tender?.updatedBy || ""),
-    "Updated At": new Date().toISOString()
-  };
-}
-
-async function sendTenderSpreadsheetMutation(action, tender, options = {}) {
-  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN || !currentUser || !tender?.id) return;
-  try {
-    const firebaseIdToken = await currentUser.getIdToken(true);
-    await fetch(window.PERSONNEL_BRIDGE_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        token: window.PERSONNEL_BRIDGE_TOKEN,
-        firebaseIdToken,
-        action,
-        sourceId: TENDER_SHEET_SOURCE_ID,
-        targetSourceId: TENDER_SHEET_SOURCE_ID,
-        matchColumn: "ID Tender",
-        matchValue: tender.id,
-        data: buildTenderSpreadsheetData(tender)
-      })
-    });
-    if (!options.silent) notify("Data Tender dikirim ke Google Spreadsheet.");
-  } catch (error) {
-    if (!options.silent) notify("Data Tender gagal dikirim ke Google Spreadsheet: " + error.message);
-    console.error("Tender gagal dikirim ke Google Spreadsheet:", error);
-  }
+  await getTenderFeature().saveChecklist();
 }
 
 async function syncTenderSheetFromState() {
-  if (!currentUser || !canManageTenders() || tenderSheetSyncInProgress || !state.tenders.length) return;
-  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) return;
-  const signature = JSON.stringify(state.tenders.map(tender => [
-    tender.id,
-    tender.name,
-    tender.status,
-    tender.deadline,
-    tender.updatedAt?.seconds || "",
-    createTenderChecklist(tender.documents).map(item => [item.id, item.status, item.deadline, item.url]).join("|")
-  ]));
-  if (signature === lastTenderSheetSignature) return;
-
-  tenderSheetSyncInProgress = true;
-  try {
-    for (const tender of state.tenders) {
-      await sendTenderSpreadsheetMutation("upsert", tender, { silent: true });
-    }
-    lastTenderSheetSignature = signature;
-  } finally {
-    tenderSheetSyncInProgress = false;
-  }
+  await getTenderFeature().syncSheetFromState();
 }
 
 function formatTenderDateTime(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: value.includes("T") ? "2-digit" : undefined,
-    minute: value.includes("T") ? "2-digit" : undefined
-  }).format(date);
+  return getTenderFeature().formatDateTime(value);
 }
 
 function getTenderPersonnel(tender) {
-  const references = getTenderReferencePersonnelMembers(tender?.sourceJobKey || tender?.name);
-  const manual = [
-    ...normalizeTenderPersonnelMembers(tender?.personnelMembers),
-    ...getTenderManualPersonnelFromLegacyFields(tender)
-  ];
-  const unique = new Map();
-
-  [...references, ...manual].forEach(member => {
-    const record = createTenderPersonnelRecord({
-      name: member?.name || getRecordValue(member, ["nama personil", "nama lengkap", "nama"]),
-      position: member?.position || getRecordValue(member, [
-        "posisi/jabatan (kontrak)",
-        "posisi/jabatan",
-        "jabatan",
-        "posisi"
-      ]),
-      involvement: member?.involvement || getRecordValue(member, ["keterlibatan"]),
-      source: member?.source || "Tambahan"
-    });
-    const key = normalizeSearchText(record.name);
-    if (!key || unique.has(key)) return;
-    unique.set(key, record);
-  });
-
-  return [...unique.values()];
-}
-
-function buildTenderTemplate(tender, type) {
-  const personnel = getTenderPersonnel(tender);
-  const companyName = "PT. BEMACO REKAPRIMA";
-  const commonHeader = `
-    <div class="template-letterhead">
-      <strong>${companyName}</strong>
-      <span>Dokumen Tender Jasa Konsultansi</span>
-    </div>
-  `;
-  const identity = `
-    <table>
-      <tr><th>Nama Paket</th><td>${escapeHtml(tender.name || "-")}</td></tr>
-      <tr><th>Instansi/Satker</th><td>${escapeHtml(tender.agency || "-")}</td></tr>
-      <tr><th>Lokasi</th><td>${escapeHtml(tender.location || "-")}</td></tr>
-      <tr><th>Tahun Anggaran</th><td>${escapeHtml(tender.budgetYear || "-")}</td></tr>
-    </table>
-  `;
-  const signature = `
-    <div class="template-signature">
-      <p>[Kota], [Tanggal Dokumen]</p>
-      <p>${companyName}</p>
-      <br><br><br>
-      <strong>[Nama Penandatangan]</strong>
-      <p>[Jabatan]</p>
-    </div>
-  `;
-
-  if (type === "pakta-integritas") {
-    return `${commonHeader}<h1>PAKTA INTEGRITAS</h1>${identity}
-      <p>Kami yang bertanda tangan di bawah ini menyatakan bahwa dalam proses pengadaan untuk paket tersebut:</p>
-      <ol>
-        <li>Tidak akan melakukan praktik korupsi, kolusi, dan nepotisme.</li>
-        <li>Akan melaporkan indikasi penyimpangan yang diketahui.</li>
-        <li>Akan mengikuti proses pengadaan secara bersih, transparan, dan profesional.</li>
-        <li>Bersedia dikenakan sanksi apabila melanggar pernyataan ini.</li>
-      </ol>${signature}`;
-  }
-
-  if (type === "daftar-personel" || type === "jadwal-penugasan") {
-    const isSchedule = type === "jadwal-penugasan";
-    return `${commonHeader}<h1>${isSchedule ? "JADWAL PENUGASAN PERSONEL" : "DAFTAR PERSONEL TENAGA AHLI"}</h1>${identity}
-      <table>
-        <thead><tr><th>No.</th><th>Nama Personel</th><th>Posisi/Jabatan</th>${isSchedule
-          ? "<th>Mulai</th><th>Selesai</th>"
-          : "<th>Bidang Keahlian</th><th>Status</th>"}</tr></thead>
-        <tbody>${personnel.length ? personnel.map((record, index) => `
-          <tr>
-            <td>${index + 1}</td>
-            <td>${escapeHtml(getRecordValue(record, ["nama personil", "nama lengkap", "nama"]) || "-")}</td>
-            <td>${escapeHtml(getRecordValue(record, ["posisi jabatan kontrak", "jabatan", "posisi"]) || "-")}</td>
-            ${isSchedule
-              ? `<td>${escapeHtml(getRecordValue(record, ["tanggal mulai", "mulai"]) || "-")}</td><td>${escapeHtml(getRecordValue(record, ["tanggal selesai", "selesai"]) || "-")}</td>`
-              : `<td>${escapeHtml(getRecordValue(record, ["ska bidang keahlian", "bidang keahlian", "ska"]) || "-")}</td><td>${escapeHtml(getRecordValue(record, ["status kontrak", "status"]) || "-")}</td>`}
-          </tr>`).join("") : '<tr><td colspan="6">Tambahkan data personel paket pada DATA UTAMA atau isi tabel ini secara manual.</td></tr>'}</tbody>
-      </table>${signature}`;
-  }
-
-  if (type === "metodologi") {
-    return `${commonHeader}<h1>PENDEKATAN DAN METODOLOGI</h1>${identity}
-      <h2>1. Pemahaman terhadap Kerangka Acuan Kerja</h2>
-      <p>[Jelaskan pemahaman tujuan, keluaran, lokasi, ruang lingkup, dan kondisi pekerjaan.]</p>
-      <h2>2. Pendekatan Teknis</h2>
-      <p>[Uraikan pendekatan teknis yang relevan dengan paket dan standar PUPR/Cipta Karya.]</p>
-      <h2>3. Metodologi Pelaksanaan</h2>
-      <p>[Uraikan tahapan pengumpulan data, analisis, perencanaan, koordinasi, pengendalian mutu, dan pelaporan.]</p>
-      <h2>4. Rencana Kerja dan Organisasi Tim</h2>
-      <p>[Jelaskan jadwal, pembagian peran, mekanisme komunikasi, serta pengendalian risiko.]</p>
-      <h2>5. Keluaran dan Pengendalian Mutu</h2>
-      <p>[Tuliskan daftar keluaran dan mekanisme pemeriksaan sebelum penyerahan.]</p>`;
-  }
-
-  return `${commonHeader}<h1>SURAT PENAWARAN</h1>
-    <p>Nomor: [Nomor Surat]</p>
-    <p>Kepada Yth.<br><strong>Pokja Pemilihan / Pejabat Pengadaan</strong><br>${escapeHtml(tender.agency || "[Nama Instansi/Satker]")}</p>
-    <p>Dengan hormat,</p>
-    <p>Sehubungan dengan proses pemilihan penyedia jasa konsultansi untuk paket berikut:</p>
-    ${identity}
-    <p>Kami mengajukan penawaran sesuai Dokumen Pemilihan beserta seluruh adendum. Nilai penawaran biaya kami adalah <strong>${formatRupiah(tender.hps || tender.budgetCeiling)}</strong> atau sesuai rincian penawaran biaya terlampir.</p>
-    <p>Penawaran ini berlaku selama [masa berlaku penawaran] hari kalender sejak batas akhir pemasukan penawaran.</p>
-    ${signature}`;
+  return getTenderFeature().getPersonnel(tender);
 }
 
 function generateTenderTemplate() {
-  const tender = getSelectedTender();
-  if (!tender) return notify("Pilih paket tender terlebih dahulu.");
-  const type = document.getElementById("tenderTemplateType").value;
-  document.getElementById("tenderTemplatePreview").innerHTML =
-    sanitizeTenderTemplateHtml(tender.templates?.[type] || buildTenderTemplate(tender, type));
+  getTenderFeature().generateTemplate();
 }
 
 async function saveTenderTemplateDraft() {
-  const tender = getSelectedTender();
-  if (!tender || !requirePermission(canManageTenders(), "Role Anda tidak dapat menyimpan draf template.")) return;
-  const type = document.getElementById("tenderTemplateType").value;
-  const content = sanitizeTenderTemplateHtml(
-    document.getElementById("tenderTemplatePreview").innerHTML.trim()
-  );
-  if (!content) return notify("Buat atau isi template terlebih dahulu.");
-  try {
-    await setDoc(doc(db, TENDER_STORAGE_COLLECTION, tender.id), {
-      templates: {
-        ...(tender.templates || {}),
-        [type]: content
-      },
-      updatedBy: normalizeEmail(currentUser?.email),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-    notify("Draf template berhasil disimpan pada paket tender.");
-  } catch (error) {
-    notify(getTenderFirestoreErrorMessage(error, "Draf template gagal disimpan."));
-  }
-}
-
-function getTenderFirestoreErrorMessage(error, prefix) {
-  const code = String(error?.code || "");
-  const message = String(error?.message || "");
-  if (code.includes("permission-denied") || message.toLowerCase().includes("insufficient permissions")) {
-    return `${prefix}\n\nFirestore menolak izin koleksi tenders. Buka Firebase Console > Firestore Database > Rules, masukkan firestore.rules terbaru, lalu klik Publish. Setelah itu muat ulang web.`;
-  }
-  return `${prefix}\n\n${message || "Terjadi kesalahan yang tidak diketahui."}`;
-}
-
-function sanitizeTenderTemplateHtml(value) {
-  const documentFragment = new DOMParser().parseFromString(String(value || ""), "text/html");
-  documentFragment.querySelectorAll("script, style, iframe, object, embed, form").forEach(node => node.remove());
-  documentFragment.querySelectorAll("*").forEach(node => {
-    [...node.attributes].forEach(attribute => {
-      const name = attribute.name.toLowerCase();
-      const content = attribute.value.trim().toLowerCase();
-      if (name.startsWith("on") || ((name === "href" || name === "src") && content.startsWith("javascript:"))) {
-        node.removeAttribute(attribute.name);
-      }
-    });
-  });
-  return documentFragment.body.innerHTML;
+  await getTenderFeature().saveTemplateDraft();
 }
 
 function printTenderTemplate() {
-  const tender = getSelectedTender();
-  const preview = document.getElementById("tenderTemplatePreview");
-  if (!tender || !preview.textContent.trim()) return notify("Buat template terlebih dahulu.");
-  const html = `
-    <!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(tender.name)} - Dokumen Tender</title>
-    <style>
-      @page { size: A4; margin: 20mm; }
-      body { color:#111827; font:12pt Arial,sans-serif; line-height:1.55; }
-      h1 { margin:22px 0; font-size:16pt; text-align:center; }
-      h2 { margin-top:20px; font-size:13pt; }
-      table { width:100%; border-collapse:collapse; margin:14px 0; }
-      th,td { border:1px solid #9ca3af; padding:7px; text-align:left; vertical-align:top; }
-      .template-letterhead { display:flex; justify-content:space-between; border-bottom:2px solid #1d4ed8; padding-bottom:10px; }
-      .template-signature { width:42%; margin:30px 0 0 auto; }
-    </style></head><body>${sanitizeTenderTemplateHtml(preview.innerHTML)}</body></html>`;
-  printHtmlDocument(html);
+  getTenderFeature().printTemplate();
 }
 
 function watchProfiles() {
@@ -5492,1209 +4497,75 @@ function renderView() {
   getViewRouter().renderView();
 }
 
-function getFinanceSheet() {
-  return state.externalSheets.find(sheet => sheet.id === "finance") || null;
-}
+let financeFeature = null;
 
-function getFinanceAuxSheet(sourceId) {
-  return state.externalSheets.find(sheet => sheet.id === sourceId) || null;
-}
-
-function parseFinanceNumber(value) {
-  const parsed = parseIndonesianNumber(value);
-  if (parsed != null) return parsed;
-
-  const numeric = String(value || "").replace(/[^\d,.-]/g, "").trim();
-  if (!numeric) return 0;
-  const lastComma = numeric.lastIndexOf(",");
-  const lastDot = numeric.lastIndexOf(".");
-  const decimalSeparator = lastComma > lastDot ? "," : ".";
-  const normalized = decimalSeparator === ","
-    ? numeric.replace(/\./g, "").replace(",", ".")
-    : numeric.replace(/,/g, "");
-  const number = Number(normalized);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function formatFinanceMoney(value) {
-  const number = Number(value) || 0;
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0
-  }).format(number);
-}
-
-function getFinanceRecordJobName(record) {
-  return getRecordValue(record, ["pekerjaan", "nama pekerjaan", "project", "proyek"]);
-}
-
-function getFinanceJobMatchKey(value) {
-  return normalizeSearchText(value)
-    .replace(/^(pekerjaan|project|proyek|paket)\s+/g, "")
-    .replace(/\s+(pekerjaan|project|proyek|paket)$/g, "")
-    .trim();
-}
-
-function getFinanceGroupForJob(grouped, jobName) {
-  const key = getFinanceJobMatchKey(jobName);
-  if (!key) return null;
-  if (grouped.has(key)) return grouped.get(key);
-
-  let best = null;
-  grouped.forEach(group => {
-    if (best) return;
-    const financeKey = group.matchKey || getFinanceJobMatchKey(group.pekerjaan);
-    if (!financeKey) return;
-    const longEnough = key.length >= 18 && financeKey.length >= 18;
-    if (longEnough && (key.includes(financeKey) || financeKey.includes(key))) best = group;
-  });
-  return best;
-}
-
-function getFinanceRecordPersonName(record) {
-  return getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
-}
-
-function isFinancePersonnelRecord(record) {
-  if (getFinanceRecordPersonName(record)) return true;
-  return Boolean(getRecordValue(record, [
-    "uraian",
-    "jabatan",
-    "posisi",
-    "jumlah bulan",
-    "harga satuan",
-    "total biaya personil",
-    "total harga",
-    "pajak pph 21",
-    "netto"
-  ]));
-}
-
-function getFinancePphTaxValue(record) {
-  const keys = Object.keys(record || {});
-  const exactKey = keys.find(key => {
-    const normalized = normalizeSearchText(key);
-    return normalized.includes("pajak") && normalized.includes("pph") && normalized.includes("21") && !normalized.includes("tarif");
-  });
-  if (exactKey) return String(record?.[exactKey] || "").trim();
-
-  const fallbackKey = keys.find(key => {
-    const normalized = normalizeSearchText(key);
-    return normalized.includes("pph") && normalized.includes("21") && !normalized.includes("tarif");
-  });
-  return fallbackKey ? String(record?.[fallbackKey] || "").trim() : "";
-}
-
-function getFinanceContractValue(record) {
-  const keys = Object.keys(record || {});
-  const contractKey = keys.find(key => {
-    const normalized = normalizeSearchText(key);
-    return (
-      (normalized.includes("nilai kontrak") ||
-        normalized.includes("kontrak awal") ||
-        normalized.includes("nilai pekerjaan") ||
-        normalized.includes("nilai pagu")) &&
-      !normalized.includes("total harga") &&
-      !normalized.includes("harga satuan")
-    );
-  });
-  return contractKey ? parseFinanceNumber(record?.[contractKey]) : 0;
-}
-
-function getFinanceStatusKey(entry) {
-  if (!entry.financeRecords.length) return "waiting";
-  if (entry.progress >= 100) return "complete";
-  return "billing";
-}
-
-function getFinanceStatusLabel(entry) {
-  return {
-    waiting: "Menunggu data Finance",
-    complete: "Termin selesai",
-    billing: "Tagihan berjalan"
-  }[getFinanceStatusKey(entry)] || "Tagihan berjalan";
-}
-
-function buildFinanceEntries() {
-  const financeSheet = getFinanceSheet();
-  const financeRecords = financeSheet?.status === "ready" ? financeSheet.records : [];
-  const grouped = new Map();
-  financeRecords.forEach(record => {
-    const jobName = getFinanceRecordJobName(record) || "Pekerjaan tanpa nama";
-    const key = getFinanceJobMatchKey(jobName);
-    const group = grouped.get(key) || {
-      key,
-      matchKey: key,
-      pekerjaan: jobName,
-      financeRecords: [],
-      totalHarga: 0,
-      totalBiayaPersonil: 0,
-      nilaiKontrak: 0,
-      netto: 0,
-      pajak: 0,
-      pemberiKerja: "",
-      tanggalMulai: "",
-      tanggalSelesai: ""
-    };
-    group.financeRecords.push(record);
-    const biayaPersonil = parseFinanceNumber(getRecordValue(record, ["total harga", "harga total", "total biaya", "total biaya personil"]));
-    const nilaiKontrak = getFinanceContractValue(record);
-    group.totalBiayaPersonil += biayaPersonil;
-    group.totalHarga = group.totalBiayaPersonil;
-    if (nilaiKontrak > group.nilaiKontrak) group.nilaiKontrak = nilaiKontrak;
-    group.netto += parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"]));
-    group.pajak += parseFinanceNumber(getFinancePphTaxValue(record));
-    group.pemberiKerja ||= getRecordValue(record, ["pemberi kerja", "instansi", "klien", "owner"]);
-    group.tanggalMulai ||= getRecordValue(record, ["tanggal mulai", "tgl mulai", "mulai"]);
-    group.tanggalSelesai ||= getRecordValue(record, ["tanggal selesai", "tgl selesai", "selesai"]);
-    grouped.set(key, group);
-  });
-
-  const entries = [];
-  const seen = new Set();
-  buildJobsFromAllSources().forEach(job => {
-    const key = getFinanceJobMatchKey(job.pekerjaan);
-    const finance = getFinanceGroupForJob(grouped, job.pekerjaan);
-    const progress = getPortfolioProgress(job);
-    const people = getPortfolioPeople(job, Infinity);
-    entries.push({
-      key,
-      pekerjaan: job.pekerjaan,
-      job,
-      financeRecords: finance?.financeRecords || [],
-      totalHarga: finance?.totalBiayaPersonil || finance?.totalHarga || 0,
-      totalBiayaPersonil: finance?.totalBiayaPersonil || finance?.totalHarga || 0,
-      nilaiKontrak: finance?.nilaiKontrak || 0,
-      netto: finance?.netto || 0,
-      pajak: finance?.pajak || 0,
-      pemberiKerja: getRecordValue(job.records?.[0] || {}, ["pemberi kerja", "instansi", "klien", "owner"]) || finance?.pemberiKerja || "",
-      tanggalMulai: job.tanggalMulai || "",
-      tanggalSelesai: job.tanggalSelesai || "",
-      progress,
-      status: getPortfolioStatusLabel(job),
-      yearLabel: getJobYearLabel(job),
-      personil: people,
-      source: finance ? "Finance + Portofolio" : "Portofolio"
+function getFinanceFeature() {
+  if (!financeFeature) {
+    financeFeature = createFinanceFeature({
+      state,
+      notify,
+      getCurrentUser: () => currentUser,
+      loadExternalSheetData,
+      parseIndonesianNumber,
+      getRecordValue,
+      normalizeSearchText,
+      buildJobsFromAllSources,
+      getPortfolioProgress,
+      getPortfolioPeople,
+      getPortfolioStatusLabel,
+      getJobYearLabel,
+      getYearFromDateValue,
+      getMeaningfulTokens,
+      setTextContent,
+      escapeHtml,
+      safeClassToken,
+      humanizeFieldName,
+      includesAny,
+      requirePermission,
+      canManagePersonnel
     });
-    if (finance?.matchKey) seen.add(finance.matchKey);
-    seen.add(key);
-  });
-
-  grouped.forEach((finance, key) => {
-    if (seen.has(key)) return;
-    entries.push({
-      key,
-      pekerjaan: finance.pekerjaan,
-      job: null,
-      financeRecords: finance.financeRecords,
-      totalHarga: finance.totalBiayaPersonil || finance.totalHarga,
-      totalBiayaPersonil: finance.totalBiayaPersonil || finance.totalHarga,
-      nilaiKontrak: finance.nilaiKontrak || 0,
-      netto: finance.netto,
-      pajak: finance.pajak,
-      pemberiKerja: finance.pemberiKerja,
-      tanggalMulai: finance.tanggalMulai,
-      tanggalSelesai: finance.tanggalSelesai,
-      progress: 0,
-      status: "Finance",
-      yearLabel: String(getYearFromDateValue(finance.tanggalMulai) || getYearFromDateValue(finance.tanggalSelesai) || "-"),
-      personil: finance.financeRecords.map(getFinanceRecordPersonName).filter(Boolean),
-      source: "Finance"
-    });
-  });
-
-  return entries.sort((a, b) => a.pekerjaan.localeCompare(b.pekerjaan, "id"));
+  }
+  return financeFeature;
 }
 
-function getFilteredFinanceEntries() {
-  const query = normalizeSearchText(state.financeSearch);
-  const tokens = getMeaningfulTokens(query);
-  return buildFinanceEntries().filter(entry => {
-    const yearOk = state.financeYear === "all" || String(entry.yearLabel).includes(String(state.financeYear));
-    const statusOk = state.financeStatusFilter === "all" || getFinanceStatusKey(entry) === state.financeStatusFilter;
-    const haystack = normalizeSearchText([
-      entry.pekerjaan,
-      entry.pemberiKerja,
-      entry.status,
-      entry.source,
-      entry.personil.join(" "),
-      entry.financeRecords.map(record => Object.values(record).join(" ")).join(" ")
-    ].join(" "));
-    const queryOk = !tokens.length || tokens.every(token => haystack.includes(token));
-    return yearOk && statusOk && queryOk;
-  });
-}
-
-function renderFinanceYearOptions(entries) {
-  const select = document.getElementById("financeYearFilter");
-  if (!select || document.activeElement === select) return;
-  const years = [...new Set(entries.flatMap(entry => String(entry.yearLabel || "").match(/\b(19|20)\d{2}\b/g) || []))]
-    .sort((a, b) => Number(b) - Number(a));
-  const selected = String(state.financeYear || "all");
-  select.innerHTML = ['<option value="all">Semua Tahun</option>', ...years.map(year => `<option value="${year}">${year}</option>`)].join("");
-  select.value = years.includes(selected) ? selected : "all";
-  state.financeYear = select.value;
+function bindFinanceControls() {
+  getFinanceFeature().bindControls();
 }
 
 function renderFinance() {
-  const tableBody = document.getElementById("financeTableBody");
-  if (!tableBody) return;
-  const sheet = getFinanceSheet();
-  const allEntries = buildFinanceEntries();
-  renderFinanceYearOptions(allEntries);
-  const entries = getFilteredFinanceEntries();
-  const linkedCount = allEntries.filter(entry => entry.job).length;
-  const totalNetto = allEntries.reduce((total, entry) => total + entry.netto, 0);
-  const totalTax = allEntries.reduce((total, entry) => total + entry.pajak, 0);
-  const activeBills = allEntries.filter(entry => getFinanceStatusKey(entry) === "billing").length;
-
-  setTextContent("financeKpiJobs", allEntries.length);
-  setTextContent("financeKpiJobsMeta", `${linkedCount} terhubung portofolio`);
-  setTextContent("financeKpiNetto", formatFinanceMoney(totalNetto));
-  setTextContent("financeKpiTax", formatFinanceMoney(totalTax));
-  setTextContent("financeKpiActiveBills", activeBills);
-  setTextContent("financeResultCount", `${entries.length} pekerjaan`);
-  setTextContent("financeSyncText", sheet?.status === "ready"
-    ? `${sheet.records.length} data tersinkron.`
-    : sheet?.status === "loading"
-      ? "Memuat data..."
-      : sheet?.status === "idle"
-        ? "Data belum tersedia. Daftar memakai data Portofolio sebagai kerangka."
-        : "Data belum dapat dibaca. Daftar memakai data Portofolio sebagai kerangka.");
-
-  if (!entries.length) {
-    tableBody.innerHTML = '<tr><td class="personnel-empty" colspan="8">Tidak ada pekerjaan finance yang cocok.</td></tr>';
-  } else {
-    tableBody.innerHTML = entries.map(entry => `
-      <tr class="clickable-row" data-finance-key="${escapeHtml(entry.key)}" tabindex="0">
-        <td data-label="Pekerjaan"><strong>${escapeHtml(entry.pekerjaan)}</strong><small>${escapeHtml(entry.pemberiKerja || entry.source)}</small></td>
-        <td data-label="Progress"><div class="finance-progress"><span style="width:${entry.progress}%"></span></div><small>${entry.progress}%</small></td>
-        <td data-label="Status"><span class="finance-status ${getFinanceStatusKey(entry)}">${escapeHtml(getFinanceStatusLabel(entry))}</span></td>
-        <td data-label="Total Biaya Personil">${formatFinanceMoney(entry.totalBiayaPersonil || entry.totalHarga)}</td>
-        <td data-label="Pajak">${formatFinanceMoney(entry.pajak)}</td>
-        <td data-label="Netto"><strong>${formatFinanceMoney(entry.netto)}</strong></td>
-        <td data-label="Personil">${entry.personil.length || entry.financeRecords.length || 0}</td>
-        <td data-label="Aksi"><button class="text-button" type="button" data-finance-open="${escapeHtml(entry.key)}">Rincian</button></td>
-      </tr>
-    `).join("");
-  }
-  renderFinanceMobile(entries);
-
-  const selected = allEntries.find(entry => entry.key === state.selectedFinanceJobKey);
-  if (selected) renderFinanceDetail(selected);
-}
-
-function renderFinanceMobile(entries) {
-  const container = document.getElementById("financeMobileList");
-  if (!container) return;
-  container.innerHTML = entries.length ? entries.map(entry => `
-    <article class="finance-mobile-card" data-finance-key="${escapeHtml(entry.key)}">
-      <header>
-        <strong>${escapeHtml(entry.pekerjaan)}</strong>
-        <span class="finance-status ${getFinanceStatusKey(entry)}">${escapeHtml(getFinanceStatusLabel(entry))}</span>
-      </header>
-      <div class="finance-mobile-values">
-        <span><small>Netto</small><b>${formatFinanceMoney(entry.netto)}</b></span>
-        <span><small>Progress</small><b>${entry.progress}%</b></span>
-        <span><small>Personil</small><b>${entry.personil.length || entry.financeRecords.length || 0}</b></span>
-      </div>
-      <button class="secondary-button" type="button" data-finance-open="${escapeHtml(entry.key)}">Buka rincian</button>
-    </article>
-  `).join("") : '<p class="portfolio-mobile-empty">Tidak ada pekerjaan finance yang cocok.</p>';
-}
-
-function handleFinanceTableClick(event) {
-  const key = event.target.closest("[data-finance-open]")?.dataset.financeOpen || event.target.closest("tr[data-finance-key]")?.dataset.financeKey;
-  if (!key) return;
-  openFinanceDetail(key);
-}
-
-function handleFinanceMobileClick(event) {
-  const key = event.target.closest("[data-finance-open], [data-finance-key]")?.dataset.financeOpen || event.target.closest("[data-finance-key]")?.dataset.financeKey;
-  if (!key) return;
-  openFinanceDetail(key);
-}
-
-function openFinanceDetail(key) {
-  const entry = buildFinanceEntries().find(item => item.key === key);
-  if (!entry) return notify("Rincian Finance tidak ditemukan.");
-  state.selectedFinanceJobKey = key;
-  renderFinanceDetail(entry);
-}
-
-function getFinanceEntryIdentifier(entry) {
-  return entry?.key || getFinanceJobMatchKey(entry?.pekerjaan || "");
-}
-
-function financeRecordMatchesEntry(record, entry) {
-  const entryId = getFinanceEntryIdentifier(entry);
-  const recordJobId = getFinanceJobMatchKey(getRecordValue(record, ["id pekerjaan", "row key", "id"]));
-  const recordJobName = getFinanceJobMatchKey(getRecordValue(record, ["nama pekerjaan", "pekerjaan"]));
-  const entryJobName = getFinanceJobMatchKey(entry?.pekerjaan || "");
-  return Boolean(
-    (entryId && recordJobId && entryId === recordJobId) ||
-    (entryJobName && recordJobName && entryJobName === recordJobName)
-  );
-}
-
-function getFinanceRelatedRecords(sourceId, entry) {
-  const sheet = getFinanceAuxSheet(sourceId);
-  if (!sheet || sheet.status !== "ready") return [];
-  return (sheet.records || []).filter(record => financeRecordMatchesEntry(record, entry));
-}
-
-function getFinanceTerminPlan(entry) {
-  const contractValue = entry?.nilaiKontrak || 0;
-  const records = getFinanceRelatedRecords("finance-termin", entry);
-  const upfrontRecord = records.find(record => normalizeSearchText(getRecordValue(record, ["tahap pembayaran", "nama termin"])).includes("uang muka"));
-  const upfrontPercent = parseFinanceNumber(getRecordValue(upfrontRecord || {}, ["persentase termin", "persentase", "prosentase", "persen"])) || 0;
-  const upfrontValue = parseFinanceNumber(getRecordValue(upfrontRecord || {}, ["nilai bruto", "nilai termin", "nominal termin", "nilai bersih", "netto"])) ||
-    Math.round(contractValue * upfrontPercent / 100);
-  return records
-    .map((record, index) => {
-      const label = getRecordValue(record, ["tahap pembayaran", "nama termin"]) || `Tahap ${getRecordValue(record, ["termin ke"]) || index + 1}`;
-      const isUpfront = normalizeSearchText(label).includes("uang muka");
-      const percent = parseFinanceNumber(getRecordValue(record, ["persentase termin", "persentase", "prosentase", "persen"])) || 0;
-      const grossValue = parseFinanceNumber(getRecordValue(record, ["nilai bruto", "nilai termin", "nominal termin"])) || Math.round(contractValue * percent / 100);
-      const deductionPercent = isUpfront ? 0 : parseFinanceNumber(getRecordValue(record, ["persentase potongan uang muka", "persentase potongan", "potongan persen"])) || 0;
-      const deduction = parseFinanceNumber(getRecordValue(record, ["potongan uang muka", "potongan"])) ||
-        (deductionPercent ? Math.round(upfrontValue * deductionPercent / 100) : 0);
-      const netValue = parseFinanceNumber(getRecordValue(record, ["nilai bersih", "netto"])) || Math.max(0, grossValue - deduction);
-      return {
-        label,
-        percent,
-        value: netValue,
-        grossValue,
-        deduction,
-        deductionPercent,
-        status: getRecordValue(record, ["status"]) || "Draft",
-        className: ["blue", "purple", "green"][index % 3],
-        record
-      };
-    })
-    .filter(item => item.label || item.percent || item.grossValue || item.value);
-}
-
-function getFinanceTerminPercentTotal(terminPlan) {
-  return terminPlan.reduce((total, item) => total + Number(item.percent || 0), 0);
-}
-
-function getFinanceTerminValueTotal(terminPlan) {
-  return terminPlan.reduce((total, item) => total + Number(item.value || 0), 0);
-}
-
-function formatFinanceDeduction(item) {
-  if (!item?.deduction) return "-";
-  return `${formatFinanceMoney(item.deduction)}${item.deductionPercent ? ` (${item.deductionPercent}%)` : ""}`;
-}
-
-function renderFinanceTerminCard(entry, terminPlan, nilaiKontrak) {
-  const hasStages = terminPlan.length > 0;
-  const terminPercentTotal = getFinanceTerminPercentTotal(terminPlan);
-  const terminGrossTotal = terminPlan.reduce((total, item) => total + Number(item.grossValue || item.value || 0), 0);
-  const terminValueTotal = getFinanceTerminValueTotal(terminPlan);
-  return `
-    <article class="finance-termin-card">
-      <header class="finance-card-title-row">
-        <div>
-          <h3>Skema Termin dan Uang Muka</h3>
-          <p>${hasStages
-            ? "Tahapan pembayaran dihitung dari nilai kontrak dan potongan uang muka."
-            : "Belum ada tahapan pembayaran untuk pekerjaan ini."}</p>
-        </div>
-        <div class="finance-inline-actions">
-          <button class="primary-button" type="button" data-finance-termin-action="add">+ Tambah Tahap</button>
-          <button class="secondary-button" type="button" data-finance-termin-action="template">Pakai Template</button>
-          <button class="secondary-button" type="button" data-finance-termin-action="reset" ${hasStages ? "" : "disabled"}>Reset Skema</button>
-        </div>
-      </header>
-      <div class="finance-termin-kpis">
-        <span><small>Nilai Kontrak</small><strong>${formatFinanceMoney(nilaiKontrak)}</strong></span>
-        <span><small>Tahapan</small><strong>${terminPlan.length}</strong></span>
-        <span><small>Total Bruto</small><strong>${formatFinanceMoney(terminGrossTotal)}</strong></span>
-        <span><small>Total Diterima</small><strong>${formatFinanceMoney(terminValueTotal)}</strong></span>
-      </div>
-      ${hasStages ? `
-        <div class="finance-termin-stack" aria-label="Pembagian termin">
-          ${terminPlan.map(item => `<span class="${item.className}" style="width:${terminPercentTotal ? Math.max(0, item.percent) / terminPercentTotal * 100 : 0}%"><b>${item.percent}%</b></span>`).join("")}
-        </div>
-        <div class="table-wrap finance-termin-table-wrap">
-          <table class="finance-termin-table">
-            <thead>
-              <tr><th>Tahap Pembayaran</th><th>Persentase Termin</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
-            </thead>
-            <tbody>
-              ${terminPlan.map((item, itemIndex) => `
-                <tr>
-                  <td><strong>${escapeHtml(item.label)}</strong></td>
-                  <td>${escapeHtml(item.percent)}%</td>
-                  <td>${formatFinanceMoney(item.grossValue || item.value)}</td>
-                  <td>${formatFinanceDeduction(item)}</td>
-                  <td><strong>${formatFinanceMoney(item.value)}</strong></td>
-                  <td><span class="finance-status ${safeClassToken(item.status)}">${escapeHtml(item.status)}</span></td>
-                  <td>
-                    <button class="text-button" type="button" data-finance-termin-action="edit" data-finance-termin-index="${itemIndex}">Edit</button>
-                    <button class="text-button danger-text" type="button" data-finance-termin-action="delete" data-finance-termin-index="${itemIndex}">Hapus</button>
-                  </td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-        <div class="finance-termin-total-note">Total diterima = ${formatFinanceMoney(terminValueTotal)}${nilaiKontrak ? ` dari nilai kontrak ${formatFinanceMoney(nilaiKontrak)}` : ""}.</div>
-      ` : `
-        <div class="finance-termin-empty">
-          <div class="finance-termin-empty-icon" aria-hidden="true">Rp</div>
-          <strong>Tahapan belum diisi</strong>
-          <p>Tambahkan uang muka, termin, retensi, atau tahap pembayaran lain sesuai kontrak.</p>
-        </div>
-        <div class="finance-termin-rules">
-          <strong>Logika Default</strong>
-          <ul>
-            <li>Pekerjaan baru tidak membuat termin otomatis.</li>
-            <li>Uang muka opsional.</li>
-            <li>Total diterima divalidasi terhadap nilai kontrak.</li>
-            <li>Persentase boleh fleksibel sesuai kontrak.</li>
-          </ul>
-        </div>
-        <div class="table-wrap finance-termin-table-wrap">
-          <table class="finance-termin-table">
-            <thead>
-              <tr><th>Tahap Pembayaran</th><th>Persentase Termin</th><th>Nilai Bruto</th><th>Potongan Uang Muka</th><th>Nilai Bersih</th><th>Status</th><th>Aksi</th></tr>
-            </thead>
-            <tbody><tr><td class="personnel-empty" colspan="7">Belum ada data</td></tr></tbody>
-          </table>
-        </div>
-      `}
-    </article>
-  `;
-}
-
-function renderFinanceDetail(entry) {
-  const panel = document.getElementById("financeDetailPanel");
-  const body = document.getElementById("financeDetailBody");
-  if (!panel || !body) return;
-  panel.classList.remove("hidden");
-  setTextContent("financeDetailTitle", entry.pekerjaan);
-  setTextContent("financeDetailMeta", `${entry.source} - ${getFinanceStatusLabel(entry)} - ${entry.progress}% progress`);
-  const relatedPersonnel = buildFinanceDetailPersonnel(entry);
-  const totalBiayaPersonil = entry.totalBiayaPersonil || entry.totalHarga || 0;
-  const nilaiKontrak = entry.nilaiKontrak || 0;
-  const terminPlan = getFinanceTerminPlan(entry);
-  const terminPercentTotal = getFinanceTerminPercentTotal(terminPlan);
-  const terminValueTotal = getFinanceTerminValueTotal(terminPlan);
-  const terminRemaining = Math.max(0, nilaiKontrak - terminValueTotal);
-  const terminReceiptPercent = nilaiKontrak ? Math.round((terminValueTotal / nilaiKontrak) * 100) : terminPercentTotal;
-  const terminIsBalanced = Boolean(nilaiKontrak && Math.abs(terminValueTotal - nilaiKontrak) <= 1);
-  body.innerHTML = `
-    <section class="finance-summary-groups">
-      <article class="finance-summary-group contract">
-        <header>
-          <div>
-            <span class="section-eyebrow">KONTRAK DAN TERMIN</span>
-          <h3>Nilai Kontrak tersinkron ke termin</h3>
-          </div>
-          <span class="finance-validation-badge ${terminIsBalanced ? "valid" : "warning"}">${terminReceiptPercent}% diterima</span>
-        </header>
-        <div class="finance-detail-kpis finance-contract-kpis">
-          <article class="primary"><span>Nilai Kontrak</span><strong>${formatFinanceMoney(nilaiKontrak)}</strong><small>Dasar perhitungan termin</small></article>
-          <article><span>Total Tahap</span><strong>${terminPercentTotal}%</strong><small>Total persentase bruto</small></article>
-          <article><span>Nilai Termin</span><strong>${formatFinanceMoney(terminValueTotal)}</strong><small>Akumulasi rencana termin</small></article>
-          <article><span>Sisa Alokasi</span><strong>${formatFinanceMoney(terminRemaining)}</strong><small>Terhadap nilai kontrak</small></article>
-        </div>
-      </article>
-      <article class="finance-summary-group personnel-cost">
-        <header>
-          <div>
-            <span class="section-eyebrow">BIAYA PERSONIL</span>
-            <h3>Total biaya personil, PPH 21, dan netto</h3>
-          </div>
-          <span class="finance-validation-badge neutral">${relatedPersonnel.length} personil</span>
-        </header>
-        <div class="finance-detail-kpis finance-personnel-kpis">
-          <article><span>Total Biaya Personil</span><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong><small>Dari rincian personil</small></article>
-          <article><span>PPH 21</span><strong>${formatFinanceMoney(entry.pajak)}</strong><small>Akumulasi pajak personil</small></article>
-          <article><span>Netto</span><strong>${formatFinanceMoney(entry.netto)}</strong><small>Total biaya - PPH 21</small></article>
-          <article><span>Personil</span><strong>${relatedPersonnel.length}</strong><small>Baris personil terkait</small></article>
-        </div>
-      </article>
-    </section>
-    <section class="finance-detail-grid">
-      <article class="finance-summary-card">
-        <header class="finance-card-title-row">
-          <h3>Ringkasan Pekerjaan</h3>
-        </header>
-        <dl>
-          <div><dt>Pemberi Kerja</dt><dd>${escapeHtml(entry.pemberiKerja || "-")}</dd></div>
-          <div><dt>Tanggal Mulai</dt><dd>${escapeHtml(entry.tanggalMulai || "-")}</dd></div>
-          <div><dt>Tanggal Selesai</dt><dd>${escapeHtml(entry.tanggalSelesai || "-")}</dd></div>
-          <div><dt>Status Portofolio</dt><dd>${escapeHtml(entry.status || "-")}</dd></div>
-        </dl>
-      </article>
-      ${renderFinanceTerminCard(entry, terminPlan, nilaiKontrak)}
-    </section>
-    <section class="finance-personnel-value-section">
-      <header class="finance-card-title-row">
-        <h3>Personil dan Nilai</h3>
-        <button class="secondary-button" type="button" data-finance-record-action="add-personnel">+ Tambah Nilai Personil</button>
-      </header>
-      <div class="finance-personnel-cost-strip" aria-label="Ringkasan biaya personil">
-        <span><small>Total Biaya Personil</small><strong>${formatFinanceMoney(totalBiayaPersonil)}</strong></span>
-        <span><small>PPH 21</small><strong>${formatFinanceMoney(entry.pajak)}</strong></span>
-        <span><small>Netto</small><strong>${formatFinanceMoney(entry.netto)}</strong></span>
-      </div>
-      <div class="table-wrap finance-detail-table-wrap">
-        <table class="finance-detail-table">
-          <thead><tr><th>Nama</th><th>Uraian/Jabatan</th><th>Bulan</th><th>Harga Satuan</th><th>Total Biaya</th><th>Pajak PPH 21</th><th>Netto</th><th>Keterangan</th><th>Aksi</th></tr></thead>
-          <tbody>${relatedPersonnel.length ? relatedPersonnel.map((row, rowIndex) => `
-            <tr>
-              <td data-label="Nama"><strong>${escapeHtml(row.nama)}</strong></td>
-              <td data-label="Uraian/Jabatan">${escapeHtml(row.uraian)}</td>
-              <td data-label="Bulan">${escapeHtml(row.bulan)}</td>
-              <td data-label="Harga Satuan">${row.hasFinance ? formatFinanceMoney(row.hargaSatuan) : "-"}</td>
-              <td data-label="Total Biaya">${row.hasFinance ? formatFinanceMoney(row.total) : "-"}</td>
-              <td data-label="Pajak PPH 21">${row.hasFinance ? formatFinanceMoney(row.pajak) : "-"}</td>
-              <td data-label="Netto">${row.hasFinance ? formatFinanceMoney(row.netto) : "-"}</td>
-              <td data-label="Keterangan">${escapeHtml(row.keterangan)}</td>
-              <td data-label="Aksi">${row.record ? `<button class="text-button" type="button" data-finance-record-action="edit" data-finance-record-index="${rowIndex}">Edit Nilai</button><button class="text-button danger-text" type="button" data-finance-record-action="delete" data-finance-record-index="${rowIndex}">Hapus</button>` : `<button class="text-button" type="button" data-finance-record-action="complete" data-finance-record-index="${rowIndex}">Tambah Nilai</button>`}</td>
-            </tr>
-          `).join("") : '<tr><td class="personnel-empty" colspan="9">Belum ada rincian personil Finance untuk pekerjaan ini.</td></tr>'}</tbody>
-        </table>
-      </div>
-    </section>
-  `;
-}
-
-function getFinanceRecordKey(record) {
-  const name = getFinanceRecordPersonName(record);
-  return canonicalPersonnelName(name) || normalizeSearchText(name);
-}
-
-function getPortfolioFinancePersonRows(entry) {
-  const records = entry?.job?.records || [];
-  const rows = [];
-  const seen = new Set();
-  records.forEach(record => {
-    const nama = getRecordValue(record, ["nama personil", "nama lengkap", "nama"]);
-    const key = canonicalPersonnelName(nama) || normalizeSearchText(nama);
-    if (!nama || seen.has(key)) return;
-    seen.add(key);
-    rows.push({
-      key,
-      nama,
-      uraian: getRecordValue(record, [
-        "uraian",
-        "jabatan",
-        "posisi",
-        "posisi/jabatan (kontrak)",
-        "posisi/jabatan"
-      ]) || "Terhubung dari Portofolio/Personil",
-      bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || "-",
-      record
-    });
-  });
-  return rows;
-}
-
-function buildFinanceDetailRowFromRecord(record, fallback = {}) {
-  return {
-    nama: getFinanceRecordPersonName(record) || fallback.nama || "Tanpa nama",
-    uraian: getRecordValue(record, ["uraian", "jabatan", "posisi"]) || fallback.uraian || "-",
-    bulan: getRecordValue(record, ["jumlah bulan", "bulan", "durasi kontrak"]) || fallback.bulan || "-",
-    hargaSatuan: parseFinanceNumber(getRecordValue(record, ["harga satuan", "remunerasi", "rate"])),
-    total: parseFinanceNumber(getRecordValue(record, ["total biaya personil", "total harga", "harga total"])),
-    tarifPajak: getRecordValue(record, ["tarif pajak", "tarif pph 21", "tarif pph", "pph"]),
-    pajak: parseFinanceNumber(getFinancePphTaxValue(record)),
-    netto: parseFinanceNumber(getRecordValue(record, ["netto", "nett", "net"])),
-    keterangan: getRecordValue(record, ["keterangan", "catatan", "note"]) || "-",
-    hasFinance: true,
-    record
-  };
-}
-
-function buildFinanceDetailPersonnel(entry) {
-  const financeByName = new Map();
-  const personnelRecords = (entry.financeRecords || []).filter(isFinancePersonnelRecord);
-  personnelRecords.forEach(record => {
-    const key = getFinanceRecordKey(record);
-    if (key && !financeByName.has(key)) financeByName.set(key, record);
-  });
-
-  const rows = [];
-  const usedFinanceKeys = new Set();
-  getPortfolioFinancePersonRows(entry).forEach(person => {
-    const financeRecord = financeByName.get(person.key);
-    if (financeRecord) {
-      rows.push(buildFinanceDetailRowFromRecord(financeRecord, person));
-      usedFinanceKeys.add(person.key);
-      return;
-    }
-    rows.push({
-      nama: person.nama,
-      uraian: person.uraian,
-      bulan: person.bulan,
-      hargaSatuan: 0,
-      total: 0,
-      tarifPajak: "",
-      pajak: 0,
-      netto: 0,
-      keterangan: "Menunggu rincian finance",
-      hasFinance: false,
-      record: null,
-      seed: person
-    });
-  });
-
-  personnelRecords.forEach(record => {
-    const key = getFinanceRecordKey(record);
-    if (key && usedFinanceKeys.has(key)) return;
-    rows.push(buildFinanceDetailRowFromRecord(record));
-  });
-
-  if (!rows.length) {
-    return (entry.personil || []).map(name => ({
-      nama: name,
-      uraian: "Terhubung dari Portofolio/Personil",
-      bulan: "-",
-      hargaSatuan: 0,
-      total: 0,
-      tarifPajak: "",
-      pajak: 0,
-      netto: 0,
-      keterangan: "Menunggu rincian finance",
-      hasFinance: false,
-      record: null,
-      seed: { nama: name, uraian: "Terhubung dari Portofolio/Personil", bulan: "-" }
-    }));
-  }
-
-  return rows;
+  getFinanceFeature().render();
 }
 
 function resetFinanceFilters() {
-  state.financeSearch = "";
-  state.financeStatusFilter = "all";
-  state.financeYear = "all";
-  const search = document.getElementById("financeSearch");
-  const status = document.getElementById("financeStatusFilter");
-  const year = document.getElementById("financeYearFilter");
-  if (search) search.value = "";
-  if (status) status.value = "all";
-  if (year) year.value = "all";
-  renderFinance();
+  getFinanceFeature().resetFilters();
 }
 
 function toggleFinanceToolsMenu() {
-  const menu = document.getElementById("financeToolsMenu");
-  const button = document.getElementById("financeToolsButton");
-  if (!menu || !button) return;
-  const willOpen = menu.classList.contains("hidden");
-  menu.classList.toggle("hidden", !willOpen);
-  button.setAttribute("aria-expanded", String(willOpen));
+  getFinanceFeature().toggleToolsMenu();
 }
+
 function handleFinanceAction(action) {
-  document.getElementById("financeToolsMenu")?.classList.add("hidden");
-  document.getElementById("financeToolsButton")?.setAttribute("aria-expanded", "false");
-  const entry = buildFinanceEntries().find(item => item.key === state.selectedFinanceJobKey) || getFilteredFinanceEntries()[0] || null;
-  if (action === "add") {
-    openFinanceContractForm(null, entry);
-    return;
-  }
-  const record = getFinanceContractRecord(entry);
-  if (!record) {
-    notify("Nilai kontrak belum ada. Gunakan Tambah untuk membuat data kontrak Finance.");
-    return;
-  }
-  if (action === "edit") openFinanceContractForm(record, entry);
-  if (action === "delete") deleteFinanceRecord(record, entry);
-}
-
-function getFinanceEditableColumns(records = []) {
-  const ignored = new Set(["_Sumber Baris"]);
-  const columns = [];
-  records.forEach(record => {
-    Object.keys(record || {}).forEach(column => {
-      if (!ignored.has(column) && !columns.includes(column)) columns.push(column);
-    });
-  });
-  if (columns.length) return columns;
-  return ["Pekerjaan", "Nama", "Uraian", "Pemberi Kerja", "Nilai Kontrak", "Jumlah Bulan", "Harga Satuan", "Total Biaya Personil", "Tarif Pajak", "Pajak PPH 21", "Netto", "Tanggal Mulai", "Tanggal Selesai", "Durasi Kontrak", "Keterangan"];
-}
-
-const FINANCE_CONTRACT_FIELDS = [
-  { column: "Pekerjaan", aliases: ["pekerjaan", "nama pekerjaan", "project", "proyek"], required: true, full: true },
-  { column: "Nilai Kontrak", aliases: ["nilai kontrak", "kontrak awal", "nilai pekerjaan", "nilai pagu"], required: true },
-  { column: "Pemberi Kerja", aliases: ["pemberi kerja", "instansi", "klien", "owner"] },
-  { column: "Tanggal Mulai", aliases: ["tanggal mulai", "tgl mulai", "mulai"] },
-  { column: "Tanggal Selesai", aliases: ["tanggal selesai", "tgl selesai", "selesai"] },
-  { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
-];
-
-const FINANCE_TERMIN_FIELDS = [
-  { column: "ID", aliases: ["id"] },
-  { column: "ID Pekerjaan", aliases: ["id pekerjaan"], required: true },
-  { column: "Nama Pekerjaan", aliases: ["nama pekerjaan", "pekerjaan"], required: true, full: true },
-  { column: "Termin Ke", aliases: ["termin ke", "termin"] },
-  { column: "Tahap Pembayaran", aliases: ["tahap pembayaran", "nama termin"], required: true },
-  { column: "Persentase Termin", aliases: ["persentase termin", "persentase", "prosentase", "persen"], required: true },
-  { column: "Persentase Potongan Uang Muka", aliases: ["persentase potongan uang muka", "persentase potongan", "potongan persen"] },
-  { column: "Nilai Kontrak", aliases: ["nilai kontrak"], required: true },
-  { column: "Nilai Bruto", aliases: ["nilai bruto", "nilai termin", "nominal termin"] },
-  { column: "Potongan Uang Muka", aliases: ["potongan uang muka", "potongan"] },
-  { column: "Nilai Bersih", aliases: ["nilai bersih", "netto"] },
-  { column: "Status", aliases: ["status"] },
-  { column: "Tanggal Tagihan", aliases: ["tanggal tagihan", "tgl tagihan"] },
-  { column: "Tanggal Bayar", aliases: ["tanggal bayar", "tgl bayar"] },
-  { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
-];
-
-const FINANCE_ADDENDUM_FIELDS = [
-  { column: "ID", aliases: ["id"] },
-  { column: "ID Pekerjaan", aliases: ["id pekerjaan"], required: true },
-  { column: "Nama Pekerjaan", aliases: ["nama pekerjaan", "pekerjaan"], required: true, full: true },
-  { column: "Addendum Ke", aliases: ["addendum ke", "addendum"] },
-  { column: "Nama Addendum", aliases: ["nama addendum"], required: true },
-  { column: "Nilai Kontrak Sebelum", aliases: ["nilai kontrak sebelum"] },
-  { column: "Nilai Addendum", aliases: ["nilai addendum"], required: true },
-  { column: "Nilai Kontrak Baru", aliases: ["nilai kontrak baru"] },
-  { column: "Tanggal Addendum", aliases: ["tanggal addendum", "tgl addendum"] },
-  { column: "Status", aliases: ["status"] },
-  { column: "Keterangan", aliases: ["keterangan", "catatan", "note"], full: true }
-];
-
-function resolveFinanceColumn(columns, field) {
-  const normalizedField = normalizeSearchText(field.column);
-  const aliases = [normalizedField, ...(field.aliases || []).map(normalizeSearchText)];
-  return columns.find(column => aliases.includes(normalizeSearchText(column))) ||
-    columns.find(column => includesAny(normalizeSearchText(column), field.aliases || [])) ||
-    field.column;
-}
-
-function renderFinanceInput(column, value, required, options = {}) {
-  const attributes = [
-    'name="' + escapeHtml(column) + '"',
-    'value="' + escapeHtml(value) + '"',
-    'autocomplete="off"',
-    options.readonly ? 'readonly' : '',
-    options.inputMode ? 'inputmode="' + escapeHtml(options.inputMode) + '"' : '',
-    options.placeholder ? 'placeholder="' + escapeHtml(options.placeholder) + '"' : '',
-    required ? 'required' : ''
-  ].filter(Boolean).join(" ");
-  return '<input ' + attributes + '>';
-}
-
-function getFinanceInputOptions(sourceId, column) {
-  const normalized = normalizeSearchText(column);
-  if (sourceId !== "finance-termin") return {};
-  if (["id", "id pekerjaan", "nama pekerjaan", "nilai kontrak", "nilai bruto", "potongan uang muka", "nilai bersih"].includes(normalized)) {
-    return { readonly: true };
-  }
-  if (includesAny(normalized, ["persentase", "nilai", "termin ke"])) return { inputMode: "decimal" };
-  return {};
-}
-
-function setFinanceSeedValue(target, columns, keywords, value) {
-  if (!value) return;
-  const column = columns.find(item => includesAny(normalizeSearchText(item), keywords));
-  if (column && !target[column]) target[column] = value;
-}
-
-function applyFinanceSeedToRecord(target, columns, seed) {
-  setFinanceSeedValue(target, columns, ["nama"], seed.nama);
-  setFinanceSeedValue(target, columns, ["uraian", "jabatan", "posisi"], seed.uraian);
-  setFinanceSeedValue(target, columns, ["jumlah bulan", "bulan", "durasi kontrak"], seed.bulan);
-}
-
-function makeFinanceLocalId(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`.toUpperCase();
-}
-
-function setFinanceValueByField(target, columns, field, value) {
-  if (value == null || value === "") return;
-  const column = resolveFinanceColumn(columns, field);
-  target[column] = String(value);
-}
-
-function getFinanceColumnsForSource(sourceId, fallbackFields = []) {
-  const sheet = sourceId === "finance" ? getFinanceSheet() : getFinanceAuxSheet(sourceId);
-  const records = sheet?.records || [];
-  const columns = records.length
-    ? getFinanceEditableColumns(records)
-    : fallbackFields.map(field => field.column);
-  fallbackFields.forEach(field => {
-    if (!columns.some(column => normalizeSearchText(column) === normalizeSearchText(field.column))) {
-      columns.push(field.column);
-    }
-  });
-  return columns;
-}
-
-function seedFinanceTerminRecord(entry, terminItem = null) {
-  const columns = getFinanceColumnsForSource("finance-termin", FINANCE_TERMIN_FIELDS);
-  const nextIndex = getFinanceRelatedRecords("finance-termin", entry).length + 1;
-  const sequence = terminItem?.sequence || getRecordValue(terminItem?.record || {}, ["termin ke"]) || nextIndex;
-  const percent = terminItem?.percent || 0;
-  const nilaiKontrak = entry?.nilaiKontrak || 0;
-  const grossValue = terminItem?.grossValue ?? (percent ? Math.round(nilaiKontrak * percent / 100) : "");
-  const deduction = terminItem?.deduction || "";
-  const netValue = terminItem?.value ?? (grossValue ? Math.max(0, Number(grossValue) - Number(deduction || 0)) : "");
-  const seed = {};
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[0], terminItem?.record ? "" : makeFinanceLocalId("TRM"));
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[1], getFinanceEntryIdentifier(entry));
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[2], entry?.pekerjaan || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[3], sequence);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[4], terminItem?.label || `Tahap ${sequence}`);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[5], percent || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[6], terminItem?.deductionPercent || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[7], nilaiKontrak || "");
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[8], grossValue);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[9], deduction);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[10], netValue);
-  setFinanceValueByField(seed, columns, FINANCE_TERMIN_FIELDS[11], terminItem?.status || getRecordValue(terminItem?.record || {}, ["status"]) || "Draft");
-  return seed;
-}
-
-function buildFinanceTerminTemplateRecords(entry) {
-  const nilaiKontrak = Number(entry?.nilaiKontrak || 0);
-  if (!nilaiKontrak) return [];
-  const uangMuka = Math.round(nilaiKontrak * 0.15);
-  const templates = [
-    { sequence: 1, label: "Uang Muka", percent: 15, grossValue: uangMuka, deduction: 0, value: uangMuka, status: "Rencana" },
-    { sequence: 2, label: "Termin 1", percent: 30, deductionPercent: 20, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.20), status: "Rencana" },
-    { sequence: 3, label: "Termin 2", percent: 40, deductionPercent: 40, grossValue: Math.round(nilaiKontrak * 0.40), deduction: Math.round(uangMuka * 0.40), status: "Rencana" },
-    { sequence: 4, label: "Termin 3", percent: 30, deductionPercent: 40, grossValue: Math.round(nilaiKontrak * 0.30), deduction: Math.round(uangMuka * 0.40), status: "Rencana" }
-  ];
-  return templates.map(item => seedFinanceTerminRecord(entry, {
-    ...item,
-    value: item.value ?? Math.max(0, Number(item.grossValue || 0) - Number(item.deduction || 0))
-  }));
-}
-
-function getFinanceDataKey(data, field) {
-  const keys = Object.keys(data || {});
-  const resolved = resolveFinanceColumn(keys, field);
-  return keys.find(key => normalizeSearchText(key) === normalizeSearchText(resolved)) || resolved;
-}
-
-function getFinanceDataByField(data, field) {
-  return data[getFinanceDataKey(data, field)] || "";
-}
-
-function setFinanceDataByField(data, field, value) {
-  const key = getFinanceDataKey(data, field);
-  data[key] = value == null ? "" : String(value);
-}
-
-function getFinanceUpfrontBase(entry, draftData = null) {
-  const draftLabel = draftData ? normalizeSearchText(getFinanceDataByField(draftData, FINANCE_TERMIN_FIELDS[4])) : "";
-  const draftPercent = draftData ? parseFinanceNumber(getFinanceDataByField(draftData, FINANCE_TERMIN_FIELDS[5])) : 0;
-  const draftContract = draftData ? parseFinanceNumber(getFinanceDataByField(draftData, FINANCE_TERMIN_FIELDS[7])) : 0;
-  if (draftLabel.includes("uang muka")) return Math.round(draftContract * draftPercent / 100);
-  const upfront = getFinanceTerminPlan(entry).find(item => normalizeSearchText(item.label).includes("uang muka"));
-  return Number(upfront?.grossValue || upfront?.value || 0);
-}
-
-function applyFinanceTerminCalculatedValues(data, entry) {
-  const contractValue = parseFinanceNumber(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[7])) || Number(entry?.nilaiKontrak || 0);
-  const label = normalizeSearchText(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[4]));
-  const percent = parseFinanceNumber(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[5])) || 0;
-  const deductionPercent = label.includes("uang muka") ? 0 : parseFinanceNumber(getFinanceDataByField(data, FINANCE_TERMIN_FIELDS[6])) || 0;
-  const grossValue = percent ? Math.round(contractValue * percent / 100) : 0;
-  const upfrontBase = getFinanceUpfrontBase(entry, data);
-  const deduction = deductionPercent && upfrontBase ? Math.round(upfrontBase * deductionPercent / 100) : 0;
-  const netValue = Math.max(0, grossValue - deduction);
-  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[7], contractValue || "");
-  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[8], grossValue || "");
-  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[9], deduction || "");
-  setFinanceDataByField(data, FINANCE_TERMIN_FIELDS[10], netValue || "");
-  return data;
-}
-
-function updateFinanceTerminComputedFields() {
-  const form = document.getElementById("financeRecordForm");
-  if (!form || document.getElementById("financeRecordSourceId")?.value !== "finance-termin") return;
-  const data = Object.fromEntries(Array.from(new FormData(form).entries()));
-  applyFinanceTerminCalculatedValues(data, getCurrentFinanceEntry());
-  [FINANCE_TERMIN_FIELDS[7], FINANCE_TERMIN_FIELDS[8], FINANCE_TERMIN_FIELDS[9], FINANCE_TERMIN_FIELDS[10]].forEach(field => {
-    const key = getFinanceDataKey(data, field);
-    const input = form.elements[key];
-    if (input) input.value = data[key] || "";
-  });
+  getFinanceFeature().handleAction(action);
 }
 
 function handleFinanceRecordFormInput() {
-  updateFinanceTerminComputedFields();
-}
-
-function seedFinanceAddendumRecord(entry) {
-  const columns = getFinanceColumnsForSource("finance-addendum", FINANCE_ADDENDUM_FIELDS);
-  const nextIndex = getFinanceRelatedRecords("finance-addendum", entry).length + 1;
-  const nilaiKontrak = entry?.nilaiKontrak || 0;
-  const seed = {};
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[0], makeFinanceLocalId("ADD"));
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[1], getFinanceEntryIdentifier(entry));
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[2], entry?.pekerjaan || "");
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[3], nextIndex);
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[4], `Addendum ${nextIndex}`);
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[5], nilaiKontrak || "");
-  setFinanceValueByField(seed, columns, FINANCE_ADDENDUM_FIELDS[9], "Draft");
-  return seed;
-}
-
-function openFinanceAuxForm({ sourceId, title, entry, record = null, fields, seed = {} }) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
-  const columns = getFinanceColumnsForSource(sourceId, fields);
-  const initialRecord = { ...(record || {}), ...seed };
-  document.getElementById("financeRecordFormTitle").textContent = title;
-  document.getElementById("financeRecordFormSource").textContent = "";
-  document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
-  document.getElementById("financeRecordSourceId").value = sourceId;
-  document.getElementById("financeRecordFormStatus").textContent = "";
-  document.getElementById("financeRecordFormFields").innerHTML = fields.map(field => {
-    const column = resolveFinanceColumn(columns, field);
-    const value = initialRecord[column] || getRecordValue(initialRecord, [field.column, ...(field.aliases || [])]);
-    return '<label class="' + (field.full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, value || "", field.required, getFinanceInputOptions(sourceId, column)) + '</label>';
-  }).join("");
-  document.getElementById("financeRecordFormModal").showModal();
-  updateFinanceTerminComputedFields();
-}
-
-function getFinanceContractRecord(entry) {
-  return (entry?.financeRecords || []).find(record => getFinanceContractValue(record) > 0) ||
-    (entry?.financeRecords || []).find(record => !isFinancePersonnelRecord(record)) ||
-    null;
-}
-
-function openFinanceContractForm(record = null, entry = null) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
-  const sheet = getFinanceSheet();
-  const columns = getFinanceEditableColumns(sheet?.records || []);
-  const initialRecord = { ...(record || {}) };
-  FINANCE_CONTRACT_FIELDS.forEach(field => {
-    const column = resolveFinanceColumn(columns, field);
-    if (!initialRecord[column]) {
-      if (field.column === "Pekerjaan") initialRecord[column] = entry?.pekerjaan || "";
-      if (field.column === "Nilai Kontrak") initialRecord[column] = entry?.nilaiKontrak ? String(entry.nilaiKontrak) : "";
-      if (field.column === "Pemberi Kerja") initialRecord[column] = entry?.pemberiKerja || "";
-      if (field.column === "Tanggal Mulai") initialRecord[column] = entry?.tanggalMulai || "";
-      if (field.column === "Tanggal Selesai") initialRecord[column] = entry?.tanggalSelesai || "";
-    }
-  });
-  document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Kontrak Finance" : "Tambah Nilai Kontrak";
-  document.getElementById("financeRecordFormSource").textContent = "";
-  document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
-  document.getElementById("financeRecordSourceId").value = "finance";
-  document.getElementById("financeRecordFormStatus").textContent = "";
-  document.getElementById("financeRecordFormFields").innerHTML = FINANCE_CONTRACT_FIELDS.map(field => {
-    const column = resolveFinanceColumn(columns, field);
-    return '<label class="' + (field.full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, initialRecord[column] || "", field.required) + '</label>';
-  }).join("");
-  document.getElementById("financeRecordFormModal").showModal();
-}
-
-function openFinanceRecordForm(record = null, entry = null, seed = null) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
-  const sheet = getFinanceSheet();
-  const columns = getFinanceEditableColumns(sheet?.records || []);
-  const jobColumn = columns.find(column => includesAny(normalizeSearchText(column), ["pekerjaan", "nama pekerjaan", "project", "proyek"])) || columns[0];
-  const initialRecord = { ...(record || {}) };
-  if (!record && entry?.pekerjaan && jobColumn) initialRecord[jobColumn] = entry.pekerjaan;
-  if (!record && seed) applyFinanceSeedToRecord(initialRecord, columns, seed);
-  document.getElementById("financeRecordFormTitle").textContent = record ? "Edit Nilai Personil" : "Tambah Nilai Personil";
-  document.getElementById("financeRecordFormSource").textContent = "";
-  document.getElementById("financeRecordRowNumber").value = record?.["_Sumber Baris"] || "";
-  document.getElementById("financeRecordSourceId").value = "finance";
-  document.getElementById("financeRecordFormStatus").textContent = "";
-  document.getElementById("financeRecordFormFields").innerHTML = columns.map((column, index) => {
-    const full = column === jobColumn || includesAny(normalizeSearchText(column), ["keterangan", "catatan"]);
-    return '<label class="' + (full ? 'full' : '') + '"><span>' + escapeHtml(humanizeFieldName(column)) + '</span>' + renderFinanceInput(column, initialRecord[column] || "", column === jobColumn || index === 0) + '</label>';
-  }).join("");
-  document.getElementById("financeRecordFormModal").showModal();
+  getFinanceFeature().handleRecordFormInput();
 }
 
 function closeFinanceRecordForm() {
-  const modal = document.getElementById("financeRecordFormModal");
-  if (modal?.open) modal.close();
+  getFinanceFeature().closeRecordForm();
 }
 
-async function saveFinanceRecord(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const rowNumber = Number(document.getElementById("financeRecordRowNumber").value) || 0;
-  const sourceId = document.getElementById("financeRecordSourceId").value || "finance";
-  let data = Object.fromEntries(Array.from(new FormData(form).entries()).filter(([key]) => key !== "").map(([key, value]) => [key, String(value).trim()]));
-  if (sourceId === "finance-termin") data = applyFinanceTerminCalculatedValues(data, getCurrentFinanceEntry());
-  document.getElementById("financeRecordFormStatus").textContent = "Mengirim perubahan...";
-  document.getElementById("saveFinanceRecordButton").disabled = true;
-  await sendFinanceMutation(rowNumber ? "update" : "add", { rowNumber, data, sourceId, targetSourceId: sourceId });
+function handleFinanceDetailAction(event) {
+  getFinanceFeature().handleDetailAction(event);
 }
 
-async function sendFinanceMutation(action, payload) {
-  if (!window.PERSONNEL_BRIDGE_URL || !window.PERSONNEL_BRIDGE_TOKEN) return notify("Spreadsheet Bridge belum dikonfigurasi.");
-  if (!currentUser) return notify("Silakan login kembali.");
-  try {
-    const firebaseIdToken = await currentUser.getIdToken(true);
-    await fetch(window.PERSONNEL_BRIDGE_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        token: window.PERSONNEL_BRIDGE_TOKEN,
-        firebaseIdToken,
-        action,
-        sourceId: payload.sourceId || "finance",
-        targetSourceId: payload.targetSourceId || payload.sourceId || "finance",
-        rowNumber: payload.rowNumber || 0,
-        data: payload.data || {}
-      })
-    });
-    if (action !== "delete" && !payload.keepFormOpen) closeFinanceRecordForm();
-    if (!payload.silent) notify(action === "delete" ? "Permintaan hapus Finance dikirim ke Google Spreadsheet." : "Data Finance dikirim ke Google Spreadsheet.");
-    if (!payload.skipRefresh) {
-      await new Promise(resolve => window.setTimeout(resolve, 1400));
-      await loadExternalSheetData();
-      refreshCurrentFinanceDetail();
-    }
-  } catch (error) {
-    notify("Data Finance gagal dikirim: " + error.message);
-    const status = document.getElementById("financeRecordFormStatus");
-    if (status) status.textContent = error.message || "Perubahan gagal dikirim.";
-  } finally {
-    const saveButton = document.getElementById("saveFinanceRecordButton");
-    if (saveButton) saveButton.disabled = false;
-  }
+function handleFinanceTableClick(event) {
+  getFinanceFeature().handleTableClick(event);
 }
 
-function getCurrentFinanceEntry() {
-  return buildFinanceEntries().find(item => item.key === state.selectedFinanceJobKey) || null;
-}
-
-function refreshCurrentFinanceDetail() {
-  const panelOpen = !document.getElementById("financeDetailPanel")?.classList.contains("hidden");
-  if (!panelOpen || !state.selectedFinanceJobKey) return;
-  const entry = getCurrentFinanceEntry();
-  if (entry) renderFinanceDetail(entry);
-}
-
-function openFinanceTerminForm(entry, terminItem = null) {
-  const record = terminItem?.record || null;
-  openFinanceAuxForm({
-    sourceId: "finance-termin",
-    title: terminItem ? "Edit Termin" : "Tambah Termin",
-    entry,
-    record,
-    fields: FINANCE_TERMIN_FIELDS,
-    seed: record ? {} : seedFinanceTerminRecord(entry, terminItem)
-  });
-}
-
-function openFinanceAddendumForm(entry, record = null) {
-  openFinanceAuxForm({
-    sourceId: "finance-addendum",
-    title: record ? "Edit Addendum" : "Tambah Addendum",
-    entry,
-    record,
-    fields: FINANCE_ADDENDUM_FIELDS,
-    seed: record ? {} : seedFinanceAddendumRecord(entry)
-  });
-}
-
-async function deleteFinanceAuxRecord(sourceId, record, label) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat menghapus data Finance.")) return;
-  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
-  if (!rowNumber) return notify(`${label} default belum tersimpan di spreadsheet.`);
-  if (!confirm(`Hapus ${label} dari Google Spreadsheet?`)) return;
-  await sendFinanceMutation("delete", { sourceId, targetSourceId: sourceId, rowNumber, data: {} });
-}
-
-async function applyFinanceTerminTemplate(entry) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat mengubah data Finance.")) return;
-  const rows = buildFinanceTerminTemplateRecords(entry);
-  if (!rows.length) return notify("Isi Nilai Kontrak terlebih dahulu sebelum memakai template termin.");
-  const existingRows = getFinanceRelatedRecords("finance-termin", entry).length;
-  if (existingRows && !confirm("Pakai template akan menambahkan tahapan baru di atas data yang sudah ada. Lanjutkan?")) return;
-  for (const data of rows) {
-    await sendFinanceMutation("add", {
-      sourceId: "finance-termin",
-      targetSourceId: "finance-termin",
-      data,
-      silent: true,
-      skipRefresh: true,
-      keepFormOpen: true
-    });
-  }
-  notify("Template termin dikirim ke Google Spreadsheet.");
-  await new Promise(resolve => window.setTimeout(resolve, 1400));
-  await loadExternalSheetData();
-  refreshCurrentFinanceDetail();
-}
-
-async function resetFinanceTerminScheme(entry) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat menghapus data Finance.")) return;
-  const rows = getFinanceRelatedRecords("finance-termin", entry);
-  if (!rows.length) return notify("Belum ada tahapan termin untuk direset.");
-  const rowsWithNumbers = rows.filter(row => Number(row?.["_Sumber Baris"]) > 0);
-  if (rowsWithNumbers.length !== rows.length) return notify("Sebagian tahapan belum memiliki nomor baris spreadsheet. Refresh data lalu coba lagi.");
-  if (!confirm("Reset skema akan menghapus semua tahapan termin pekerjaan ini dari Google Spreadsheet. Lanjutkan?")) return;
-  for (const record of rowsWithNumbers) {
-    await sendFinanceMutation("delete", {
-      sourceId: "finance-termin",
-      targetSourceId: "finance-termin",
-      rowNumber: Number(record["_Sumber Baris"]),
-      data: {},
-      silent: true,
-      skipRefresh: true
-    });
-  }
-  notify("Skema termin direset di Google Spreadsheet.");
-  await new Promise(resolve => window.setTimeout(resolve, 1400));
-  await loadExternalSheetData();
-  refreshCurrentFinanceDetail();
-}
-
-async function handleFinanceDetailAction(event) {
-  const terminButton = event.target.closest("[data-finance-termin-action]");
-  if (terminButton) {
-    const entry = getCurrentFinanceEntry();
-    if (!entry) return notify("Rincian Finance tidak ditemukan.");
-    const action = terminButton.dataset.financeTerminAction;
-    const terminPlan = getFinanceTerminPlan(entry);
-    const selectedTermin = terminPlan[Number(terminButton.dataset.financeTerminIndex)] || null;
-    if (action === "add") openFinanceTerminForm(entry);
-    if (action === "addendum") openFinanceAddendumForm(entry);
-    if (action === "template") await applyFinanceTerminTemplate(entry);
-    if (action === "reset") await resetFinanceTerminScheme(entry);
-    if (action === "edit") openFinanceTerminForm(entry, selectedTermin);
-    if (action === "delete") await deleteFinanceAuxRecord("finance-termin", selectedTermin?.record, "Termin");
-    return;
-  }
-  const button = event.target.closest("[data-finance-record-action]");
-  if (!button) return;
-  const entry = getCurrentFinanceEntry();
-  if (!entry) return notify("Rincian Finance tidak ditemukan.");
-  if (button.dataset.financeRecordAction === "add-personnel") {
-    openFinanceRecordForm(null, entry);
-    return;
-  }
-  const row = buildFinanceDetailPersonnel(entry)[Number(button.dataset.financeRecordIndex)];
-  const record = row?.record;
-  if (button.dataset.financeRecordAction === "complete") {
-    openFinanceRecordForm(null, entry, row?.seed || row);
-    return;
-  }
-  if (!record) return notify("Rincian Finance tidak ditemukan.");
-  if (button.dataset.financeRecordAction === "edit") openFinanceRecordForm(record, entry);
-  if (button.dataset.financeRecordAction === "delete") deleteFinanceRecord(record, entry);
-}
-
-async function deleteFinanceRecord(record, entry = null) {
-  if (!requirePermission(canManagePersonnel(), "Hanya Super Admin, Editor, atau Author yang dapat menghapus data Finance.")) return;
-  const rowNumber = Number(record?.["_Sumber Baris"]) || 0;
-  if (!rowNumber) return notify("Nomor baris Finance tidak ditemukan.");
-  const name = getFinanceRecordPersonName(record) || getFinanceRecordJobName(record) || "baris ini";
-  if (!confirm('Hapus rincian Finance "' + name + '" dari Google Spreadsheet?')) return;
-  await sendFinanceMutation("delete", { rowNumber, data: {} });
+function handleFinanceMobileClick(event) {
+  getFinanceFeature().handleMobileClick(event);
 }
 
 function renderStats() {
@@ -6752,347 +4623,75 @@ function renderTasksTable() {
   body.querySelectorAll("[data-action]").forEach(button => bindTaskAction(button));
 }
 
-function renderReports() {
-  renderReportsWorkspace();
+let reportsFeature = null;
 
-  const list = document.getElementById("reportsList");
-  if (!list) return;
-  list.innerHTML = state.reports.length
-    ? state.reports.map((report, index) => `
-      <article class="report-item">
-        <div class="report-item-header">
-          <strong>Laporan ${index + 1}</strong>
-          <span>${escapeHtml(state.today)}</span>
-        </div>
-        <pre>${escapeHtml(report)}</pre>
-      </article>
-    `).join("")
-    : '<p>Belum ada laporan. Klik "Generate Preview" lalu simpan laporan hari ini.</p>';
+function getReportsFeature() {
+  if (!reportsFeature) {
+    reportsFeature = createReportsFeature({
+      state,
+      notify,
+      requirePermission,
+      canCreateReports,
+      getFilteredTasks,
+      buildUnifiedAiSnapshot,
+      buildPeopleDirectory,
+      buildStats,
+      buildJobsFromAllSources,
+      getPortfolioCounts,
+      getFilteredTenders,
+      getAllIntegratedPersonnelRecords,
+      getPortfolioStatusLabel,
+      getJobYearLabel,
+      getRecordValue,
+      getPersonnelName,
+      getPersonnelStatus,
+      getPersonnelPosition,
+      getPersonnelAccumulation,
+      normalizeSearchText,
+      formatHumanDate,
+      getToday,
+      setTextContent,
+      escapeHtml,
+      printHtmlDocument
+    });
+  }
+  return reportsFeature;
+}
+
+function bindReportsControls() {
+  getReportsFeature().bindControls();
+}
+
+function renderReports() {
+  getReportsFeature().render();
 }
 
 function renderReportsWorkspace() {
-  const preview = document.getElementById("reportsWorkspacePreview");
-  if (!preview) return;
-
-  prepareReportFilters();
-  const model = buildReportPreviewModel();
-  updateReportSummaryCards(model);
-  renderReportPreviewModel(model);
-}
-
-function prepareReportFilters() {
-  const start = document.getElementById("reportsStartDate");
-  const end = document.getElementById("reportsEndDate");
-  if (start && !start.value) start.value = state.today;
-  if (end && !end.value) end.value = state.today;
-
-  const personSelect = document.getElementById("reportsPerson");
-  if (!personSelect) return;
-  const currentValue = personSelect.value || "all";
-  const snapshot = buildReportsSnapshot();
-  const people = new Map();
-  (snapshot.personnel || []).forEach(record => {
-    const name = getPersonnelName(record);
-    const key = normalizeSearchText(name);
-    if (name && key && !people.has(key)) people.set(key, name);
-  });
-  state.tasks.forEach(task => {
-    const name = task.penanggungJawab || "";
-    const key = normalizeSearchText(name);
-    if (name && key && !people.has(key)) people.set(key, name);
-  });
-
-  personSelect.innerHTML = '<option value="all">Semua personil</option>' +
-    [...people.values()]
-      .sort((a, b) => a.localeCompare(b, "id"))
-      .map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
-      .join("");
-  personSelect.value = [...personSelect.options].some(option => option.value === currentValue) ? currentValue : "all";
-}
-
-function buildReportsSnapshot() {
-  const tasks = state.tasks.map(task => ({ ...task, terlambat: isOverdue(task) }));
-  return buildUnifiedAiSnapshot(tasks, buildPeopleDirectory(tasks));
-}
-
-function getReportFilterValues() {
-  return {
-    type: document.getElementById("reportsType")?.value || "daily",
-    startDate: document.getElementById("reportsStartDate")?.value || state.today,
-    endDate: document.getElementById("reportsEndDate")?.value || state.today,
-    source: document.getElementById("reportsSource")?.value || "all",
-    status: document.getElementById("reportsStatus")?.value || "all",
-    person: document.getElementById("reportsPerson")?.value || "all"
-  };
-}
-
-function buildReportPreviewModel() {
-  const snapshot = buildReportsSnapshot();
-  const filters = getReportFilterValues();
-  const tasks = filterReportTasks(snapshot.tasks || [], filters);
-  const jobs = filterReportJobs(snapshot.jobs || [], filters);
-  const tenders = filterReportTenders(snapshot.tenders || [], filters);
-  const personnel = filterReportPersonnel(snapshot.personnel || [], filters);
-  const stats = buildStats(tasks);
-  const portfolioCounts = getPortfolioCounts(jobs);
-  const activePersonnel = personnel.filter(record => Number(getPersonnelActiveWork(record)) > 0);
-  const lateTasks = tasks.filter(task => task.terlambat);
-  const priorityTasks = tasks.filter(task => ["Tinggi", "Mendesak"].includes(task.prioritas));
-  const urgentTenders = tenders.filter(tender => tender.deadline && normalizeSearchText(tender.deadline) !== "-");
-
-  const typeLabels = {
-    daily: "Laporan Harian",
-    progress: "Laporan Progres Pekerjaan",
-    tender: "Laporan Tender",
-    personnel: "Laporan Personil",
-    portfolio: "Laporan Portofolio"
-  };
-
-  const summary = [
-    `${lateTasks.length} tugas terlambat`,
-    `${portfolioCounts.tender} pekerjaan tender`,
-    `${portfolioCounts.active} pekerjaan aktif`,
-    `${activePersonnel.length} personil memiliki pekerjaan aktif`
-  ];
-
-  const sections = [
-    {
-      title: "Ringkasan eksekutif",
-      text: summary.join(", ") + "."
-    },
-    {
-      title: "Fokus prioritas",
-      text: priorityTasks.slice(0, 4).map(task => task.namaTugas).join(", ") ||
-        jobs.filter(job => getPortfolioStatusKey(job) !== "finish").slice(0, 4).map(job => job.pekerjaan).join(", ") ||
-        "Belum ada prioritas khusus pada filter ini."
-    },
-    {
-      title: "Tugas",
-      text: `Total ${stats.total}, selesai ${stats.selesai}, proses ${stats.proses}, belum selesai ${stats.belumSelesai}, terlambat ${stats.terlambat}.`
-    },
-    {
-      title: "Pekerjaan dan portofolio",
-      text: `${portfolioCounts.total} pekerjaan: ${portfolioCounts.active} aktif, ${portfolioCounts.finish} finish, ${portfolioCounts.tender} tender, ${portfolioCounts.upcoming} upcoming.`
-    },
-    {
-      title: "Tender",
-      text: `${tenders.length} paket dipantau. ${urgentTenders.length} paket memiliki deadline yang perlu diperhatikan.`
-    },
-    {
-      title: "Personil",
-      text: `${personnel.length} personil terbaca. ${activePersonnel.length} personil memiliki pekerjaan aktif.`
-    },
-    {
-      title: "Catatan sistem",
-      text: "Data disusun dari Firebase, Apps Script Bridge, Google Spreadsheet cache, dan data sesi browser."
-    }
-  ];
-
-  const rawText = [
-    typeLabels[filters.type] || "Laporan",
-    `Periode: ${formatHumanDate(filters.startDate)} - ${formatHumanDate(filters.endDate)}`,
-    `Sumber: ${getReportSourceLabel(filters.source)}`,
-    `Status: ${getReportStatusLabel(filters.status)}`,
-    `Personil: ${filters.person === "all" ? "Semua personil" : filters.person}`,
-    "",
-    ...sections.flatMap(section => [section.title.toUpperCase(), section.text, ""])
-  ].join("\n").trim();
-
-  return {
-    title: typeLabels[filters.type] || "Laporan",
-    filters,
-    stats,
-    portfolioCounts,
-    sections,
-    rawText,
-    counts: {
-      todayReports: state.reports.length,
-      doneActivities: stats.selesai + portfolioCounts.finish,
-      late: stats.terlambat,
-      tender: portfolioCounts.tender || tenders.length,
-      activePersonnel: activePersonnel.length
-    }
-  };
-}
-
-function filterReportTasks(tasks, filters) {
-  return tasks.filter(task => {
-    const taskDate = task.tanggal || String(task.deadline || "").slice(0, 10);
-    const matchesDate = !taskDate || (taskDate >= filters.startDate && taskDate <= filters.endDate);
-    const matchesSource = filters.source === "all" || filters.source === "tasks";
-    const matchesPerson = filters.person === "all" || normalizeSearchText(task.penanggungJawab).includes(normalizeSearchText(filters.person));
-    const matchesStatus = filters.status === "all" ||
-      (filters.status === "active" && task.status !== "Selesai") ||
-      (filters.status === "finish" && task.status === "Selesai");
-    return matchesDate && matchesSource && matchesPerson && matchesStatus;
-  });
-}
-
-function filterReportJobs(jobs, filters) {
-  if (!(filters.source === "all" || filters.source === "jobs")) return [];
-  return jobs.filter(job => {
-    const matchesStatus = filters.status === "all" || jobMatchesStatusFilter(job, filters.status);
-    const matchesPerson = filters.person === "all" || getAiJobPersonnelNames(job)
-      .some(name => normalizeSearchText(name).includes(normalizeSearchText(filters.person)));
-    return matchesStatus && matchesPerson;
-  });
-}
-
-function filterReportTenders(tenders, filters) {
-  if (!(filters.source === "all" || filters.source === "tenders")) return [];
-  return tenders.filter(tender => {
-    const matchesPerson = filters.person === "all" || normalizeSearchText([
-      tender.penanggungJawab,
-      tender.personil
-    ].join(" ")).includes(normalizeSearchText(filters.person));
-    return matchesPerson;
-  });
-}
-
-function filterReportPersonnel(personnel, filters) {
-  if (!(filters.source === "all" || filters.source === "personnel")) return [];
-  return personnel.filter(record => {
-    const matchesPerson = filters.person === "all" || normalizeSearchText(getPersonnelName(record)).includes(normalizeSearchText(filters.person));
-    return matchesPerson;
-  });
-}
-
-function updateReportSummaryCards(model) {
-  const setText = (id, value) => {
-    const element = document.getElementById(id);
-    if (element) element.textContent = value;
-  };
-  setText("reportsStatToday", model.counts.todayReports);
-  setText("reportsStatDone", model.counts.doneActivities);
-  setText("reportsStatLate", model.counts.late);
-  setText("reportsStatTender", model.counts.tender);
-  setText("reportsStatPersonnel", model.counts.activePersonnel);
-}
-
-function renderReportPreviewModel(model) {
-  const title = document.getElementById("reportsPreviewTitle");
-  const preview = document.getElementById("reportsWorkspacePreview");
-  if (title) title.textContent = `Preview ${model.title}`;
-  if (!preview) return;
-
-  preview.innerHTML = model.sections.map(section => `
-    <article class="report-preview-block">
-      <span>${escapeHtml(section.title)}</span>
-      <p>${escapeHtml(section.text)}</p>
-    </article>
-  `).join("");
-
-  const dashboardPreview = document.getElementById("reportPreview");
-  if (dashboardPreview) dashboardPreview.textContent = model.sections.slice(0, 3)
-    .map(section => `${section.title}: ${section.text}`)
-    .join("\n\n");
+  getReportsFeature().renderWorkspace();
 }
 
 function generateReportPreview(saveToHistory = false) {
-  if (!requirePermission(canCreateReports(), "Role Anda hanya dapat melihat laporan.")) return;
-  const model = buildReportPreviewModel();
-  renderReportPreviewModel(model);
-  if (saveToHistory) {
-    state.reports.unshift(model.rawText);
-    renderReports();
-    notify("Laporan berhasil dibuat dari data terbaru.");
-  }
+  getReportsFeature().generatePreview(saveToHistory);
 }
 
 function resetReportFilters() {
-  const fields = {
-    reportsType: "daily",
-    reportsStartDate: state.today,
-    reportsEndDate: state.today,
-    reportsSource: "all",
-    reportsStatus: "all",
-    reportsPerson: "all"
-  };
-  Object.entries(fields).forEach(([id, value]) => {
-    const field = document.getElementById(id);
-    if (field) field.value = value;
-  });
-  renderReportsWorkspace();
+  getReportsFeature().resetFilters();
 }
 
 function applyReportTemplate(type) {
-  const field = document.getElementById("reportsType");
-  if (field) field.value = type;
-  renderReportsWorkspace();
-}
-
-function getCurrentReportModel() {
-  const model = buildReportPreviewModel();
-  renderReportPreviewModel(model);
-  return model;
+  getReportsFeature().applyTemplate(type);
 }
 
 function exportReportExcel() {
-  const model = getCurrentReportModel();
-  const html = buildReportExportHtml(model);
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `laporan-${state.today}.xls`;
-  link.click();
-  URL.revokeObjectURL(url);
+  getReportsFeature().exportExcel();
 }
 
 function exportReportPdf() {
-  printHtmlDocument(buildReportExportHtml(getCurrentReportModel()));
+  getReportsFeature().exportPdf();
 }
 
 function printReportPreview() {
-  printHtmlDocument(buildReportExportHtml(getCurrentReportModel()));
-}
-
-function buildReportExportHtml(model) {
-  return `
-    <html>
-      <head>
-        <title>${escapeHtml(model.title)}</title>
-        <style>
-          body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
-          h1 { margin: 0 0 6px; font-size: 22px; }
-          .meta { color: #64748b; margin-bottom: 18px; }
-          table { border-collapse: collapse; width: 100%; font-size: 12px; }
-          th { background: #2563eb; color: #fff; text-align: left; }
-          th, td { border: 1px solid #cbd5e1; padding: 9px; vertical-align: top; }
-        </style>
-      </head>
-      <body>
-        <h1>${escapeHtml(model.title)}</h1>
-        <div class="meta">Periode ${escapeHtml(formatHumanDate(model.filters.startDate))} - ${escapeHtml(formatHumanDate(model.filters.endDate))}</div>
-        <table>
-          <thead><tr><th>Bagian</th><th>Isi Laporan</th></tr></thead>
-          <tbody>
-            ${model.sections.map(section => `<tr><td><strong>${escapeHtml(section.title)}</strong></td><td>${escapeHtml(section.text)}</td></tr>`).join("")}
-          </tbody>
-        </table>
-      </body>
-    </html>
-  `;
-}
-
-function getReportSourceLabel(value) {
-  return {
-    all: "Tugas, Tender, Personil, Portofolio",
-    tasks: "Tugas",
-    jobs: "Pekerjaan / Portofolio",
-    tenders: "Tender",
-    personnel: "Personil"
-  }[value] || value;
-}
-
-function getReportStatusLabel(value) {
-  return {
-    all: "Semua status",
-    active: "Aktif / Ongoing",
-    finish: "Finish",
-    tender: "Tender",
-    upcoming: "Upcoming"
-  }[value] || value;
+  getReportsFeature().printPreview();
 }
 
 function renderRecipients() {

@@ -1,0 +1,237 @@
+.settings-grid { display: grid; grid-template-columns: minmax(300px, 0.85fr) minmax(420px, 1.15fr); gap: 16px; }
+.check-row { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #ffffff; color: var(--text); }
+.check-row input { width: auto; box-shadow: none; }
+
+.storage-panel { min-width: 0; }
+
+.access-summary-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.access-summary-panel > div {
+  display: grid;
+  gap: 5px;
+}
+
+.access-summary-panel h2,
+.access-summary-panel p { margin: 0; }
+.access-summary-panel > small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.role-management-panel {
+  grid-column: 1 / -1;
+}
+
+.system-config-panel {
+  grid-column: 1 / -1;
+}
+
+.system-config-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.system-config-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.system-config-form footer,
+.menu-visibility-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.config-status {
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.menu-visibility-table {
+  min-width: 900px;
+}
+
+.menu-visibility-table th,
+.menu-visibility-table td {
+  text-align: center;
+}
+
+.menu-visibility-table th:first-child,
+.menu-visibility-table td:first-child {
+  min-width: 150px;
+  text-align: left;
+}
+
+.menu-visibility-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  box-shadow: none;
+}
+
+.role-assignment-form {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) minmax(190px, 0.65fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 18px 0 10px;
+}
+
+.role-assignment-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.role-management-note {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.role-table { min-width: 720px; }
+.role-table td:first-child { min-width: 230px; }
+.danger-text { color: var(--red); }
+.protected-role-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.role-super_admin {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.role-admin {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.role-editor,
+.role-author,
+.role-contributor {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+.storage-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.storage-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.storage-item > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.storage-item p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.storage-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 7px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.firebase-storage-icon { background: #f59e0b; }
+.drive-storage-icon { background: #16a34a; }
+.sheets-storage-icon {
+  background: #e8f5ec;
+  color: #188038;
+}
+
+.sheet-storage-copy {
+  min-width: 0;
+  width: 100%;
+}
+
+.sheet-source-status {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sheet-status-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sheet-status-row strong {
+  font-size: 11px;
+  color: var(--text);
+}
+
+.sheet-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.sheet-status-dot.ready { background: #16a34a; }
+.sheet-status-dot.loading { background: #2563eb; }
+.sheet-status-dot.error { background: #dc2626; }
+.sheet-status-dot.idle { background: #94a3b8; }
+
+.drive-link {
+  width: fit-content;
+  margin-top: 3px;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #e8f5e9;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.drive-link:hover {
+  background: #dcfce7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
